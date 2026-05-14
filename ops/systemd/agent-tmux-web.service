@@ -1,0 +1,19 @@
+[Unit]
+Description=Agent Tmux Web
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/dev/agent-tmux-web
+Environment=HOST=127.0.0.1
+Environment=PORT=6174
+Environment=CODEX_APP_SERVER_PORT=43117
+Environment=CLI_WEB_DEFAULT_CWD=%h
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env pnpm start
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

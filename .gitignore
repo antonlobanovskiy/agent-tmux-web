@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+.vite/
+
+.env
+.env.*
+!.env.example
+
+*.log
+*.pid
+*.sock
+
+uploads/
+.DS_Store
