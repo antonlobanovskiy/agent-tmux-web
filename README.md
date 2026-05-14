@@ -163,13 +163,17 @@ systemctl --user enable --now agent-tmux-web.service
 
 ## Security Notes
 
+- This repository is just the application code. Publishing or cloning it does
+  not expose anyone's running server, tmux sessions, uploads, `.env`, auth token,
+  or local systemd service.
 - Do not expose this app directly to the public internet.
 - Treat browser access as terminal access to the server user running the app.
 - Use a VPN, SSH tunnel, or authenticated reverse proxy.
 - Set `AGENT_TMUX_WEB_AUTH_TOKEN` if the app can be reached by anyone else.
 - Uploads are temporary by default and are cleaned on startup and hourly.
-- Do not commit local `.env` files, uploads, build output, or service files with
-  real IPs, usernames, tokens, or private paths.
+- Keep each deployment separate from the repo: do not commit local `.env` files,
+  uploads, build output, generated logs, or service files with real IPs,
+  usernames, tokens, or private paths.
 
 ## License
 

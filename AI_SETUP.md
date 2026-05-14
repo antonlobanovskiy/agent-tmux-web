@@ -21,6 +21,10 @@ the control surface.
 Do not expose it directly to the public internet. Treat access to this app as
 terminal access to the server user running it.
 
+Publishing or cloning this repository does not expose the maintainer's server,
+tmux sessions, uploads, `.env`, auth token, or local service files. Each
+deployment is separate. Keep user-specific runtime config out of git.
+
 ## Assistant Checklist
 
 1. Inspect the repository.
