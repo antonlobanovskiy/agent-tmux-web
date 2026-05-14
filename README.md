@@ -63,6 +63,11 @@ The session keeps running either way.
 
 ## Setup
 
+For AI-assisted setup, point your assistant at [AI_SETUP.md](./AI_SETUP.md) and
+ask it to install Agent Tmux Web on your server. That file is written as a
+step-by-step checklist for getting the app running privately and verifying tmux,
+launchers, raw mode, uploads, and notifications.
+
 ```bash
 git clone <your-agent-tmux-web-repo-url>
 cd agent-tmux-web
