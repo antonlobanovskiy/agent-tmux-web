@@ -127,7 +127,8 @@ deployment is separate. Keep user-specific runtime config out of git.
    - Send a short prompt through the input.
    - Attach Raw mode, then detach and confirm tmux size is restored.
    - Enable browser notifications with the bell button if the user wants done
-     alerts.
+     alerts. Use HTTPS or localhost; most mobile browsers block notification
+     prompts on plain HTTP LAN/Tailscale origins.
    - Confirm uploads use a temporary server path and are not kept forever.
 
 10. Handoff summary.
@@ -149,6 +150,8 @@ deployment is separate. Keep user-specific runtime config out of git.
 - Raw terminal acts resized after detach: detach from the UI, then check for
   active tmux clients with `tmux list-clients`.
 - Notifications do not fire: browser permission must be granted from the bell
-  button, and the app must see a send/run action before it watches for idle.
+  button, and the app must see a send/run action before it watches for idle. On
+  Brave mobile, also check Android app notifications and Brave site settings for
+  the app origin, then reload and tap the bell again.
 - CLI launcher does nothing: verify the command exists in the server user's
   `PATH`, not just in an interactive shell.

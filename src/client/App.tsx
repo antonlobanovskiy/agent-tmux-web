@@ -42,6 +42,7 @@ import {
 import { parseTmuxChatOutput, splitTmuxChatMessage, type TmuxChatMessage } from "./tmuxGui.js";
 import { shouldAutoCaptureTmux, TMUX_CAPTURE_POLL_INTERVAL_MS, TMUX_SEND_FOLLOW_DELAYS_MS } from "./tmuxFollow.js";
 import { looksLikeTmuxWaitingForInput } from "./tmuxActivity.js";
+import { canShowBrowserNotifications, getBrowserNotificationAvailability, getBrowserNotificationSnapshot } from "./browserNotifications.js";
 
 type TimelineEntry = {
   id: string;
@@ -730,14 +731,22 @@ export function App() {
       return;
     }
 
-    if (!supportsBrowserNotifications()) {
-      setTerminalStatus("browser notifications unavailable");
+    const availability = getBrowserNotificationAvailability();
+    if (!availability.available) {
+      setTerminalStatus(availability.message);
       return;
     }
 
-    const permission = Notification.permission === "default"
-      ? await Notification.requestPermission()
-      : Notification.permission;
+    let permission: NotificationPermission;
+    try {
+      permission = Notification.permission === "default"
+        ? await Notification.requestPermission()
+        : Notification.permission;
+    } catch {
+      setTerminalStatus("browser blocked notification prompt");
+      return;
+    }
+
     if (permission === "granted") {
       setTmuxNotificationsEnabled(true);
       writeTmuxNotificationPreference(true);
@@ -747,7 +756,11 @@ export function App() {
 
     setTmuxNotificationsEnabled(false);
     writeTmuxNotificationPreference(false);
-    setTerminalStatus("browser notifications blocked");
+    const nextAvailability = getBrowserNotificationAvailability({
+      ...getBrowserNotificationSnapshot(),
+      permission
+    });
+    setTerminalStatus(nextAvailability.available ? "browser notifications not enabled" : nextAvailability.message);
   }
 
   function sendRawTerminalData(data: string) {
@@ -1481,12 +1494,8 @@ function buildTmuxToolCommandPreview(tool: TmuxToolDto, modeIds: string[]): stri
   return [tool.command.trim(), ...args].filter(Boolean).join(" ");
 }
 
-function supportsBrowserNotifications(): boolean {
-  return typeof window !== "undefined" && "Notification" in window;
-}
-
 function readTmuxNotificationPreference(): boolean {
-  if (!supportsBrowserNotifications() || Notification.permission !== "granted") {
+  if (!canShowBrowserNotifications()) {
     return false;
   }
   try {
@@ -1508,7 +1517,7 @@ function writeTmuxNotificationPreference(enabled: boolean) {
 }
 
 function showTmuxDoneNotification(session: string, label: string) {
-  if (!supportsBrowserNotifications() || Notification.permission !== "granted") {
+  if (!canShowBrowserNotifications()) {
     return;
   }
 

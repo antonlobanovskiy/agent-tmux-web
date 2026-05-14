@@ -148,6 +148,12 @@ session and notifies when the captured pane looks ready for input again. While a
 watched task is active, capture polling can continue even if the browser tab is
 hidden.
 
+Mobile browsers usually require a secure browser context for notifications. Use
+HTTPS, localhost, or an installed/private browser context that your browser
+treats as secure. If Brave says notifications are blocked, enable notifications
+for the Brave app in Android settings, then allow notifications for this site in
+Brave's site settings and reload the app.
+
 ## systemd
 
 `ops/systemd/agent-tmux-web.service` is an example user service. Before installing
