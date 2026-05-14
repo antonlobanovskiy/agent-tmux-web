@@ -1,12 +1,45 @@
 # Agent Tmux Web
 
-Mobile-friendly browser control panel for long-running terminal agent CLIs inside
-tmux. It can launch and control Codex, Claude Code, or any other command-line
-tool available on the server.
+Run long-lived Codex, Claude, Gemini, and custom terminal agents from your phone
+without keeping an SSH client open.
 
-The app is designed for private-network access from a phone, laptop, or desktop.
-Tailscale works out of the box if it is installed, but any VPN, SSH tunnel,
-reverse proxy, or LAN binding can be used.
+Terminal agents are powerful, but they are awkward on mobile: SSH sessions resize
+panes, disconnects break the flow, file upload is clumsy, and switching between
+multiple agent sessions takes too much ceremony. Agent Tmux Web keeps the real
+work inside tmux on your server and gives your phone or desktop a focused browser
+control surface.
+
+Use the normalized chat view when you want readable CLI output. Attach to raw
+tmux when you need exact terminal behavior, arrow keys, Ctrl-C, or a full TUI.
+The session keeps running either way.
+
+## Demo
+
+![Agent Tmux Web showcase](./docs/assets/agent-tmux-web-showcase.gif)
+
+[MP4 showcase](./docs/assets/agent-tmux-web-showcase.mp4)
+
+## What It Solves
+
+- Keeps terminal agents alive on the server even if your browser disconnects.
+- Makes active tmux sessions visible and switchable from mobile.
+- Launches `codex --yolo`, Claude, Gemini, or custom commands in the selected
+  tmux session.
+- Gives you both a readable chat-style transcript and raw tmux attach mode.
+- Uploads files from Android, iOS, or desktop browsers to temporary server paths
+  you can paste into prompts.
+- Works over Tailscale, a VPN, an SSH tunnel, a LAN bind, or a private reverse
+  proxy.
+
+## Screenshots
+
+![Mobile chat view](./docs/assets/mobile-chat.png)
+
+![Mobile launcher menu](./docs/assets/mobile-launchers.png)
+
+![Raw tmux terminal mode](./docs/assets/mobile-raw-terminal.png)
+
+![Desktop overview](./docs/assets/desktop-overview.png)
 
 ## Features
 
@@ -22,20 +55,6 @@ reverse proxy, or LAN binding can be used.
 - Optionally starts the Codex app-server for Codex-specific thread/model/skill
   APIs. The tmux workflow works without it.
 
-## Demo
-
-![Mobile animated demo](./docs/assets/agent-tmux-web-mobile-demo.gif)
-
-[MP4 demo](./docs/assets/agent-tmux-web-mobile-demo.mp4)
-
-![Mobile chat view](./docs/assets/mobile-chat.png)
-
-![Mobile launcher menu](./docs/assets/mobile-launchers.png)
-
-![Raw tmux terminal mode](./docs/assets/mobile-raw-terminal.png)
-
-![Desktop overview](./docs/assets/desktop-overview.png)
-
 ## Requirements
 
 - Node.js 22+
@@ -45,22 +64,38 @@ reverse proxy, or LAN binding can be used.
   script
 - Optional: Tailscale or another private network path to the server
 
-## Run
+## Setup
 
 ```bash
+git clone <your-agent-tmux-web-repo-url>
+cd agent-tmux-web
 pnpm install
+cp .env.example .env
 pnpm build
 HOST=127.0.0.1 PORT=6174 pnpm start
 ```
 
-Bind `HOST` to the interface you want to expose:
+Open `http://127.0.0.1:6174` in a browser on the same machine.
+
+For phone access, bind `HOST` to a private interface and use a private network
+path:
 
 - `127.0.0.1` for local-only or SSH tunnel use.
 - A Tailscale IP such as `100.x.y.z` for tailnet-only access.
 - `0.0.0.0` only behind a firewall, VPN, or authenticated reverse proxy.
 
-When exposing the app beyond a trusted private network, set
-`AGENT_TMUX_WEB_AUTH_TOKEN` and pass `?token=...` in the URL.
+When anyone else can reach the bind address, set `AGENT_TMUX_WEB_AUTH_TOKEN` and
+open the app with `?token=...`:
+
+```bash
+HOST=100.x.y.z PORT=6174 AGENT_TMUX_WEB_AUTH_TOKEN=change-me pnpm start
+```
+
+Then open:
+
+```text
+http://100.x.y.z:6174/?token=change-me
+```
 
 ## Configuration
 
