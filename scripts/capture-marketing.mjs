@@ -89,6 +89,12 @@ try {
   await delay(250);
   await capture(pageCdp, path.join(assetsDir, "mobile-claude.png"));
 
+  await evaluate(pageCdp, "document.querySelector('.tmux-session-menu-button')?.click()");
+  await delay(250);
+  await evaluate(pageCdp, "document.querySelector('[aria-label=\"Attach raw tmux terminal\"]')?.click()");
+  await delay(350);
+  await capture(pageCdp, path.join(assetsDir, "mobile-raw-terminal.png"));
+
   await setViewport(pageCdp, 1440, 900, false);
   await pageCdp.send("Page.navigate", { url: demoUrl });
   await delay(1000);
@@ -111,7 +117,8 @@ try {
         }
       })()
     `),
-    async () => evaluate(pageCdp, "document.querySelector('[aria-label=\"Show terminal capture\"], [aria-label=\"Show GUI chat\"]')?.click()")
+    async () => evaluate(pageCdp, "document.querySelector('.tmux-session-menu-button')?.click()"),
+    async () => evaluate(pageCdp, "document.querySelector('[aria-label=\"Attach raw tmux terminal\"]')?.click()")
   ]) {
     await step();
     await delay(350);
@@ -137,6 +144,20 @@ try {
     "-movflags",
     "+faststart",
     path.join(assetsDir, "agent-tmux-web-mobile-demo.mp4")
+  ]);
+
+  await run("ffmpeg", [
+    "-y",
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-framerate",
+    "6",
+    "-i",
+    path.join(framesDir, "frame-%03d.png"),
+    "-filter_complex",
+    "fps=6,scale=390:-1:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5",
+    path.join(assetsDir, "agent-tmux-web-mobile-demo.gif")
   ]);
 
   await rm(framesDir, { recursive: true, force: true });

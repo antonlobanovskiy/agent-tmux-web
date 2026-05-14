@@ -24,11 +24,15 @@ reverse proxy, or LAN binding can be used.
 
 ## Demo
 
-<video src="./docs/assets/agent-tmux-web-mobile-demo.mp4" controls></video>
+![Mobile animated demo](./docs/assets/agent-tmux-web-mobile-demo.gif)
+
+[MP4 demo](./docs/assets/agent-tmux-web-mobile-demo.mp4)
 
 ![Mobile chat view](./docs/assets/mobile-chat.png)
 
 ![Mobile launcher menu](./docs/assets/mobile-launchers.png)
+
+![Raw tmux terminal mode](./docs/assets/mobile-raw-terminal.png)
 
 ![Desktop overview](./docs/assets/desktop-overview.png)
 

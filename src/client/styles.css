@@ -675,6 +675,23 @@ textarea:focus {
   background: #0d0f10;
 }
 
+.tmux-terminal-demo {
+  overflow: auto;
+  padding: 12px;
+  color: #d8dee2;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tmux-terminal-demo pre {
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
 .tmux-terminal .xterm {
   height: 100%;
   padding: 10px;

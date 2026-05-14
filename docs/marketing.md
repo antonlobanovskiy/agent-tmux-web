@@ -22,10 +22,12 @@ or a private reverse proxy.
 
 ## Assets
 
+- Mobile animated demo: `docs/assets/agent-tmux-web-mobile-demo.gif`
 - Mobile demo video: `docs/assets/agent-tmux-web-mobile-demo.mp4`
 - Mobile chat screenshot: `docs/assets/mobile-chat.png`
 - Mobile launcher menu: `docs/assets/mobile-launchers.png`
 - Mobile Claude launcher: `docs/assets/mobile-claude.png`
+- Raw tmux mode screenshot: `docs/assets/mobile-raw-terminal.png`
 - Desktop overview: `docs/assets/desktop-overview.png`
 
 Regenerate assets with:

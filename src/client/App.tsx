@@ -113,6 +113,22 @@ const DEMO_TMUX_OUTPUT = [
   "",
   "  agent demo · ~/workspace/project"
 ].join("\n");
+const DEMO_RAW_TERMINAL_OUTPUT = [
+  "$ tmux attach -t agent-demo",
+  "agent-demo:0.0  390x844  raw browser terminal",
+  "",
+  "$ claude",
+  "",
+  "Claude Code  /workspace/project",
+  "> /status",
+  "connected: tmux session agent-demo",
+  "keys: Esc Tab Ctrl-C Ctrl-D Ctrl-L arrows Enter",
+  "",
+  "> Review mobile captures and README",
+  "Working... use Ctrl-C to stop or detach to keep it running.",
+  "",
+  "agent-demo $"
+].join("\n");
 
 export function App() {
   const [status, setStatus] = useState<AppStatus | null>(demoMode ? DEMO_STATUS : null);
@@ -331,6 +347,9 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (demoMode) {
+      return;
+    }
     if (!terminalActive || !selectedTmux || !terminalHostRef.current) {
       return;
     }
@@ -624,7 +643,7 @@ export function App() {
       clearTmuxFollowTimers(tmuxFollowTimersRef);
       setTmuxGuiActive(false);
       setTerminalStatus(`live terminal for ${selectedTmux}`);
-      setTerminalActive(false);
+      setTerminalActive(true);
       return;
     }
     clearTmuxFollowTimers(tmuxFollowTimersRef);
@@ -658,6 +677,10 @@ export function App() {
   }
 
   function sendRawTerminalData(data: string) {
+    if (demoMode && terminalActive) {
+      setTerminalStatus(`sent ${describeTerminalKey(data)} to ${selectedTmux}`);
+      return;
+    }
     const socket = terminalSocketRef.current;
     if (!terminalActive || !socket || socket.readyState !== WebSocket.OPEN) {
       setTerminalStatus("raw terminal not connected");
@@ -1164,7 +1187,11 @@ export function App() {
             </button>
             <span>{terminalStatus || selectedTmux || "no session selected"}</span>
           </div>
-          {terminalActive ? (
+          {terminalActive && demoMode ? (
+            <div className="tmux-terminal tmux-terminal-demo">
+              <pre>{DEMO_RAW_TERMINAL_OUTPUT}</pre>
+            </div>
+          ) : terminalActive ? (
             <div ref={terminalHostRef} className="tmux-terminal" />
           ) : tmuxGuiActive ? (
             <TmuxChatView ref={tmuxChatRef} messages={tmuxChatMessages} onScroll={handleTmuxOutputScroll} />
@@ -1306,6 +1333,20 @@ async function uploadFileToServer(file: File): Promise<UploadedFileDto> {
 function formatUploadedFilesForPrompt(files: UploadedFileDto[]): string {
   const label = files.length === 1 ? "Attached file on server" : "Attached files on server";
   return `${label}: ${files.map((file) => file.path).join(" ")}`;
+}
+
+function describeTerminalKey(data: string): string {
+  if (data === "\x1b") return "Esc";
+  if (data === "\t") return "Tab";
+  if (data === "\x03") return "Ctrl-C";
+  if (data === "\x04") return "Ctrl-D";
+  if (data === "\x0c") return "Ctrl-L";
+  if (data === "\r") return "Enter";
+  if (data === "\x1b[A") return "Up";
+  if (data === "\x1b[B") return "Down";
+  if (data === "\x1b[C") return "Right";
+  if (data === "\x1b[D") return "Left";
+  return "key";
 }
 
 function handleWsPayload(
