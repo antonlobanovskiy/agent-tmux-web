@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUp,
+  Bell,
   Bot,
   ChevronRight,
   CircleStop,
@@ -40,6 +41,7 @@ import {
 } from "./slashCommands.js";
 import { parseTmuxChatOutput, splitTmuxChatMessage, type TmuxChatMessage } from "./tmuxGui.js";
 import { shouldAutoCaptureTmux, TMUX_CAPTURE_POLL_INTERVAL_MS, TMUX_SEND_FOLLOW_DELAYS_MS } from "./tmuxFollow.js";
+import { looksLikeTmuxWaitingForInput } from "./tmuxActivity.js";
 
 type TimelineEntry = {
   id: string;
@@ -66,8 +68,16 @@ type WsPayload = {
   notification?: unknown;
 };
 
+type TmuxTaskWatch = {
+  label: string;
+  notified: boolean;
+  startedAt: number;
+};
+
 const defaultCwd = "";
 const TMUX_TERMINAL_SUBMIT_DELAY_MS = 350;
+const TMUX_DONE_NOTIFICATION_MIN_MS = 2500;
+const TMUX_NOTIFICATION_STORAGE_KEY = "agent-tmux-web.notify";
 const demoMode = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("demo");
 const DEMO_STATUS: AppStatus = {
   bindHost: "127.0.0.1",
@@ -88,7 +98,7 @@ const DEMO_TMUX_SESSIONS: TmuxSessionDto[] = [
   { name: "infra-check", windows: 2, created: "Thu May 14 09:20:00 2026", attached: false }
 ];
 const DEMO_TMUX_TOOLS: TmuxToolDto[] = [
-  { id: "codex", label: "Codex", command: "codex --yolo", defaultSessionName: "codex" },
+  { id: "codex", label: "Codex", command: "codex", defaultSessionName: "codex", modes: [{ id: "yolo", label: "Yolo", args: "--yolo" }] },
   { id: "claude", label: "Claude", command: "claude", defaultSessionName: "claude" },
   { id: "gemini", label: "Gemini", command: "gemini", defaultSessionName: "gemini" }
 ];
@@ -153,11 +163,13 @@ export function App() {
   const [error, setError] = useState("");
   const [newTmuxName, setNewTmuxName] = useState("agent");
   const [selectedTmuxTool, setSelectedTmuxTool] = useState("codex");
+  const [selectedTmuxToolModes, setSelectedTmuxToolModes] = useState<Record<string, string[]>>({});
   const [customTmuxCommand, setCustomTmuxCommand] = useState("");
   const [slashIndex, setSlashIndex] = useState(0);
   const [terminalActive, setTerminalActive] = useState(false);
   const [tmuxGuiActive, setTmuxGuiActive] = useState(demoMode);
   const [tmuxMenuOpen, setTmuxMenuOpen] = useState(false);
+  const [tmuxNotificationsEnabled, setTmuxNotificationsEnabled] = useState(readTmuxNotificationPreference);
   const [uploadingTmuxFiles, setUploadingTmuxFiles] = useState(false);
   const [terminalStatus, setTerminalStatus] = useState(demoMode ? "gui view for agent-demo" : "");
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -170,6 +182,7 @@ export function App() {
   const tmuxOutputRef = useRef<HTMLPreElement | null>(null);
   const tmuxChatRef = useRef<HTMLDivElement | null>(null);
   const tmuxFollowTimersRef = useRef<number[]>([]);
+  const tmuxTaskWatchRef = useRef<Record<string, TmuxTaskWatch>>({});
   const tmuxStickToBottomRef = useRef(true);
   const forceTmuxScrollBottomRef = useRef(false);
 
@@ -188,6 +201,13 @@ export function App() {
   const slashQuery = useMemo(() => slashQueryForMessage(message, composerCaret), [composerCaret, message]);
   const slashMatches = useMemo(() => slashQuery ? filterSlashCommands(slashQuery.query) : [], [slashQuery]);
   const tmuxChatMessages = useMemo(() => parseTmuxChatOutput(tmuxOutput), [tmuxOutput]);
+  const currentTmuxTool = useMemo(() => tmuxTools.find((tool) => tool.id === selectedTmuxTool) ?? null, [selectedTmuxTool, tmuxTools]);
+  const currentTmuxToolModeIds = useMemo(() => currentTmuxTool
+    ? selectedTmuxToolModes[currentTmuxTool.id] ?? defaultTmuxToolModeIds(currentTmuxTool)
+    : [], [currentTmuxTool, selectedTmuxToolModes]);
+  const currentTmuxToolCommand = useMemo(() => currentTmuxTool
+    ? buildTmuxToolCommandPreview(currentTmuxTool, currentTmuxToolModeIds)
+    : "", [currentTmuxTool, currentTmuxToolModeIds]);
 
   const baseUrl = useMemo(() => {
     if (!status) {
@@ -240,6 +260,28 @@ export function App() {
     setSelectedTmux((current) => current || result.data.find((session) => session.attached)?.name || result.data[0]?.name || "");
   }, []);
 
+  const markTmuxTaskStarted = useCallback((session: string, label: string) => {
+    tmuxTaskWatchRef.current[session] = {
+      label,
+      notified: false,
+      startedAt: Date.now()
+    };
+  }, []);
+
+  const maybeNotifyTmuxDone = useCallback((session: string, output: string) => {
+    const watch = tmuxTaskWatchRef.current[session];
+    if (!tmuxNotificationsEnabled || !watch || watch.notified) {
+      return;
+    }
+    if (Date.now() - watch.startedAt < TMUX_DONE_NOTIFICATION_MIN_MS || !looksLikeTmuxWaitingForInput(output)) {
+      return;
+    }
+
+    watch.notified = true;
+    showTmuxDoneNotification(session, watch.label);
+    setTerminalStatus(`${session} is waiting for input`);
+  }, [tmuxNotificationsEnabled]);
+
   const loadTmuxTools = useCallback(async () => {
     if (demoMode) {
       setTmuxTools(DEMO_TMUX_TOOLS);
@@ -261,7 +303,8 @@ export function App() {
     }
     const result = await api<{ output: string }>(`/api/tmux/capture?session=${encodeURIComponent(session)}&lines=220`);
     setTmuxOutput(result.output);
-  }, [selectedTmux]);
+    maybeNotifyTmuxDone(session, result.output);
+  }, [maybeNotifyTmuxDone, selectedTmux]);
 
   useEffect(() => {
     loadStatus().catch(reportError(setError));
@@ -311,13 +354,15 @@ export function App() {
     }
 
     const interval = window.setInterval(() => {
-      if (shouldAutoCaptureTmux({ selectedTmux, terminalActive, documentHidden: document.hidden })) {
+      const watchedTask = tmuxTaskWatchRef.current[selectedTmux];
+      const keepWatchingHidden = tmuxNotificationsEnabled && watchedTask && !watchedTask.notified;
+      if (shouldAutoCaptureTmux({ selectedTmux, terminalActive, documentHidden: document.hidden && !keepWatchingHidden })) {
         captureTmux(selectedTmux).catch(reportError(setError));
       }
     }, TMUX_CAPTURE_POLL_INTERVAL_MS);
 
     return () => window.clearInterval(interval);
-  }, [captureTmux, selectedTmux, terminalActive]);
+  }, [captureTmux, selectedTmux, terminalActive, tmuxNotificationsEnabled]);
 
   useEffect(() => {
     if (demoMode) {
@@ -548,6 +593,7 @@ export function App() {
       return;
     }
 
+    markTmuxTaskStarted(session, "Tmux task");
     if (sendTmuxViaTerminal(session, text)) {
       setTmuxInput("");
       if (tmuxInputRef.current) {
@@ -676,6 +722,34 @@ export function App() {
     void captureTmux(selectedTmux).catch(reportError(setError));
   }
 
+  async function toggleTmuxNotifications() {
+    if (tmuxNotificationsEnabled) {
+      setTmuxNotificationsEnabled(false);
+      writeTmuxNotificationPreference(false);
+      setTerminalStatus("browser notifications off");
+      return;
+    }
+
+    if (!supportsBrowserNotifications()) {
+      setTerminalStatus("browser notifications unavailable");
+      return;
+    }
+
+    const permission = Notification.permission === "default"
+      ? await Notification.requestPermission()
+      : Notification.permission;
+    if (permission === "granted") {
+      setTmuxNotificationsEnabled(true);
+      writeTmuxNotificationPreference(true);
+      setTerminalStatus("browser notifications on");
+      return;
+    }
+
+    setTmuxNotificationsEnabled(false);
+    writeTmuxNotificationPreference(false);
+    setTerminalStatus("browser notifications blocked");
+  }
+
   function sendRawTerminalData(data: string) {
     if (demoMode && terminalActive) {
       setTerminalStatus(`sent ${describeTerminalKey(data)} to ${selectedTmux}`);
@@ -756,8 +830,8 @@ export function App() {
       return;
     }
 
-    const tool = tmuxTools.find((entry) => entry.id === selectedTmuxTool);
-    const command = selectedTmuxTool === "custom" ? customTmuxCommand.trim() : tool?.command ?? "";
+    const tool = currentTmuxTool;
+    const command = selectedTmuxTool === "custom" ? customTmuxCommand.trim() : currentTmuxToolCommand;
     if (!command) {
       setError("Enter a CLI command to launch.");
       return;
@@ -772,12 +846,14 @@ export function App() {
       return;
     }
 
+    markTmuxTaskStarted(selectedTmux, tool?.label ?? command);
     const result = await api<{ output: string }>("/api/tmux/open-tool", {
       method: "POST",
       body: JSON.stringify({
         session: selectedTmux,
         toolId: selectedTmuxTool === "custom" ? undefined : selectedTmuxTool,
-        command
+        command,
+        modeIds: selectedTmuxTool === "custom" ? [] : currentTmuxToolModeIds
       })
     });
     setTmuxOutput(result.output);
@@ -785,6 +861,23 @@ export function App() {
     setTmuxGuiActive(false);
     setTmuxMenuOpen(false);
     setTerminalStatus(`started ${tool?.label ?? command} in ${selectedTmux}`);
+  }
+
+  function toggleSelectedTmuxToolMode(modeId: string) {
+    if (!currentTmuxTool) {
+      return;
+    }
+
+    setSelectedTmuxToolModes((current) => {
+      const existing = current[currentTmuxTool.id] ?? defaultTmuxToolModeIds(currentTmuxTool);
+      const next = existing.includes(modeId)
+        ? existing.filter((entry) => entry !== modeId)
+        : [...existing, modeId];
+      return {
+        ...current,
+        [currentTmuxTool.id]: next
+      };
+    });
   }
 
   function selectTmuxSession(session: string) {
@@ -1153,12 +1246,26 @@ export function App() {
               <input
                 aria-label="Custom CLI command"
                 disabled={selectedTmuxTool !== "custom"}
-                value={selectedTmuxTool === "custom" ? customTmuxCommand : tmuxTools.find((tool) => tool.id === selectedTmuxTool)?.command ?? ""}
+                value={selectedTmuxTool === "custom" ? customTmuxCommand : currentTmuxToolCommand}
                 onChange={(event) => setCustomTmuxCommand(event.target.value)}
                 placeholder="command"
               />
               <button aria-label="Start CLI tool in selected tmux session" title="Start CLI tool in selected tmux session" type="button" disabled={!selectedTmux} onClick={() => openSelectedTmuxTool().catch(reportError(setError))}><TerminalIcon size={15} /> Run</button>
             </div>
+            {selectedTmuxTool !== "custom" && currentTmuxTool?.modes?.length ? (
+              <div className="tmux-tool-modes" aria-label="CLI tool modes">
+                {currentTmuxTool.modes.map((mode) => (
+                  <label key={mode.id}>
+                    <input
+                      checked={currentTmuxToolModeIds.includes(mode.id)}
+                      onChange={() => toggleSelectedTmuxToolMode(mode.id)}
+                      type="checkbox"
+                    />
+                    <span>{mode.label}</span>
+                  </label>
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
         <div className="tmux-workspace">
@@ -1184,6 +1291,16 @@ export function App() {
             >
               {terminalActive ? <X size={15} /> : <Keyboard size={15} />}
               <span>{terminalActive ? "Detach" : "Raw"}</span>
+            </button>
+            <button
+              aria-label={tmuxNotificationsEnabled ? "Disable browser notifications" : "Enable browser notifications"}
+              className={tmuxNotificationsEnabled ? "active" : ""}
+              title={tmuxNotificationsEnabled ? "Disable browser notifications" : "Enable browser notifications"}
+              type="button"
+              onClick={() => toggleTmuxNotifications().catch(reportError(setError))}
+            >
+              <Bell size={15} />
+              <span>Notify</span>
             </button>
             <span>{terminalStatus || selectedTmux || "no session selected"}</span>
           </div>
@@ -1333,6 +1450,60 @@ async function uploadFileToServer(file: File): Promise<UploadedFileDto> {
 function formatUploadedFilesForPrompt(files: UploadedFileDto[]): string {
   const label = files.length === 1 ? "Attached file on server" : "Attached files on server";
   return `${label}: ${files.map((file) => file.path).join(" ")}`;
+}
+
+function defaultTmuxToolModeIds(tool: TmuxToolDto): string[] {
+  return tool.modes?.filter((mode) => mode.defaultEnabled).map((mode) => mode.id) ?? [];
+}
+
+function buildTmuxToolCommandPreview(tool: TmuxToolDto, modeIds: string[]): string {
+  const modeIdSet = new Set(modeIds);
+  const args = tool.modes
+    ?.filter((mode) => modeIdSet.has(mode.id))
+    .map((mode) => mode.args.trim())
+    .filter(Boolean) ?? [];
+  return [tool.command.trim(), ...args].filter(Boolean).join(" ");
+}
+
+function supportsBrowserNotifications(): boolean {
+  return typeof window !== "undefined" && "Notification" in window;
+}
+
+function readTmuxNotificationPreference(): boolean {
+  if (!supportsBrowserNotifications() || Notification.permission !== "granted") {
+    return false;
+  }
+  try {
+    return window.localStorage.getItem(TMUX_NOTIFICATION_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeTmuxNotificationPreference(enabled: boolean) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(TMUX_NOTIFICATION_STORAGE_KEY, enabled ? "1" : "0");
+  } catch {
+    // Some private browser modes block localStorage; notification permission still applies.
+  }
+}
+
+function showTmuxDoneNotification(session: string, label: string) {
+  if (!supportsBrowserNotifications() || Notification.permission !== "granted") {
+    return;
+  }
+
+  try {
+    new Notification(`${session} is waiting`, {
+      body: `${label} finished and is waiting for input.`,
+      tag: `agent-tmux-web-${session}`
+    });
+  } catch {
+    // Browsers can still reject notifications after permission changes.
+  }
 }
 
 function describeTerminalKey(data: string): string {

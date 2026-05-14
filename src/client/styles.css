@@ -644,9 +644,36 @@ textarea:focus {
   margin: 0 0 10px;
 }
 
+.tmux-tool-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -2px 0 10px;
+}
+
+.tmux-tool-modes label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid #343b40;
+  border-radius: 8px;
+  background: #202428;
+  color: #dbe2e5;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tmux-tool-modes input {
+  width: 14px;
+  height: 14px;
+  accent-color: #54b399;
+}
+
 .tmux-terminal-toolbar {
   display: grid;
-  grid-template-columns: auto auto auto minmax(0, 1fr);
+  grid-template-columns: auto auto auto auto minmax(0, 1fr);
   gap: 8px;
   align-items: center;
   margin: 10px 0;
@@ -990,7 +1017,7 @@ textarea:focus {
 
   .tmux-terminal-toolbar {
     flex: none;
-    grid-template-columns: 38px 38px 38px minmax(0, 1fr);
+    grid-template-columns: 38px 38px 38px 38px minmax(0, 1fr);
     margin: 0 0 4px;
   }
 

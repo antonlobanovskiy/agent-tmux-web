@@ -19,6 +19,7 @@ uploads over a private network path.
 - Launch Codex, Claude Code, Gemini, or custom commands.
 - Switch between normalized chat capture and raw tmux terminal mode.
 - Upload files from Android or desktop browsers to temporary server paths.
+- Browser notifications can alert when an active tmux task returns to input.
 - Designed for private networks, not public internet exposure.
 
 ## Assets
@@ -26,7 +27,9 @@ uploads over a private network path.
 - Showcase GIF: `docs/assets/agent-tmux-web-showcase.gif`
 - Showcase MP4: `docs/assets/agent-tmux-web-showcase.mp4`
 - Showcase poster: `docs/assets/agent-tmux-web-showcase-poster.png`
+- Compact modes overview: `docs/assets/modes-overview.png`
 - Mobile chat screenshot: `docs/assets/mobile-chat.png`
+- Mobile TTY screenshot: `docs/assets/mobile-tty.png`
 - Mobile launcher menu: `docs/assets/mobile-launchers.png`
 - Mobile Claude launcher: `docs/assets/mobile-claude.png`
 - Raw tmux mode screenshot: `docs/assets/mobile-raw-terminal.png`

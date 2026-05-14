@@ -81,8 +81,15 @@ describe("tmux command builders", () => {
       {
         id: "codex",
         label: "Codex",
-        command: "codex --yolo",
-        defaultSessionName: "codex"
+        command: "codex",
+        defaultSessionName: "codex",
+        modes: [
+          {
+            id: "yolo",
+            label: "Yolo",
+            args: "--yolo"
+          }
+        ]
       },
       {
         id: "claude",
@@ -96,7 +103,7 @@ describe("tmux command builders", () => {
   it("parses configured generic tmux tools from JSON", () => {
     expect(parseTmuxTools(JSON.stringify([
       { label: "Gemini CLI", command: "gemini", defaultSessionName: "gemini work" },
-      { id: "claude-plan", label: "Claude Plan", command: "claude --permission-mode plan" }
+      { id: "claude-plan", label: "Claude Plan", command: "claude", modes: [{ label: "Plan", args: "--permission-mode plan", defaultEnabled: true }] }
     ]))).toEqual([
       {
         id: "gemini-cli",
@@ -107,24 +114,36 @@ describe("tmux command builders", () => {
       {
         id: "claude-plan",
         label: "Claude Plan",
-        command: "claude --permission-mode plan",
-        defaultSessionName: "claude-plan"
+        command: "claude",
+        defaultSessionName: "claude-plan",
+        modes: [
+          {
+            id: "plan",
+            label: "Plan",
+            args: "--permission-mode plan",
+            defaultEnabled: true
+          }
+        ]
       }
     ]);
   });
 
-  it("builds a yolo Codex command for opening inside tmux", () => {
+  it("builds a plain Codex command for opening inside tmux", () => {
     expect(
       buildCodexTmuxCommand({
         cwd: "/workspace/project",
         model: "gpt-5.5"
       })
-    ).toBe("codex --yolo");
+    ).toBe("codex");
   });
 
   it("builds a generic CLI tool command for opening inside tmux", () => {
     expect(buildTmuxToolCommand({ command: "claude" })).toBe("claude");
     expect(buildTmuxToolCommand({ command: "gemini --sandbox" })).toBe("gemini --sandbox");
+    expect(buildTmuxToolCommand({
+      command: "codex",
+      modes: [{ id: "yolo", label: "Yolo", args: "--yolo" }]
+    }, ["yolo"])).toBe("codex --yolo");
   });
 
   it("builds kill-session args for destroying a tmux session", () => {

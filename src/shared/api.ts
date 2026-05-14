@@ -29,6 +29,12 @@ export type TmuxToolDto = {
   label: string;
   command: string;
   defaultSessionName: string;
+  modes?: Array<{
+    id: string;
+    label: string;
+    args: string;
+    defaultEnabled?: boolean;
+  }>;
 };
 
 export type UploadedFileDto = {

@@ -232,8 +232,9 @@ app.post("/api/tmux/open-tool", asyncHandler(async (req, res) => {
   const configuredTool = requestedToolId
     ? listTmuxTools().find((tool) => tool.id === requestedToolId)
     : null;
+  const modeIds = stringArray(body.modeIds);
   const command = configuredTool?.command ?? requireString(body.command, "command");
-  await openTmuxTool(session, { command });
+  await openTmuxTool(session, configuredTool ?? { command }, configuredTool ? modeIds : []);
   res.json({
     ok: true,
     output: await captureTmuxPane(session, 220)
@@ -593,6 +594,10 @@ function requireString(value: unknown, name: string): string {
     throw new Error(`Missing required field: ${name}`);
   }
   return result;
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.flatMap((entry) => stringOrNull(entry) ?? []) : [];
 }
 
 function buildUserInput(text: string, skills: unknown) {

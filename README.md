@@ -23,7 +23,7 @@ The session keeps running either way.
 
 - Keeps terminal agents alive on the server even if your browser disconnects.
 - Makes active tmux sessions visible and switchable from mobile.
-- Launches `codex --yolo`, Claude, Gemini, or custom commands in the selected
+- Launches Codex, Claude, Gemini, or custom commands in the selected
   tmux session.
 - Gives you both a readable chat-style transcript and raw tmux attach mode.
 - Uploads files from Android, iOS, or desktop browsers to temporary server paths
@@ -31,25 +31,22 @@ The session keeps running either way.
 - Works over Tailscale, a VPN, an SSH tunnel, a LAN bind, or a private reverse
   proxy.
 
-## Screenshots
+## Modes
 
-![Mobile chat view](./docs/assets/mobile-chat.png)
-
-![Mobile launcher menu](./docs/assets/mobile-launchers.png)
-
-![Raw tmux terminal mode](./docs/assets/mobile-raw-terminal.png)
-
-![Desktop overview](./docs/assets/desktop-overview.png)
+<img src="./docs/assets/modes-overview.png" alt="GUI, TTY, and raw tmux modes" width="760">
 
 ## Features
 
 - Lists tmux sessions and switches between them.
 - Creates and destroys tmux sessions.
 - Launches configured CLI tools inside the selected tmux session.
-- Ships with default launchers for `codex --yolo` and `claude`.
+- Ships with default launchers for Codex and Claude.
 - Supports custom launch commands from the UI.
+- Supports optional per-tool mode toggles for flags such as Codex Yolo mode.
 - Captures tmux panes as either terminal text or a normalized chat-style view.
 - Attaches a raw browser terminal to tmux for exact native CLI behavior.
+- Can send browser notifications when the selected tmux session returns to an
+  input prompt after a send/run action.
 - Uploads files from Android/desktop browsers to a temporary server path and
   inserts that path into the prompt.
 - Optionally starts the Codex app-server for Codex-specific thread/model/skill
@@ -106,7 +103,9 @@ Useful variables:
 - `HOST`: HTTP bind host. Defaults to `127.0.0.1`.
 - `PORT`: HTTP port. Defaults to `6174`.
 - `CLI_WEB_DEFAULT_CWD`: working directory used for new tmux sessions.
-- `CLI_WEB_TOOLS`: JSON array of launchers shown in the tmux menu.
+- `CLI_WEB_TOOLS`: JSON array of launchers shown in the tmux menu. Each
+  launcher can define optional `modes`; each enabled mode appends its `args` to
+  the base command.
 - `AGENT_TMUX_WEB_AUTH_TOKEN`: optional shared token for browser access.
 - `AGENT_TMUX_WEB_UPLOAD_DIR`: optional upload directory. Defaults to
   `/tmp/agent-tmux-web/uploads`.
@@ -118,11 +117,30 @@ Example `CLI_WEB_TOOLS`:
 
 ```json
 [
-  { "id": "codex", "label": "Codex", "command": "codex --yolo", "defaultSessionName": "codex" },
+  {
+    "id": "codex",
+    "label": "Codex",
+    "command": "codex",
+    "defaultSessionName": "codex",
+    "modes": [{ "id": "yolo", "label": "Yolo", "args": "--yolo" }]
+  },
   { "id": "claude", "label": "Claude", "command": "claude", "defaultSessionName": "claude" },
   { "id": "gemini", "label": "Gemini", "command": "gemini", "defaultSessionName": "gemini" }
 ]
 ```
+
+For flags that do not deserve a reusable toggle, select `Custom` in the tmux
+menu and enter the full command, for example:
+
+```bash
+codex -C /workspace/project -m gpt-5.5
+```
+
+Use the bell button in the tmux toolbar to enable browser notifications. After
+permission is granted, the app watches send/run actions in the selected tmux
+session and notifies when the captured pane looks ready for input again. While a
+watched task is active, capture polling can continue even if the browser tab is
+hidden.
 
 ## systemd
 

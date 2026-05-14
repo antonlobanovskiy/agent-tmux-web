@@ -26,8 +26,15 @@ const DEFAULT_TMUX_TOOLS: TmuxToolConfig[] = [
   {
     id: "codex",
     label: "Codex",
-    command: "codex --yolo",
-    defaultSessionName: "codex"
+    command: "codex",
+    defaultSessionName: "codex",
+    modes: [
+      {
+        id: "yolo",
+        label: "Yolo",
+        args: "--yolo"
+      }
+    ]
   },
   {
     id: "claude",
@@ -57,6 +64,31 @@ export function normalizeTmuxToolId(value: string): string {
     .slice(0, 60);
 }
 
+function parseTmuxToolModes(value: unknown): NonNullable<TmuxToolConfig["modes"]> {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((entry, index) => {
+    if (!entry || typeof entry !== "object") {
+      return [];
+    }
+    const record = entry as Record<string, unknown>;
+    const args = typeof record.args === "string" ? record.args.trim() : "";
+    if (!args) {
+      return [];
+    }
+    const label = typeof record.label === "string" && record.label.trim() ? record.label.trim() : `Mode ${index + 1}`;
+    const id = normalizeTmuxToolId(typeof record.id === "string" ? record.id : label) || `mode-${index + 1}`;
+    return [{
+      id,
+      label,
+      args,
+      ...(record.defaultEnabled === true ? { defaultEnabled: true } : {})
+    }];
+  });
+}
+
 export function parseTmuxTools(value: string | undefined = process.env.CLI_WEB_TOOLS): TmuxToolConfig[] {
   if (!value?.trim()) {
     return DEFAULT_TMUX_TOOLS;
@@ -83,7 +115,8 @@ export function parseTmuxTools(value: string | undefined = process.env.CLI_WEB_T
         ? record.defaultSessionName
         : id
     );
-    return [{ id, label, command, defaultSessionName }];
+    const modes = parseTmuxToolModes(record.modes);
+    return [{ id, label, command, defaultSessionName, ...(modes.length > 0 ? { modes } : {}) }];
   });
 
   if (tools.length === 0) {
@@ -138,11 +171,16 @@ export function tmuxSubmitDelayMs(submitKey: TmuxSubmitKey, text: string): numbe
 }
 
 export function buildCodexTmuxCommand(_options: CodexTmuxCommandOptions): string {
-  return "codex --yolo";
+  return "codex";
 }
 
-export function buildTmuxToolCommand(tool: Pick<TmuxToolConfig, "command">): string {
-  return tool.command;
+export function buildTmuxToolCommand(tool: Pick<TmuxToolConfig, "command" | "modes">, modeIds: string[] = []): string {
+  const modeIdSet = new Set(modeIds.map(normalizeTmuxToolId).filter(Boolean));
+  const args = tool.modes
+    ?.filter((mode) => modeIdSet.has(mode.id))
+    .map((mode) => mode.args.trim())
+    .filter(Boolean) ?? [];
+  return [tool.command.trim(), ...args].filter(Boolean).join(" ");
 }
 
 export function parseTmuxSessions(output: string): TmuxSession[] {
@@ -194,8 +232,8 @@ export async function openCodexInTmux(session: string, options: CodexTmuxCommand
   await sendTmuxText(session, buildCodexTmuxCommand(options), true);
 }
 
-export async function openTmuxTool(session: string, tool: Pick<TmuxToolConfig, "command">): Promise<void> {
-  await sendTmuxText(session, buildTmuxToolCommand(tool), true);
+export async function openTmuxTool(session: string, tool: Pick<TmuxToolConfig, "command" | "modes">, modeIds: string[] = []): Promise<void> {
+  await sendTmuxText(session, buildTmuxToolCommand(tool, modeIds), true);
 }
 
 export async function captureTmuxPane(session: string, lines = 160): Promise<string> {

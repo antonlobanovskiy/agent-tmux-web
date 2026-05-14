@@ -22,27 +22,35 @@ const showcaseScenes = [
     layout: "phone"
   },
   {
-    eyebrow: "Session control",
-    title: "See live tmux sessions and launch the right tool",
-    body: "Switch between active sessions, create a new one, or start codex --yolo, Claude, Gemini, or a custom command.",
-    bullets: ["session tabs", "tool launcher menu", "destroy sessions when done"],
-    media: "../mobile-launchers.png",
+    eyebrow: "GUI mode",
+    title: "Read terminal agents like a chat thread",
+    body: "Use the normalized GUI when the CLI is waiting, summarizing, or showing command output you want to scan quickly.",
+    bullets: ["readable bubbles", "code blocks", "bottom-following scroll"],
+    media: "../mobile-chat.png",
     layout: "phone"
   },
   {
-    eyebrow: "Readable mode",
-    title: "Use a normalized chat view when the CLI is waiting",
-    body: "Captured terminal output becomes a clean transcript with code blocks, file upload paths, stop, and submit controls.",
-    bullets: ["chat-style transcript", "temporary server uploads", "bottom-following scroll"],
-    media: "../mobile-claude.png",
+    eyebrow: "TTY mode",
+    title: "Keep the plain terminal capture one tap away",
+    body: "Switch back to text capture when you want the raw pane output without attaching to the interactive terminal.",
+    bullets: ["exact pane text", "fast capture", "easy copy context"],
+    media: "../mobile-tty.png",
     layout: "phone"
   },
   {
-    eyebrow: "Raw mode",
+    eyebrow: "tmux mode",
     title: "Drop into exact tmux control when you need it",
     body: "Attach to the raw terminal from mobile and keep common keys nearby: arrows, Enter, Escape, Tab, Ctrl-C, and Ctrl-D.",
     bullets: ["native TUI behavior", "soft terminal keys", "detach without killing work"],
     media: "../mobile-raw-terminal.png",
+    layout: "phone"
+  },
+  {
+    eyebrow: "Session control",
+    title: "See live tmux sessions and launch the right tool",
+    body: "Switch between active sessions, create a new one, or start Codex, Claude, Gemini, or a custom command.",
+    bullets: ["session tabs", "tool launcher menu", "destroy sessions when done"],
+    media: "../mobile-launchers.png",
     layout: "phone"
   },
   {
@@ -115,6 +123,12 @@ try {
   await delay(1200);
   await capture(pageCdp, path.join(assetsDir, "mobile-chat.png"));
 
+  await evaluate(pageCdp, "document.querySelector('[aria-label=\"Show terminal capture\"]')?.click()");
+  await delay(250);
+  await capture(pageCdp, path.join(assetsDir, "mobile-tty.png"));
+
+  await evaluate(pageCdp, "document.querySelector('[aria-label=\"Show GUI chat\"]')?.click()");
+  await delay(250);
   await evaluate(pageCdp, "document.querySelector('.tmux-session-menu-button')?.click()");
   await delay(250);
   await capture(pageCdp, path.join(assetsDir, "mobile-launchers.png"));
@@ -136,6 +150,8 @@ try {
   await evaluate(pageCdp, "document.querySelector('[aria-label=\"Attach raw tmux terminal\"]')?.click()");
   await delay(350);
   await capture(pageCdp, path.join(assetsDir, "mobile-raw-terminal.png"));
+
+  await renderModesOverview(pageCdp);
 
   await setViewport(pageCdp, 1440, 900, false);
   await pageCdp.send("Page.navigate", { url: demoUrl });
@@ -164,6 +180,15 @@ async function capture(cdp, file) {
   await writeFile(file, await screenshot(cdp));
 }
 
+async function renderModesOverview(cdp) {
+  const modesHtmlFile = path.join(framesDir, "modes-overview.html");
+  await writeFile(modesHtmlFile, buildModesOverviewHtml());
+  await setViewport(cdp, 1280, 720, false);
+  await cdp.send("Page.navigate", { url: pathToFileURL(modesHtmlFile).href });
+  await delay(500);
+  await capture(cdp, path.join(assetsDir, "modes-overview.png"));
+}
+
 async function renderShowcaseAssets(cdp) {
   const showcaseFramesDir = path.join(framesDir, "showcase");
   await rm(showcaseFramesDir, { recursive: true, force: true });
@@ -175,7 +200,7 @@ async function renderShowcaseAssets(cdp) {
   await cdp.send("Page.navigate", { url: pathToFileURL(showcaseHtmlFile).href });
   await delay(500);
 
-  const framesPerScene = 24;
+  const framesPerScene = 32;
   let frameIndex = 0;
   for (let sceneIndex = 0; sceneIndex < showcaseScenes.length; sceneIndex += 1) {
     for (let sceneFrame = 0; sceneFrame < framesPerScene; sceneFrame += 1) {
@@ -197,7 +222,7 @@ async function renderShowcaseAssets(cdp) {
     "-loglevel",
     "error",
     "-framerate",
-    "12",
+    "8",
     "-i",
     path.join(showcaseFramesDir, "frame-%03d.png"),
     "-vf",
@@ -213,13 +238,166 @@ async function renderShowcaseAssets(cdp) {
     "-loglevel",
     "error",
     "-framerate",
-    "12",
+    "8",
     "-i",
     path.join(showcaseFramesDir, "frame-%03d.png"),
     "-filter_complex",
-    "fps=12,scale=960:-1:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=4",
+    "fps=8,scale=960:-1:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=4",
     path.join(assetsDir, "agent-tmux-web-showcase.gif")
   ]);
+}
+
+function buildModesOverviewHtml() {
+  const modes = [
+    {
+      label: "GUI",
+      title: "Readable agent transcript",
+      image: "../mobile-chat.png"
+    },
+    {
+      label: "TTY",
+      title: "Plain pane capture",
+      image: "../mobile-tty.png"
+    },
+    {
+      label: "tmux",
+      title: "Raw attached terminal",
+      image: "../mobile-raw-terminal.png"
+    }
+  ];
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0e1113;
+      color: #f2f5f4;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 1280px;
+      height: 720px;
+      margin: 0;
+      overflow: hidden;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(255,255,255,0.035) 1px, transparent 1px),
+        #0e1113;
+      background-size: 44px 44px, 44px 44px, auto;
+    }
+
+    main {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 24px;
+      width: 1280px;
+      height: 720px;
+      padding: 42px 58px;
+    }
+
+    header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 28px;
+    }
+
+    h1 {
+      max-width: 760px;
+      margin: 0;
+      color: #f4f7f6;
+      font-size: 48px;
+      line-height: 1.04;
+      letter-spacing: 0;
+    }
+
+    p {
+      max-width: 330px;
+      margin: 0 0 5px;
+      color: #b8c3c1;
+      font-size: 18px;
+      line-height: 1.35;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
+      min-height: 0;
+    }
+
+    article {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 12px;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 38px;
+      padding: 0 2px;
+      color: #dce5e2;
+      font-size: 17px;
+      font-weight: 800;
+    }
+
+    .label span:first-child {
+      color: #67d2b5;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      text-transform: uppercase;
+    }
+
+    .phone {
+      min-height: 0;
+      padding: 10px;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 34px;
+      background: #20262a;
+      filter: drop-shadow(0 26px 42px rgba(0,0,0,0.38));
+    }
+
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 25px;
+      object-fit: cover;
+      object-position: top;
+      background: #0f1214;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Pick the view that fits the moment.</h1>
+      <p>GUI for readable agent output, TTY for pane capture, raw tmux when you need exact terminal control.</p>
+    </header>
+    <section class="grid">
+      ${modes.map((mode) => `
+        <article>
+          <div class="label"><span>${mode.label}</span><span>${mode.title}</span></div>
+          <div class="phone"><img alt="${mode.title}" src="${mode.image}"></div>
+        </article>
+      `).join("")}
+    </section>
+  </main>
+</body>
+</html>`;
 }
 
 function buildShowcaseHtml() {
