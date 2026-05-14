@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "tsx watch src/server/index.ts",
     "build": "vite build && tsc -p tsconfig.server.json",
+    "capture:marketing": "node scripts/capture-marketing.mjs",
     "start": "node dist/server/server/index.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json"

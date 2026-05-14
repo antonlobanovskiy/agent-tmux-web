@@ -68,23 +68,68 @@ type WsPayload = {
 
 const defaultCwd = "";
 const TMUX_TERMINAL_SUBMIT_DELAY_MS = 350;
+const demoMode = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("demo");
+const DEMO_STATUS: AppStatus = {
+  bindHost: "127.0.0.1",
+  port: 6174,
+  defaultCwd: "/workspace/project",
+  tailscaleIp: "100.x.y.z",
+  tailscaleDns: "agent-server.tailnet.example",
+  codex: {
+    connected: false,
+    appServerUrl: "ws://127.0.0.1:43117",
+    initialized: false,
+    lastError: null
+  }
+};
+const DEMO_TMUX_SESSIONS: TmuxSessionDto[] = [
+  { name: "agent-demo", windows: 1, created: "Thu May 14 09:00:00 2026", attached: true },
+  { name: "release-notes", windows: 1, created: "Thu May 14 09:10:00 2026", attached: false },
+  { name: "infra-check", windows: 2, created: "Thu May 14 09:20:00 2026", attached: false }
+];
+const DEMO_TMUX_TOOLS: TmuxToolDto[] = [
+  { id: "codex", label: "Codex", command: "codex --yolo", defaultSessionName: "codex" },
+  { id: "claude", label: "Claude", command: "claude", defaultSessionName: "claude" },
+  { id: "gemini", label: "Gemini", command: "gemini", defaultSessionName: "gemini" }
+];
+const DEMO_TMUX_OUTPUT = [
+  "› Review the mobile release checklist and prep the launch notes.",
+  "",
+  "• Mobile layout checked at 390px wide.",
+  "• Tmux sessions stay docked at the bottom while the transcript scrolls.",
+  "• Codex, Claude, Gemini, and custom CLI commands can launch from the same menu.",
+  "",
+  "```terminal",
+  "pnpm test",
+  "40 tests passed",
+  "pnpm build",
+  "production bundle ready",
+  "```",
+  "",
+  "› Attach docs/release-plan.md and summarize next steps.",
+  "",
+  "• Uploaded files are stored as temporary server paths.",
+  "• Raw tmux mode keeps native arrow keys, Ctrl-C, and exact TUI behavior available.",
+  "",
+  "  agent demo · ~/workspace/project"
+].join("\n");
 
 export function App() {
-  const [status, setStatus] = useState<AppStatus | null>(null);
+  const [status, setStatus] = useState<AppStatus | null>(demoMode ? DEMO_STATUS : null);
   const [models, setModels] = useState<CodexModel[]>([]);
   const [skills, setSkills] = useState<CodexSkill[]>([]);
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
-  const [tmuxSessions, setTmuxSessions] = useState<TmuxSessionDto[]>([]);
-  const [tmuxTools, setTmuxTools] = useState<TmuxToolDto[]>([]);
-  const [selectedTmux, setSelectedTmux] = useState("");
-  const [tmuxOutput, setTmuxOutput] = useState("");
-  const [tmuxInput, setTmuxInput] = useState("");
+  const [tmuxSessions, setTmuxSessions] = useState<TmuxSessionDto[]>(demoMode ? DEMO_TMUX_SESSIONS : []);
+  const [tmuxTools, setTmuxTools] = useState<TmuxToolDto[]>(demoMode ? DEMO_TMUX_TOOLS : []);
+  const [selectedTmux, setSelectedTmux] = useState(demoMode ? "agent-demo" : "");
+  const [tmuxOutput, setTmuxOutput] = useState(demoMode ? DEMO_TMUX_OUTPUT : "");
+  const [tmuxInput, setTmuxInput] = useState(demoMode ? "Ask Claude to check the mobile layout and summarize risks" : "");
   const [threadId, setThreadId] = useState("");
   const [activeTurnId, setActiveTurnId] = useState("");
   const [threadStatus, setThreadStatus] = useState("idle");
   const [model, setModel] = useState("gpt-5.5");
   const [effort, setEffort] = useState("xhigh");
-  const [cwd, setCwd] = useState(defaultCwd);
+  const [cwd, setCwd] = useState(demoMode ? DEMO_STATUS.defaultCwd : defaultCwd);
   const [message, setMessage] = useState("");
   const [composerCaret, setComposerCaret] = useState(0);
   const [skillQuery, setSkillQuery] = useState("");
@@ -95,10 +140,10 @@ export function App() {
   const [customTmuxCommand, setCustomTmuxCommand] = useState("");
   const [slashIndex, setSlashIndex] = useState(0);
   const [terminalActive, setTerminalActive] = useState(false);
-  const [tmuxGuiActive, setTmuxGuiActive] = useState(false);
+  const [tmuxGuiActive, setTmuxGuiActive] = useState(demoMode);
   const [tmuxMenuOpen, setTmuxMenuOpen] = useState(false);
   const [uploadingTmuxFiles, setUploadingTmuxFiles] = useState(false);
-  const [terminalStatus, setTerminalStatus] = useState("");
+  const [terminalStatus, setTerminalStatus] = useState(demoMode ? "gui view for agent-demo" : "");
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const terminalHostRef = useRef<HTMLDivElement | null>(null);
@@ -137,6 +182,11 @@ export function App() {
   }, [status]);
 
   const loadStatus = useCallback(async () => {
+    if (demoMode) {
+      setStatus(DEMO_STATUS);
+      setCwd(DEMO_STATUS.defaultCwd);
+      return;
+    }
     const nextStatus = await api<AppStatus>("/api/status");
     setStatus(nextStatus);
     setCwd((current) => current || nextStatus.defaultCwd);
@@ -164,12 +214,22 @@ export function App() {
   }, []);
 
   const loadTmuxSessions = useCallback(async () => {
+    if (demoMode) {
+      setTmuxSessions(DEMO_TMUX_SESSIONS);
+      setSelectedTmux((current) => current || DEMO_TMUX_SESSIONS[0]?.name || "");
+      return;
+    }
     const result = await api<{ data: TmuxSessionDto[] }>("/api/tmux/sessions");
     setTmuxSessions(result.data);
     setSelectedTmux((current) => current || result.data.find((session) => session.attached)?.name || result.data[0]?.name || "");
   }, []);
 
   const loadTmuxTools = useCallback(async () => {
+    if (demoMode) {
+      setTmuxTools(DEMO_TMUX_TOOLS);
+      setSelectedTmuxTool((current) => DEMO_TMUX_TOOLS.some((tool) => tool.id === current) ? current : DEMO_TMUX_TOOLS[0]?.id ?? "custom");
+      return;
+    }
     const result = await api<{ data: TmuxToolDto[] }>("/api/tmux/tools");
     setTmuxTools(result.data);
     setSelectedTmuxTool((current) => result.data.some((tool) => tool.id === current) ? current : result.data[0]?.id ?? "custom");
@@ -177,6 +237,10 @@ export function App() {
 
   const captureTmux = useCallback(async (session = selectedTmux) => {
     if (!session) {
+      return;
+    }
+    if (demoMode) {
+      setTmuxOutput(DEMO_TMUX_OUTPUT);
       return;
     }
     const result = await api<{ output: string }>(`/api/tmux/capture?session=${encodeURIComponent(session)}&lines=220`);
@@ -240,6 +304,9 @@ export function App() {
   }, [captureTmux, selectedTmux, terminalActive]);
 
   useEffect(() => {
+    if (demoMode) {
+      return;
+    }
     const token = new URLSearchParams(window.location.search).get("token");
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
     const socket = new WebSocket(`${protocol}://${window.location.host}/ws${token ? `?token=${encodeURIComponent(token)}` : ""}`);
@@ -455,6 +522,13 @@ export function App() {
     const session = selectedTmux;
     queueTmuxOutputBottomScroll();
 
+    if (demoMode) {
+      setTmuxOutput(`${DEMO_TMUX_OUTPUT}\n\n› ${text}\n\n• Demo input captured without touching a real tmux session.`);
+      setTmuxInput("");
+      setTerminalStatus(`sent to ${session}; following output`);
+      return;
+    }
+
     if (sendTmuxViaTerminal(session, text)) {
       setTmuxInput("");
       if (tmuxInputRef.current) {
@@ -481,6 +555,10 @@ export function App() {
       return;
     }
     queueTmuxOutputBottomScroll();
+    if (demoMode) {
+      setTerminalStatus(`stop sent to ${selectedTmux}`);
+      return;
+    }
     const result = await api<{ output: string }>("/api/tmux/interrupt", {
       method: "POST",
       body: JSON.stringify({ session: selectedTmux })
@@ -499,6 +577,17 @@ export function App() {
     setError("");
     setUploadingTmuxFiles(true);
     try {
+      if (demoMode) {
+        const uploads = selectedFiles.map((file) => ({
+          name: file.name,
+          path: `/tmp/agent-tmux-web/uploads/demo/${file.name || "upload"}`,
+          size: file.size,
+          mimeType: file.type || null
+        }));
+        appendTmuxPromptText(formatUploadedFilesForPrompt(uploads));
+        setTerminalStatus(`uploaded ${uploads.length} file${uploads.length === 1 ? "" : "s"} to server`);
+        return;
+      }
       const uploads: UploadedFileDto[] = [];
       for (const file of selectedFiles) {
         uploads.push(await uploadFileToServer(file));
@@ -529,6 +618,13 @@ export function App() {
 
   function openRawTerminal() {
     if (!selectedTmux) {
+      return;
+    }
+    if (demoMode) {
+      clearTmuxFollowTimers(tmuxFollowTimersRef);
+      setTmuxGuiActive(false);
+      setTerminalStatus(`live terminal for ${selectedTmux}`);
+      setTerminalActive(false);
       return;
     }
     clearTmuxFollowTimers(tmuxFollowTimersRef);
@@ -590,6 +686,12 @@ export function App() {
       return;
     }
     const sessionName = newTmuxName.trim().toLowerCase().replace(/[^a-z0-9_.-]+/g, "-").replace(/^-+|-+$/g, "") || "codex";
+    if (demoMode) {
+      const next = { name: sessionName, windows: 1, created: "Thu May 14 09:30:00 2026", attached: false };
+      setTmuxSessions((current) => [...current, next]);
+      selectTmuxSession(sessionName);
+      return;
+    }
     const result = await api<{ data: TmuxSessionDto[] }>("/api/tmux/create", {
       method: "POST",
       body: JSON.stringify({ name: newTmuxName, cwd })
@@ -600,6 +702,17 @@ export function App() {
 
   async function destroySession() {
     if (!selectedTmux || !window.confirm(`Destroy tmux session "${selectedTmux}"?`)) {
+      return;
+    }
+
+    if (demoMode) {
+      const remaining = tmuxSessions.filter((session) => session.name !== selectedTmux);
+      const nextSession = remaining[0] ?? null;
+      setTmuxSessions(remaining);
+      setSelectedTmux(nextSession?.name ?? "");
+      setTmuxOutput(nextSession ? DEMO_TMUX_OUTPUT : "");
+      setTmuxMenuOpen(false);
+      setTerminalStatus(nextSession?.name ?? "no session selected");
       return;
     }
 
@@ -624,6 +737,15 @@ export function App() {
     const command = selectedTmuxTool === "custom" ? customTmuxCommand.trim() : tool?.command ?? "";
     if (!command) {
       setError("Enter a CLI command to launch.");
+      return;
+    }
+
+    if (demoMode) {
+      setTmuxOutput(`${DEMO_TMUX_OUTPUT}\n\n› ${command}\n\n• Started ${tool?.label ?? command} in ${selectedTmux}.`);
+      setTerminalActive(false);
+      setTmuxGuiActive(true);
+      setTmuxMenuOpen(false);
+      setTerminalStatus(`started ${tool?.label ?? command} in ${selectedTmux}`);
       return;
     }
 

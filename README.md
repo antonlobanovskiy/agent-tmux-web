@@ -22,6 +22,16 @@ reverse proxy, or LAN binding can be used.
 - Optionally starts the Codex app-server for Codex-specific thread/model/skill
   APIs. The tmux workflow works without it.
 
+## Demo
+
+<video src="./docs/assets/agent-tmux-web-mobile-demo.mp4" controls></video>
+
+![Mobile chat view](./docs/assets/mobile-chat.png)
+
+![Mobile launcher menu](./docs/assets/mobile-launchers.png)
+
+![Desktop overview](./docs/assets/desktop-overview.png)
+
 ## Requirements
 
 - Node.js 22+
