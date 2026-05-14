@@ -150,9 +150,7 @@ hidden.
 
 Mobile browsers usually require a secure browser context for notifications. Use
 HTTPS, localhost, or an installed/private browser context that your browser
-treats as secure. If Brave says notifications are blocked, enable notifications
-for the Brave app in Android settings, then allow notifications for this site in
-Brave's site settings and reload the app.
+treats as secure.
 
 ## systemd
 
