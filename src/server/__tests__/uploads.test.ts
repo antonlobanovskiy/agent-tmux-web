@@ -114,4 +114,24 @@ describe("upload helpers", () => {
     await expect(access(oldDirectory)).rejects.toThrow();
     await expect(readFile(freshFile, "utf8")).resolves.toBe("fresh");
   });
+
+  it("only cleans dated upload directories below the upload root", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-web-upload-test-"));
+    tempRoots.push(root);
+    const unrelatedDirectory = path.join(root, "unrelated");
+    const oldUploadDirectory = path.join(root, "2026-05-13");
+    await mkdir(unrelatedDirectory, { recursive: true });
+    await mkdir(oldUploadDirectory, { recursive: true });
+    const unrelatedFile = path.join(unrelatedDirectory, "old.txt");
+    const oldUploadFile = path.join(oldUploadDirectory, "old.txt");
+    await writeFile(unrelatedFile, "keep");
+    await writeFile(oldUploadFile, "delete");
+    await utimes(unrelatedFile, new Date("2026-05-13T11:00:00.000Z"), new Date("2026-05-13T11:00:00.000Z"));
+    await utimes(oldUploadFile, new Date("2026-05-13T11:00:00.000Z"), new Date("2026-05-13T11:00:00.000Z"));
+
+    await cleanupExpiredUploads(root, { now: new Date("2026-05-14T12:00:00.000Z"), ttlMs: DEFAULT_UPLOAD_TTL_MS });
+
+    await expect(readFile(unrelatedFile, "utf8")).resolves.toBe("keep");
+    await expect(access(oldUploadFile)).rejects.toThrow();
+  });
 });

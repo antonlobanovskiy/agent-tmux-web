@@ -120,6 +120,11 @@ async function cleanupExpiredUploadsInDirectory(directory: string, cutoff: numbe
   let empty = true;
   for (const entry of entries) {
     const entryPath = path.join(directory, entry.name);
+    if (isRoot && !isUploadDateDirectory(entry.name)) {
+      empty = false;
+      continue;
+    }
+
     if (entry.isDirectory()) {
       const childEmpty = await cleanupExpiredUploadsInDirectory(entryPath, cutoff);
       if (childEmpty) {
@@ -152,6 +157,10 @@ async function cleanupExpiredUploadsInDirectory(directory: string, cutoff: numbe
   }
 
   return !isRoot && empty;
+}
+
+function isUploadDateDirectory(name: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(name);
 }
 
 class ByteLimitTransform extends Transform {

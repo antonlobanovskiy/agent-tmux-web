@@ -52,7 +52,8 @@ terminal access to the server user running it.
    - `CLI_WEB_DEFAULT_CWD` should be the directory where new tmux sessions
      should start.
    - Set `AGENT_TMUX_WEB_AUTH_TOKEN` if the app can be reached by anyone other
-     than the server user.
+     than the server user. Generate it with `openssl rand -hex 32` or an
+     equivalent random token generator.
    - Customize `CLI_WEB_TOOLS` only if the defaults are not enough.
 
 5. Configure CLI launchers.

@@ -1416,12 +1416,18 @@ function TmuxChatBubble({ message }: { message: TmuxChatMessage }) {
 }
 
 async function api<T = unknown>(url: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers);
+  if (!headers.has("content-type")) {
+    headers.set("content-type", "application/json");
+  }
+  const token = browserAccessToken();
+  if (token && !headers.has("x-agent-tmux-web-token")) {
+    headers.set("x-agent-tmux-web-token", token);
+  }
+
   const response = await fetch(url, {
     ...init,
-    headers: {
-      "content-type": "application/json",
-      ...(init?.headers ?? {})
-    }
+    headers
   });
   if (!response.ok) {
     const body = await response.text();
@@ -1432,11 +1438,17 @@ async function api<T = unknown>(url: string, init?: RequestInit): Promise<T> {
 
 async function uploadFileToServer(file: File): Promise<UploadedFileDto> {
   const query = new URLSearchParams({ filename: file.name || "upload" });
+  const headers = new Headers({
+    "content-type": file.type || "application/octet-stream"
+  });
+  const token = browserAccessToken();
+  if (token) {
+    headers.set("x-agent-tmux-web-token", token);
+  }
+
   const response = await fetch(`/api/uploads?${query}`, {
     method: "POST",
-    headers: {
-      "content-type": file.type || "application/octet-stream"
-    },
+    headers,
     body: file
   });
   if (!response.ok) {
@@ -1450,6 +1462,10 @@ async function uploadFileToServer(file: File): Promise<UploadedFileDto> {
 function formatUploadedFilesForPrompt(files: UploadedFileDto[]): string {
   const label = files.length === 1 ? "Attached file on server" : "Attached files on server";
   return `${label}: ${files.map((file) => file.path).join(" ")}`;
+}
+
+function browserAccessToken(): string {
+  return typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("token")?.trim() ?? "";
 }
 
 function defaultTmuxToolModeIds(tool: TmuxToolDto): string[] {

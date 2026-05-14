@@ -87,16 +87,17 @@ path:
 - `0.0.0.0` only behind a firewall, VPN, or authenticated reverse proxy.
 
 When anyone else can reach the bind address, set `AGENT_TMUX_WEB_AUTH_TOKEN` and
-open the app with `?token=...`:
+open the app with `?token=...`. Use a generated token, not the placeholder below:
 
 ```bash
-HOST=100.x.y.z PORT=6174 AGENT_TMUX_WEB_AUTH_TOKEN=change-me pnpm start
+export AGENT_TMUX_WEB_AUTH_TOKEN="$(openssl rand -hex 32)"
+HOST=100.x.y.z PORT=6174 pnpm start
 ```
 
 Then open:
 
 ```text
-http://100.x.y.z:6174/?token=change-me
+http://100.x.y.z:6174/?token=<the generated token>
 ```
 
 ## Configuration

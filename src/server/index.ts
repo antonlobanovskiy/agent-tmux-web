@@ -1,4 +1,5 @@
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { timingSafeEqual } from "node:crypto";
 import http from "node:http";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -57,6 +58,27 @@ const sockets = new Set<WebSocket>();
 const recentEvents: unknown[] = [];
 const jsonBodyParser = express.json({ limit: "2mb" });
 
+app.disable("x-powered-by");
+
+app.use((_req, res, next) => {
+  res.setHeader("Content-Security-Policy", [
+    "default-src 'self'",
+    "connect-src 'self' ws: wss:",
+    "img-src 'self' data: blob:",
+    "style-src 'self' 'unsafe-inline'",
+    "script-src 'self'",
+    "base-uri 'none'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "object-src 'none'"
+  ].join("; "));
+  res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  next();
+});
+
 app.use((req, res, next) => {
   if (req.path === "/api/uploads") {
     next();
@@ -66,13 +88,13 @@ app.use((req, res, next) => {
 });
 
 app.use((req, res, next) => {
-  if (!authToken || req.path === "/healthz") {
+  if (!authToken || req.path === "/healthz" || isPublicAssetRequest(req)) {
     next();
     return;
   }
 
   const provided = req.header("x-agent-tmux-web-token") ?? req.header("x-codex-web-token") ?? String(req.query.token ?? "");
-  if (provided === authToken) {
+  if (isValidAuthToken(provided)) {
     next();
     return;
   }
@@ -430,8 +452,22 @@ function asyncHandler(handler: (req: Request, res: Response, next: NextFunction)
   };
 }
 
+function isPublicAssetRequest(req: Request): boolean {
+  return req.method === "GET" && (req.path.startsWith("/assets/") || req.path === "/favicon.ico");
+}
+
 function isAuthorizedWebSocket(url: URL): boolean {
-  return !authToken || url.searchParams.get("token") === authToken;
+  return !authToken || isValidAuthToken(url.searchParams.get("token") ?? "");
+}
+
+function isValidAuthToken(provided: string): boolean {
+  if (!authToken || !provided) {
+    return false;
+  }
+
+  const expected = Buffer.from(authToken);
+  const actual = Buffer.from(provided);
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
 function sendTerminalMessage(socket: WebSocket, payload: unknown): void {
