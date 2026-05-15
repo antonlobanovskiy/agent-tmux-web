@@ -5,6 +5,10 @@ It does not run tmux or CLI tools on the phone. The server still owns tmux,
 uploads, launchers, and auth; the app stores only the server URL and optional
 token on the device.
 
+This app is sideload-only. It is not distributed through Google Play. Public APK
+builds are generic and should open to the setup screen; private builds may
+prefill a server URL/token for your own device.
+
 ## Build
 
 Prerequisites:
@@ -19,6 +23,12 @@ Build installable APKs:
 ```bash
 cd android
 ./gradlew assembleDebug assembleRelease
+```
+
+Build a shareable public sideload APK with no embedded server URL or token:
+
+```bash
+pnpm android:build:public
 ```
 
 The APKs are written to:
@@ -49,6 +59,11 @@ agentTmuxDefaultToken=optional-token
 
 `android/local.properties` is ignored by git.
 
+Do not upload APKs built with `android/local.properties` unless you intentionally
+want that private server URL/token embedded. For public release assets, use
+`pnpm android:build:public`; it passes blank Gradle properties and runs an APK
+string check before reporting success.
+
 You can also pass values at build time:
 
 ```bash
@@ -63,6 +78,8 @@ cd android
 - HTTP is allowed because many private installs run over LAN, VPN, or Tailscale.
 - Use a private network path or authenticated reverse proxy; the app is terminal
   access to the server user.
+- Public APKs are sideload-only setup wrappers. Users must enter their own
+  private server URL and optional auth token.
 - File inputs in the web UI open the Android file picker.
 - Notifications use a native Android bridge. When enabled, the app runs a
   low-importance foreground watcher that polls the server for completed tmux

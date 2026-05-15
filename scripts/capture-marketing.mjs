@@ -54,6 +54,14 @@ const showcaseScenes = [
     layout: "phone"
   },
   {
+    eyebrow: "Android app",
+    title: "Sideload the wrapper and keep done alerts native",
+    body: "The public APK is a generic setup wrapper. Enter your private server URL, upload files with Android's picker, and let the native watcher notify when tmux is waiting.",
+    bullets: ["sideload-only APK", "no embedded public secrets", "native completion alerts"],
+    media: "../mobile-chat.png",
+    layout: "phone"
+  },
+  {
     eyebrow: "Desktop too",
     title: "Same server, wider control surface on PC",
     body: "The desktop layout gives the active tmux session more width while keeping the same sessions and launchers available.",

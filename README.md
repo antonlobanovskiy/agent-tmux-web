@@ -42,8 +42,13 @@ your running Agent Tmux Web server in a WebView, stores the server URL/token on
 the device, supports Android file picking for uploads, and uses a native bridge
 for task-done notifications.
 
+The APK is sideload-only. It is not published through Google Play, does not run
+tmux locally, and does not include any maintainer server credentials in public
+builds. Install it, enter your own private server URL on the setup screen, then
+enable `Notify` if you want background task-complete alerts.
+
 ```bash
-pnpm android:build
+pnpm android:build:public
 ```
 
 For setup details, see [`android/README.md`](./android/README.md).
@@ -111,6 +116,25 @@ Then open:
 ```text
 http://100.x.y.z:6174/?token=<the generated token>
 ```
+
+## Sideload APK
+
+Public APKs should be built without a default server URL or auth token:
+
+```bash
+pnpm android:build:public
+```
+
+That command forces blank Android defaults and runs
+`scripts/verify-public-apk.mjs` against the release APK. The resulting APK is:
+
+```text
+android/app/build/outputs/apk/release/app-release.apk
+```
+
+For private personal builds, you may prefill the setup screen with
+`android/local.properties`, but do not upload or publish those APKs. Public APKs
+should always show the setup screen first.
 
 ## Configuration
 
@@ -182,6 +206,10 @@ systemctl --user enable --now agent-tmux-web.service
 - This repository is just the application code. Publishing or cloning it does
   not expose anyone's running server, tmux sessions, uploads, `.env`, auth token,
   or local systemd service.
+- Public sideload APKs are generic WebView wrappers. They should be built with
+  `pnpm android:build:public`, which verifies that no default server URL or auth
+  token is embedded. Private APKs built with `android/local.properties` can
+  contain a personal URL/token and should not be shared.
 - Do not expose this app directly to the public internet.
 - Treat browser access as terminal access to the server user running the app.
 - Use a VPN, SSH tunnel, or authenticated reverse proxy.

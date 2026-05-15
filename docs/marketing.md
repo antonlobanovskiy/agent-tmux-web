@@ -19,7 +19,10 @@ uploads over a private network path.
 - Launch Codex, Claude Code, Gemini, or custom commands.
 - Switch between normalized chat capture and raw tmux terminal mode.
 - Upload files from Android or desktop browsers to temporary server paths.
-- Browser notifications can alert when an active tmux task returns to input.
+- Android sideload APK wraps the private server UI with native file picking and
+  task-complete notifications.
+- Browser/native notifications can alert when a watched tmux task returns to
+  input.
 - Designed for private networks, not public internet exposure.
 
 ## Assets
@@ -34,6 +37,13 @@ uploads over a private network path.
 - Mobile Claude launcher: `docs/assets/mobile-claude.png`
 - Raw tmux mode screenshot: `docs/assets/mobile-raw-terminal.png`
 - Desktop overview: `docs/assets/desktop-overview.png`
+
+## Android Demo Note
+
+The Android APK is sideload-only and generic in public builds. It should show a
+setup screen where users enter their own server URL/token, then it loads the
+same GUI/TTY/raw tmux modes shown in the browser demo. Turn on `Notify` in the
+tmux toolbar to start the native foreground watcher for task-complete alerts.
 
 Regenerate assets with:
 

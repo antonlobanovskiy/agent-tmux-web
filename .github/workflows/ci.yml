@@ -46,10 +46,10 @@ jobs:
       - run: yes | sdkmanager --licenses
       - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: ./gradlew assembleDebug assembleRelease lintDebug
+      - run: pnpm android:build:public
+      - run: ./gradlew assembleDebug lintDebug
         working-directory: android
       - uses: actions/upload-artifact@v4
         with:
-          name: agent-tmux-web-release-apk
+          name: agent-tmux-web-public-sideload-apk
           path: android/app/build/outputs/apk/release/app-release.apk

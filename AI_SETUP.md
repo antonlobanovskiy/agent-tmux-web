@@ -130,9 +130,12 @@ deployment is separate. Keep user-specific runtime config out of git.
      Browser installs need HTTPS or localhost; the Android wrapper can use its
      native notification bridge against the private server URL.
    - Confirm uploads use a temporary server path and are not kept forever.
-   - If setting up Android, build `pnpm android:build`, install the APK from
-     `android/app/build/outputs/apk/release/app-release.apk`, and point the
-     setup screen at the private server URL.
+   - If setting up Android for one private device, build `pnpm android:build`,
+     install the APK from `android/app/build/outputs/apk/release/app-release.apk`,
+     and point the setup screen at the private server URL.
+   - If creating an APK to share or upload publicly, build
+     `pnpm android:build:public`. Do not share APKs built with
+     `android/local.properties` because they may embed a private URL/token.
 
 10. Handoff summary.
     - URL to open.
@@ -155,5 +158,8 @@ deployment is separate. Keep user-specific runtime config out of git.
 - Notifications do not fire: permission must be granted from the bell button,
   and the app must see a send/run action before it watches for idle. On Android,
   leave the foreground watcher notification enabled.
+- Public APK contains a private URL/token: rebuild with
+  `pnpm android:build:public` and verify `android/local.properties` values were
+  not used.
 - CLI launcher does nothing: verify the command exists in the server user's
   `PATH`, not just in an interactive shell.
