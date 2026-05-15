@@ -21,6 +21,8 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,6 +34,7 @@ public final class WatchPollingService extends Service {
     private static final String PREF_AUTH_TOKEN = "auth_token";
     private static final String PREF_WATCH_POLLING_ENABLED = "watch_polling_enabled";
     private static final String PREF_WATCH_LAST_EVENT_ID = "watch_last_event_id";
+    private static final String PREF_WATCH_ENABLED_AT_MS = "watch_enabled_at_ms";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable pollRunnable = this::poll;
@@ -40,9 +43,14 @@ public final class WatchPollingService extends Service {
     private SharedPreferences preferences;
 
     public static void setEnabled(Context context, boolean enabled) {
-        preferences(context).edit()
-            .putBoolean(PREF_WATCH_POLLING_ENABLED, enabled)
-            .apply();
+        SharedPreferences.Editor editor = preferences(context).edit()
+            .putBoolean(PREF_WATCH_POLLING_ENABLED, enabled);
+        if (enabled) {
+            editor.putLong(PREF_WATCH_ENABLED_AT_MS, System.currentTimeMillis());
+        } else {
+            editor.remove(PREF_WATCH_ENABLED_AT_MS);
+        }
+        editor.apply();
         if (enabled) {
             start(context);
         } else {
@@ -56,6 +64,7 @@ public final class WatchPollingService extends Service {
 
     public static void startIfEnabled(Context context) {
         if (isEnabled(context)) {
+            ensureEnabledAt(context);
             start(context);
         }
     }
@@ -139,22 +148,24 @@ public final class WatchPollingService extends Service {
 
         long lastEventId = preferences.getLong(PREF_WATCH_LAST_EVENT_ID, 0);
         boolean initialized = preferences.contains(PREF_WATCH_LAST_EVENT_ID);
+        long enabledAtMs = preferences.getLong(PREF_WATCH_ENABLED_AT_MS, System.currentTimeMillis());
         PollResult result = fetchEvents(lastEventId);
         long nextEventId = Math.max(lastEventId, result.latestEventId);
 
-        if (initialized) {
-            for (WatchEvent event : result.events) {
-                if (event.id <= lastEventId) {
-                    continue;
-                }
-                nextEventId = Math.max(nextEventId, event.id);
-                AgentNotifications.postTaskNotification(
-                    this,
-                    event.session + " is waiting",
-                    event.label + " finished and is waiting for input.",
-                    "agent-tmux-watch-" + event.id
-                );
+        for (WatchEvent event : result.events) {
+            if (event.id <= lastEventId) {
+                continue;
             }
+            nextEventId = Math.max(nextEventId, event.id);
+            if (!initialized && event.finishedAtMs < enabledAtMs) {
+                continue;
+            }
+            AgentNotifications.postTaskNotification(
+                this,
+                event.session + " is waiting",
+                event.label + " finished and is waiting for input.",
+                "agent-tmux-watch-" + event.id
+            );
         }
 
         preferences.edit()
@@ -197,8 +208,9 @@ public final class WatchPollingService extends Service {
                     long id = item.optLong("id", 0);
                     String session = item.optString("session", "").trim();
                     String label = item.optString("label", "Tmux task").trim();
+                    long finishedAtMs = parseIsoTime(item.optString("finishedAt", ""));
                     if (id > 0 && !session.isEmpty()) {
-                        events.add(new WatchEvent(id, session, label.isEmpty() ? "Tmux task" : label));
+                        events.add(new WatchEvent(id, session, label.isEmpty() ? "Tmux task" : label, finishedAtMs));
                     }
                 }
             }
@@ -263,6 +275,27 @@ public final class WatchPollingService extends Service {
         return context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
     }
 
+    private static void ensureEnabledAt(Context context) {
+        SharedPreferences prefs = preferences(context);
+        if (prefs.contains(PREF_WATCH_ENABLED_AT_MS)) {
+            return;
+        }
+        prefs.edit()
+            .putLong(PREF_WATCH_ENABLED_AT_MS, System.currentTimeMillis())
+            .apply();
+    }
+
+    private static long parseIsoTime(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return 0;
+        }
+        try {
+            return Instant.parse(value.trim()).toEpochMilli();
+        } catch (DateTimeParseException error) {
+            return 0;
+        }
+    }
+
     private static final class PollResult {
         final long latestEventId;
         final List<WatchEvent> events;
@@ -277,11 +310,13 @@ public final class WatchPollingService extends Service {
         final long id;
         final String session;
         final String label;
+        final long finishedAtMs;
 
-        WatchEvent(long id, String session, String label) {
+        WatchEvent(long id, String session, String label, long finishedAtMs) {
             this.id = id;
             this.session = session;
             this.label = label;
+            this.finishedAtMs = finishedAtMs;
         }
     }
 }

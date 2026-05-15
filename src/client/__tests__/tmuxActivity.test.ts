@@ -24,4 +24,37 @@ describe("tmux activity detection", () => {
   it("does not treat old user prompts as idle state", () => {
     expect(looksLikeTmuxWaitingForInput("› Review the release checklist\n• Still running analysis")).toBe(false);
   });
+
+  it("detects Codex completion status even when no prompt line is visible", () => {
+    expect(looksLikeTmuxWaitingForInput([
+      "Implemented the requested change.",
+      "Verified tests.",
+      "› Summarize recent commits",
+      "gpt-5.5 xhigh fast · ~/dev                                Goal achieved (5m)"
+    ].join("\n"))).toBe(true);
+  });
+
+  it("does not let older working lines block a later completion status", () => {
+    expect(looksLikeTmuxWorking([
+      "• Working (45s • esc to interrupt)",
+      "",
+      "Done.",
+      "gpt-5.5 xhigh fast · ~/dev                                Goal achieved (1m)"
+    ].join("\n"))).toBe(false);
+    expect(looksLikeTmuxWaitingForInput([
+      "• Working (45s • esc to interrupt)",
+      "",
+      "Done.",
+      "gpt-5.5 xhigh fast · ~/dev                                Goal achieved (1m)"
+    ].join("\n"))).toBe(true);
+  });
+
+  it("detects Codex confirmation prompts as waiting for input", () => {
+    expect(looksLikeTmuxWaitingForInput([
+      "Replace goal?",
+      "› 1. Replace current goal  Set the new objective and start it now",
+      "  2. Cancel                Keep the current goal",
+      "Press enter to confirm or esc to go back"
+    ].join("\n"))).toBe(true);
+  });
 });
