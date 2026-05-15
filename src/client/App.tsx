@@ -42,7 +42,7 @@ import {
 import { parseTmuxChatOutput, splitTmuxChatMessage, type TmuxChatMessage } from "./tmuxGui.js";
 import { shouldAutoCaptureTmux, TMUX_CAPTURE_POLL_INTERVAL_MS, TMUX_SEND_FOLLOW_DELAYS_MS } from "./tmuxFollow.js";
 import { looksLikeTmuxWaitingForInput } from "./tmuxActivity.js";
-import { canShowBrowserNotifications, getBrowserNotificationAvailability, getBrowserNotificationSnapshot } from "./browserNotifications.js";
+import { canShowBrowserNotifications, getBrowserNotificationAvailability, getBrowserNotificationSnapshot, showAgentNotification } from "./browserNotifications.js";
 
 type TimelineEntry = {
   id: string;
@@ -731,9 +731,17 @@ export function App() {
       return;
     }
 
-    const availability = getBrowserNotificationAvailability();
+    const snapshot = getBrowserNotificationSnapshot();
+    const availability = getBrowserNotificationAvailability(snapshot);
     if (!availability.available) {
       setTerminalStatus(availability.message);
+      return;
+    }
+
+    if (snapshot.androidBridge) {
+      setTmuxNotificationsEnabled(true);
+      writeTmuxNotificationPreference(true);
+      setTerminalStatus("app notifications on");
       return;
     }
 
@@ -1517,18 +1525,11 @@ function writeTmuxNotificationPreference(enabled: boolean) {
 }
 
 function showTmuxDoneNotification(session: string, label: string) {
-  if (!canShowBrowserNotifications()) {
-    return;
-  }
-
-  try {
-    new Notification(`${session} is waiting`, {
-      body: `${label} finished and is waiting for input.`,
-      tag: `agent-tmux-web-${session}`
-    });
-  } catch {
-    // Browsers can still reject notifications after permission changes.
-  }
+  showAgentNotification(
+    `${session} is waiting`,
+    `${label} finished and is waiting for input.`,
+    `agent-tmux-web-${session}`
+  );
 }
 
 function describeTerminalKey(data: string): string {

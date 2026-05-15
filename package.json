@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "tsx watch src/server/index.ts",
     "build": "vite build && tsc -p tsconfig.server.json",
+    "android:build": "pnpm build && cd android && ./gradlew assembleDebug",
+    "android:install": "cd android && ./gradlew installDebug",
     "capture:marketing": "node scripts/capture-marketing.mjs",
     "start": "node dist/server/server/index.js",
     "test": "vitest run",

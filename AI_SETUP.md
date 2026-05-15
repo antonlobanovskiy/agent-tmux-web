@@ -130,6 +130,9 @@ deployment is separate. Keep user-specific runtime config out of git.
      alerts. Use HTTPS or localhost; most mobile browsers block notification
      prompts on plain HTTP LAN/Tailscale origins.
    - Confirm uploads use a temporary server path and are not kept forever.
+   - If setting up Android, build `pnpm android:build`, install the APK from
+     `android/app/build/outputs/apk/debug/app-debug.apk`, and point the setup
+     screen at the private server URL.
 
 10. Handoff summary.
     - URL to open.

@@ -7,6 +7,8 @@ function snapshot(overrides: Partial<BrowserNotificationSnapshot>): BrowserNotif
     supported: true,
     secureContext: true,
     permission: "default",
+    androidBridge: false,
+    androidNotificationsEnabled: false,
     ...overrides
   };
 }
@@ -36,5 +38,24 @@ describe("browser notification availability", () => {
   it("allows notification requests in secure contexts", () => {
     expect(getBrowserNotificationAvailability(snapshot({ permission: "default" }))).toEqual({ available: true });
     expect(getBrowserNotificationAvailability(snapshot({ permission: "granted" }))).toEqual({ available: true });
+  });
+
+  it("uses the Android bridge before browser permission rules", () => {
+    expect(getBrowserNotificationAvailability(snapshot({
+      androidBridge: true,
+      androidNotificationsEnabled: true,
+      secureContext: false,
+      supported: false
+    }))).toEqual({ available: true });
+  });
+
+  it("reports blocked native Android notifications", () => {
+    expect(getBrowserNotificationAvailability(snapshot({
+      androidBridge: true,
+      androidNotificationsEnabled: false
+    }))).toEqual({
+      available: false,
+      message: "app notifications blocked in Android settings"
+    });
   });
 });

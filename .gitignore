@@ -12,4 +12,8 @@ coverage/
 *.sock
 
 uploads/
+android/.gradle/
+android/build/
+android/local.properties
+android/app/build/
 .DS_Store

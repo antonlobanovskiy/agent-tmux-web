@@ -35,6 +35,19 @@ The session keeps running either way.
 
 <img src="./docs/assets/modes-overview.png" alt="GUI, TTY, and raw tmux modes" width="760">
 
+## Android App
+
+The repo includes a native Android wrapper in [`android/`](./android). It loads
+your running Agent Tmux Web server in a WebView, stores the server URL/token on
+the device, supports Android file picking for uploads, and uses a native bridge
+for task-done notifications.
+
+```bash
+pnpm android:build
+```
+
+For setup details, see [`android/README.md`](./android/README.md).
+
 ## Features
 
 - Lists tmux sessions and switches between them.
