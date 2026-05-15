@@ -38,4 +38,12 @@ android {
     buildFeatures {
         buildConfig true
     }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.debug
+            minifyEnabled false
+            debuggable false
+        }
+    }
 }

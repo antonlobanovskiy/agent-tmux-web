@@ -14,17 +14,18 @@ Prerequisites:
 - Android SDK build-tools 35
 - Android platform-tools if you want to install with `adb`
 
-Build a debug APK:
+Build installable APKs:
 
 ```bash
 cd android
-./gradlew assembleDebug
+./gradlew assembleDebug assembleRelease
 ```
 
-The APK is written to:
+The APKs are written to:
 
 ```text
 android/app/build/outputs/apk/debug/app-debug.apk
+android/app/build/outputs/apk/release/app-release.apk
 ```
 
 Install on a connected Android device:
@@ -64,3 +65,5 @@ cd android
   access to the server user.
 - File inputs in the web UI open the Android file picker.
 - Browser notifications use a native Android bridge inside the app.
+- The release APK is signed with the standard Android debug key for easy
+  sideloading. Use your own signing key before publishing through an app store.
