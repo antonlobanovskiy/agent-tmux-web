@@ -185,6 +185,8 @@ public final class WatchPollingService extends Service {
             connection.setReadTimeout(8000);
             connection.setRequestMethod("GET");
             connection.setRequestProperty("Accept", "application/json");
+            connection.setRequestProperty("User-Agent", "AgentTmuxAndroidWatch/" + BuildConfig.VERSION_NAME);
+            connection.setRequestProperty("x-agent-tmux-web-client", "android-watch");
             String token = authToken();
             if (!token.isEmpty()) {
                 connection.setRequestProperty("x-agent-tmux-web-token", token);

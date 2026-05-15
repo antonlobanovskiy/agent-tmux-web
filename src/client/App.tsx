@@ -721,6 +721,12 @@ export function App() {
     if (snapshot.androidBridge) {
       setTmuxNotificationsEnabled(true);
       writeTmuxNotificationPreference(true);
+      setAndroidWatchPollingEnabled(true);
+      showAgentNotification(
+        "Agent Tmux notifications",
+        "Background task notifications are enabled.",
+        "agent-tmux-watch-enabled"
+      );
       setTerminalStatus("app notifications on");
       return;
     }
@@ -738,6 +744,11 @@ export function App() {
     if (permission === "granted") {
       setTmuxNotificationsEnabled(true);
       writeTmuxNotificationPreference(true);
+      showAgentNotification(
+        "Agent Tmux notifications",
+        "Task notifications are enabled.",
+        "agent-tmux-watch-enabled"
+      );
       setTerminalStatus("browser notifications on");
       return;
     }

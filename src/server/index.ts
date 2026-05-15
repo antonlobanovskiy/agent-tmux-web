@@ -57,6 +57,13 @@ const server = http.createServer(app);
 const bridge = new CodexBridge({ port: codexAppServerPort });
 const sockets = new Set<WebSocket>();
 const recentEvents: unknown[] = [];
+const watchPollers = new Map<string, {
+  id: string;
+  lastSeen: string;
+  remoteAddress: string;
+  since: number;
+  userAgent: string;
+}>();
 const tmuxWatch = new TmuxWatchStore({
   capture: captureTmuxPane,
   onEvent: (event) => broadcast({ type: "tmux-watch-done", event }),
@@ -322,10 +329,20 @@ app.delete("/api/tmux/watch/:session", asyncHandler(async (req, res) => {
 app.get("/api/tmux/watch/events", asyncHandler(async (req, res) => {
   const since = typeof req.query.since === "string" ? Number(req.query.since) : 0;
   const cursor = Number.isFinite(since) && since > 0 ? Math.floor(since) : 0;
+  recordWatchPoll(req, cursor);
   res.json({
     data: tmuxWatch.getEventsSince(cursor),
     latestEventId: tmuxWatch.latestEventId(),
     watches: tmuxWatch.listWatches()
+  });
+}));
+
+app.get("/api/tmux/watch/status", asyncHandler(async (_req, res) => {
+  res.json({
+    latestEventId: tmuxWatch.latestEventId(),
+    watches: tmuxWatch.listWatches(),
+    recentEvents: tmuxWatch.getEventsSince(Math.max(0, tmuxWatch.latestEventId() - 10)),
+    pollers: listRecentWatchPollers()
   });
 }));
 
@@ -612,6 +629,38 @@ function startUploadCleanup(): void {
   clean();
   const timer = setInterval(clean, 60 * 60 * 1000);
   timer.unref();
+}
+
+function recordWatchPoll(req: Request, since: number): void {
+  const userAgent = req.header("user-agent") ?? "";
+  const explicitClient = req.header("x-agent-tmux-web-client") ?? "";
+  const remoteAddress = req.ip || req.socket.remoteAddress || "unknown";
+  const id = `${explicitClient || userAgent || "unknown"} ${remoteAddress}`;
+  watchPollers.set(id, {
+    id,
+    lastSeen: new Date().toISOString(),
+    remoteAddress,
+    since,
+    userAgent
+  });
+}
+
+function listRecentWatchPollers(): Array<{
+  id: string;
+  lastSeen: string;
+  remoteAddress: string;
+  secondsAgo: number;
+  since: number;
+  userAgent: string;
+}> {
+  const now = Date.now();
+  return [...watchPollers.values()]
+    .map((poller) => ({
+      ...poller,
+      secondsAgo: Math.round((now - Date.parse(poller.lastSeen)) / 1000)
+    }))
+    .filter((poller) => poller.secondsAgo <= 10 * 60)
+    .sort((left, right) => left.secondsAgo - right.secondsAgo);
 }
 
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
