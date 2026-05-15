@@ -624,14 +624,26 @@ textarea:focus {
 
 .tmux-send {
   display: grid;
+  align-items: end;
   grid-template-columns: 38px 38px minmax(0, 1fr) 38px;
   gap: 8px;
   min-width: 0;
   margin-top: 10px;
 }
 
-.tmux-send input {
+.tmux-send input,
+.tmux-send textarea {
   min-width: 0;
+}
+
+.tmux-send textarea {
+  height: 38px;
+  min-height: 38px;
+  max-height: 112px;
+  padding: 8px 10px;
+  resize: none;
+  line-height: 1.35;
+  overflow: hidden;
 }
 
 .tmux-file-input {

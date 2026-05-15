@@ -164,7 +164,7 @@ public final class WatchPollingService extends Service {
                 this,
                 event.session + " is waiting",
                 event.label + " finished and is waiting for input.",
-                "agent-tmux-watch-" + event.id
+                "agent-tmux-watch-" + event.session
             );
         }
 

@@ -134,6 +134,21 @@ const DEMO_RAW_TERMINAL_OUTPUT = [
   "agent-demo $"
 ].join("\n");
 
+function resizeTmuxInput(node: HTMLTextAreaElement | null) {
+  if (!node) {
+    return;
+  }
+
+  node.style.height = "0px";
+  const maxHeight = 112;
+  const nextHeight = Math.min(Math.max(node.scrollHeight, 38), maxHeight);
+  node.style.height = `${nextHeight}px`;
+  node.style.overflowY = node.scrollHeight > maxHeight ? "auto" : "hidden";
+  if (node.selectionEnd >= node.value.length - 1) {
+    node.scrollTop = node.scrollHeight;
+  }
+}
+
 export function App() {
   const [status, setStatus] = useState<AppStatus | null>(demoMode ? DEMO_STATUS : null);
   const [models, setModels] = useState<CodexModel[]>([]);
@@ -171,7 +186,7 @@ export function App() {
   const terminalHostRef = useRef<HTMLDivElement | null>(null);
   const terminalSocketRef = useRef<WebSocket | null>(null);
   const terminalSessionRef = useRef("");
-  const tmuxInputRef = useRef<HTMLInputElement | null>(null);
+  const tmuxInputRef = useRef<HTMLTextAreaElement | null>(null);
   const tmuxFileInputRef = useRef<HTMLInputElement | null>(null);
   const tmuxOutputRef = useRef<HTMLPreElement | null>(null);
   const tmuxChatRef = useRef<HTMLDivElement | null>(null);
@@ -323,6 +338,10 @@ export function App() {
     node.scrollTop = node.scrollHeight;
     forceTmuxScrollBottomRef.current = false;
   }, [terminalActive, tmuxGuiActive, tmuxOutput]);
+
+  useLayoutEffect(() => {
+    resizeTmuxInput(tmuxInputRef.current);
+  }, [tmuxInput]);
 
   useEffect(() => {
     if (!selectedTmux || terminalActive) {
@@ -570,6 +589,7 @@ export function App() {
     if (demoMode) {
       setTmuxOutput(`${DEMO_TMUX_OUTPUT}\n\n› ${text}\n\n• Demo input captured without touching a real tmux session.`);
       setTmuxInput("");
+      resizeTmuxInput(tmuxInputRef.current);
       setTerminalStatus(`sent to ${session}; following output`);
       return;
     }
@@ -580,6 +600,7 @@ export function App() {
       if (tmuxInputRef.current) {
         tmuxInputRef.current.value = "";
       }
+      resizeTmuxInput(tmuxInputRef.current);
       setTerminalStatus(`sent to ${session}`);
       return;
     }
@@ -592,6 +613,7 @@ export function App() {
     if (tmuxInputRef.current) {
       tmuxInputRef.current.value = "";
     }
+    resizeTmuxInput(tmuxInputRef.current);
     setTerminalStatus(`sent to ${session}; following output`);
     scheduleTmuxFollow(session);
   }
@@ -657,6 +679,7 @@ export function App() {
         return;
       }
       input.focus();
+      resizeTmuxInput(input);
       const end = input.value.length;
       input.setSelectionRange(end, end);
     });
@@ -1366,7 +1389,22 @@ export function App() {
                 });
               }}
             />
-            <input ref={tmuxInputRef} value={tmuxInput} onChange={(event) => setTmuxInput(event.target.value)} placeholder="send keys + Enter" />
+            <textarea
+              ref={tmuxInputRef}
+              rows={1}
+              value={tmuxInput}
+              onChange={(event) => {
+                setTmuxInput(event.target.value);
+                resizeTmuxInput(event.currentTarget);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
+              placeholder="send keys + Enter"
+            />
             <button aria-label="Send to tmux" title="Send to tmux" type="submit"><Play size={15} /></button>
           </form>
         </div>
