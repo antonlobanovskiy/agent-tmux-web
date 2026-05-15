@@ -41,6 +41,7 @@ import {
   resolveUploadRoot,
   saveUploadedFile
 } from "./uploads.js";
+import { TmuxWatchStore } from "./tmuxWatch.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -56,6 +57,15 @@ const server = http.createServer(app);
 const bridge = new CodexBridge({ port: codexAppServerPort });
 const sockets = new Set<WebSocket>();
 const recentEvents: unknown[] = [];
+const tmuxWatch = new TmuxWatchStore({
+  capture: captureTmuxPane,
+  onEvent: (event) => broadcast({ type: "tmux-watch-done", event }),
+  onError: (error, session) => {
+    if ((process.env.AGENT_TMUX_WEB_VERBOSE ?? process.env.CODEX_WEB_VERBOSE) === "1") {
+      console.error(`tmux watch failed for ${session}`, error);
+    }
+  }
+});
 const jsonBodyParser = express.json({ limit: "2mb" });
 
 app.disable("x-powered-by");
@@ -229,8 +239,11 @@ app.post("/api/tmux/create", asyncHandler(async (req, res) => {
 
 app.post("/api/tmux/destroy", asyncHandler(async (req, res) => {
   const body = req.body as Record<string, unknown>;
+  const session = requireString(body.session, "session");
+  const data = await destroyTmuxSession(session);
+  tmuxWatch.cancelWatch(session);
   res.json({
-    data: await destroyTmuxSession(requireString(body.session, "session"))
+    data
   });
 }));
 
@@ -241,6 +254,7 @@ app.post("/api/tmux/open-codex", asyncHandler(async (req, res) => {
     cwd: stringOrNull(body.cwd) ?? process.cwd(),
     model: stringOrNull(body.model)
   });
+  tmuxWatch.startWatch(session, "Codex");
   res.json({
     ok: true,
     output: await captureTmuxPane(session, 220)
@@ -257,6 +271,7 @@ app.post("/api/tmux/open-tool", asyncHandler(async (req, res) => {
   const modeIds = stringArray(body.modeIds);
   const command = configuredTool?.command ?? requireString(body.command, "command");
   await openTmuxTool(session, configuredTool ?? { command }, configuredTool ? modeIds : []);
+  tmuxWatch.startWatch(session, configuredTool?.label ?? command);
   res.json({
     ok: true,
     output: await captureTmuxPane(session, 220)
@@ -273,6 +288,9 @@ app.post("/api/tmux/send", asyncHandler(async (req, res) => {
     enter,
     enter ? await resolveTmuxSubmitKey(session, body.submitKey) : "enter"
   );
+  if (enter) {
+    tmuxWatch.startWatch(session, stringOrNull(body.label) ?? "Tmux task");
+  }
   res.json({ ok: true });
 }));
 
@@ -280,9 +298,34 @@ app.post("/api/tmux/interrupt", asyncHandler(async (req, res) => {
   const body = req.body as Record<string, unknown>;
   const session = requireString(body.session, "session");
   await interruptTmuxPane(session, await resolveTmuxInterruptKey(session, body.interruptKey));
+  tmuxWatch.cancelWatch(session);
   res.json({
     ok: true,
     output: await captureTmuxPane(session, 220)
+  });
+}));
+
+app.post("/api/tmux/watch", asyncHandler(async (req, res) => {
+  const body = req.body as Record<string, unknown>;
+  const session = requireString(body.session, "session");
+  res.json({
+    ok: true,
+    watch: tmuxWatch.startWatch(session, stringOrNull(body.label) ?? "Tmux task")
+  });
+}));
+
+app.delete("/api/tmux/watch/:session", asyncHandler(async (req, res) => {
+  tmuxWatch.cancelWatch(String(req.params.session));
+  res.json({ ok: true });
+}));
+
+app.get("/api/tmux/watch/events", asyncHandler(async (req, res) => {
+  const since = typeof req.query.since === "string" ? Number(req.query.since) : 0;
+  const cursor = Number.isFinite(since) && since > 0 ? Math.floor(since) : 0;
+  res.json({
+    data: tmuxWatch.getEventsSince(cursor),
+    latestEventId: tmuxWatch.latestEventId(),
+    watches: tmuxWatch.listWatches()
   });
 }));
 
@@ -439,6 +482,7 @@ bridge.on("log", (line) => {
 server.listen(port, bindHost, async () => {
   console.log(`agent-tmux-web listening on http://${bindHost}:${port}`);
   startUploadCleanup();
+  tmuxWatch.startAutoPoll();
   if (codexAppServerAutostart) {
     bridge.start().catch((error: unknown) => {
       console.error("Failed to start Codex bridge", error);

@@ -13,6 +13,7 @@ export type BrowserNotificationAvailability =
 type AndroidNotificationBridge = {
   notificationsEnabled?: () => boolean;
   notify?: (title: string, body: string, tag: string) => void;
+  setWatchPollingEnabled?: (enabled: boolean) => void;
 };
 
 declare global {
@@ -82,6 +83,18 @@ export function showAgentNotification(title: string, body: string, tag: string):
     new Notification(title, { body, tag });
   } catch {
     // Browsers can still reject notifications after permission changes.
+  }
+}
+
+export function setAndroidWatchPollingEnabled(enabled: boolean): void {
+  if (!hasAndroidNotificationBridge()) {
+    return;
+  }
+
+  try {
+    window.AgentTmuxAndroid?.setWatchPollingEnabled?.(enabled);
+  } catch {
+    // The native bridge can disappear if the WebView is being torn down.
   }
 }
 

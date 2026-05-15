@@ -44,6 +44,20 @@ export type UploadedFileDto = {
   mimeType: string | null;
 };
 
+export type TmuxWatchDto = {
+  session: string;
+  label: string;
+  startedAt: string;
+};
+
+export type TmuxWatchEvent = {
+  id: number;
+  session: string;
+  label: string;
+  startedAt: string;
+  finishedAt: string;
+};
+
 export type AppStatus = {
   bindHost: string;
   port: number;

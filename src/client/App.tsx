@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { FormEvent, KeyboardEvent, UIEvent, forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import type { AppStatus, CodexModel, CodexSkill, TmuxSessionDto, TmuxToolDto, UploadedFileDto } from "../shared/api.js";
+import type { AppStatus, CodexModel, CodexSkill, TmuxSessionDto, TmuxToolDto, TmuxWatchEvent, UploadedFileDto } from "../shared/api.js";
 import { describeThreadItem, type UiEventDescription } from "../shared/codexEvents.js";
 import {
   filterSlashCommands,
@@ -41,8 +41,7 @@ import {
 } from "./slashCommands.js";
 import { parseTmuxChatOutput, splitTmuxChatMessage, type TmuxChatMessage } from "./tmuxGui.js";
 import { shouldAutoCaptureTmux, TMUX_CAPTURE_POLL_INTERVAL_MS, TMUX_SEND_FOLLOW_DELAYS_MS } from "./tmuxFollow.js";
-import { looksLikeTmuxWaitingForInput } from "./tmuxActivity.js";
-import { canShowBrowserNotifications, getBrowserNotificationAvailability, getBrowserNotificationSnapshot, showAgentNotification } from "./browserNotifications.js";
+import { canShowBrowserNotifications, getBrowserNotificationAvailability, getBrowserNotificationSnapshot, setAndroidWatchPollingEnabled, showAgentNotification } from "./browserNotifications.js";
 
 type TimelineEntry = {
   id: string;
@@ -67,17 +66,11 @@ type WsPayload = {
   recentEvents?: WsPayload[];
   description?: UiEventDescription;
   notification?: unknown;
-};
-
-type TmuxTaskWatch = {
-  label: string;
-  notified: boolean;
-  startedAt: number;
+  event?: TmuxWatchEvent;
 };
 
 const defaultCwd = "";
 const TMUX_TERMINAL_SUBMIT_DELAY_MS = 350;
-const TMUX_DONE_NOTIFICATION_MIN_MS = 2500;
 const TMUX_NOTIFICATION_STORAGE_KEY = "agent-tmux-web.notify";
 const demoMode = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("demo");
 const DEMO_STATUS: AppStatus = {
@@ -183,7 +176,7 @@ export function App() {
   const tmuxOutputRef = useRef<HTMLPreElement | null>(null);
   const tmuxChatRef = useRef<HTMLDivElement | null>(null);
   const tmuxFollowTimersRef = useRef<number[]>([]);
-  const tmuxTaskWatchRef = useRef<Record<string, TmuxTaskWatch>>({});
+  const tmuxNotificationsEnabledRef = useRef(tmuxNotificationsEnabled);
   const tmuxStickToBottomRef = useRef(true);
   const forceTmuxScrollBottomRef = useRef(false);
 
@@ -261,28 +254,6 @@ export function App() {
     setSelectedTmux((current) => current || result.data.find((session) => session.attached)?.name || result.data[0]?.name || "");
   }, []);
 
-  const markTmuxTaskStarted = useCallback((session: string, label: string) => {
-    tmuxTaskWatchRef.current[session] = {
-      label,
-      notified: false,
-      startedAt: Date.now()
-    };
-  }, []);
-
-  const maybeNotifyTmuxDone = useCallback((session: string, output: string) => {
-    const watch = tmuxTaskWatchRef.current[session];
-    if (!tmuxNotificationsEnabled || !watch || watch.notified) {
-      return;
-    }
-    if (Date.now() - watch.startedAt < TMUX_DONE_NOTIFICATION_MIN_MS || !looksLikeTmuxWaitingForInput(output)) {
-      return;
-    }
-
-    watch.notified = true;
-    showTmuxDoneNotification(session, watch.label);
-    setTerminalStatus(`${session} is waiting for input`);
-  }, [tmuxNotificationsEnabled]);
-
   const loadTmuxTools = useCallback(async () => {
     if (demoMode) {
       setTmuxTools(DEMO_TMUX_TOOLS);
@@ -304,8 +275,7 @@ export function App() {
     }
     const result = await api<{ output: string }>(`/api/tmux/capture?session=${encodeURIComponent(session)}&lines=220`);
     setTmuxOutput(result.output);
-    maybeNotifyTmuxDone(session, result.output);
-  }, [maybeNotifyTmuxDone, selectedTmux]);
+  }, [selectedTmux]);
 
   useEffect(() => {
     loadStatus().catch(reportError(setError));
@@ -327,6 +297,11 @@ export function App() {
     }
     loadSkills().catch(reportError(setError));
   }, [loadSkills, status?.codex.initialized]);
+
+  useEffect(() => {
+    tmuxNotificationsEnabledRef.current = tmuxNotificationsEnabled;
+    setAndroidWatchPollingEnabled(tmuxNotificationsEnabled);
+  }, [tmuxNotificationsEnabled]);
 
   useEffect(() => {
     if (selectedTmux) {
@@ -355,15 +330,13 @@ export function App() {
     }
 
     const interval = window.setInterval(() => {
-      const watchedTask = tmuxTaskWatchRef.current[selectedTmux];
-      const keepWatchingHidden = tmuxNotificationsEnabled && watchedTask && !watchedTask.notified;
-      if (shouldAutoCaptureTmux({ selectedTmux, terminalActive, documentHidden: document.hidden && !keepWatchingHidden })) {
+      if (shouldAutoCaptureTmux({ selectedTmux, terminalActive, documentHidden: document.hidden })) {
         captureTmux(selectedTmux).catch(reportError(setError));
       }
     }, TMUX_CAPTURE_POLL_INTERVAL_MS);
 
     return () => window.clearInterval(interval);
-  }, [captureTmux, selectedTmux, terminalActive, tmuxNotificationsEnabled]);
+  }, [captureTmux, selectedTmux, terminalActive]);
 
   useEffect(() => {
     if (demoMode) {
@@ -374,6 +347,13 @@ export function App() {
     const socket = new WebSocket(`${protocol}://${window.location.host}/ws${token ? `?token=${encodeURIComponent(token)}` : ""}`);
     socket.onmessage = (event) => {
       const payload = JSON.parse(event.data) as WsPayload;
+      if (payload.type === "tmux-watch-done" && isTmuxWatchEvent(payload.event)) {
+        if (tmuxNotificationsEnabledRef.current) {
+          showTmuxDoneNotification(payload.event.session, payload.event.label);
+        }
+        setTerminalStatus(`${payload.event.session} is waiting for input`);
+        return;
+      }
       handleWsPayload(payload, setStatus, setThreadStatus, setTimeline, setActiveTurnId);
     };
     socket.onerror = () => setError("WebSocket connection failed");
@@ -594,7 +574,7 @@ export function App() {
       return;
     }
 
-    markTmuxTaskStarted(session, "Tmux task");
+    await registerTmuxTaskWatch(session, "Tmux task");
     if (sendTmuxViaTerminal(session, text)) {
       setTmuxInput("");
       if (tmuxInputRef.current) {
@@ -867,7 +847,7 @@ export function App() {
       return;
     }
 
-    markTmuxTaskStarted(selectedTmux, tool?.label ?? command);
+    await registerTmuxTaskWatch(selectedTmux, tool?.label ?? command);
     const result = await api<{ output: string }>("/api/tmux/open-tool", {
       method: "POST",
       body: JSON.stringify({
@@ -1480,6 +1460,13 @@ async function uploadFileToServer(file: File): Promise<UploadedFileDto> {
   return result.file;
 }
 
+async function registerTmuxTaskWatch(session: string, label: string): Promise<void> {
+  await api("/api/tmux/watch", {
+    method: "POST",
+    body: JSON.stringify({ session, label })
+  });
+}
+
 function formatUploadedFilesForPrompt(files: UploadedFileDto[]): string {
   const label = files.length === 1 ? "Attached file on server" : "Attached files on server";
   return `${label}: ${files.map((file) => file.path).join(" ")}`;
@@ -1596,6 +1583,16 @@ function isAppStatus(value: unknown): value is AppStatus {
 
 function isCodexStatus(value: unknown): value is Partial<AppStatus["codex"]> {
   return Boolean(value && typeof value === "object" && ("connected" in value || "initialized" in value || "lastError" in value));
+}
+
+function isTmuxWatchEvent(value: unknown): value is TmuxWatchEvent {
+  return Boolean(
+    value
+    && typeof value === "object"
+    && typeof (value as Record<string, unknown>).id === "number"
+    && typeof (value as Record<string, unknown>).session === "string"
+    && typeof (value as Record<string, unknown>).label === "string"
+  );
 }
 
 function applyDescription(entries: TimelineEntry[], description: UiEventDescription): TimelineEntry[] {

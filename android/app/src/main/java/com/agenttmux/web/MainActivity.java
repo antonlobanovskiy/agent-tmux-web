@@ -49,6 +49,12 @@ public final class MainActivity extends Activity {
 
         preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         root = new FrameLayout(this);
+        root.setFitsSystemWindows(true);
+        getWindow().setStatusBarColor(Color.rgb(13, 15, 16));
+        getWindow().setNavigationBarColor(Color.rgb(13, 15, 16));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            getWindow().setDecorFitsSystemWindows(true);
+        }
         setContentView(root);
 
         webView = new WebView(this);
@@ -66,6 +72,7 @@ public final class MainActivity extends Activity {
         } else {
             loadConfiguredServer();
         }
+        WatchPollingService.startIfEnabled(this);
     }
 
     @Override
@@ -226,6 +233,7 @@ public final class MainActivity extends Activity {
                 .apply();
             hideSetup();
             loadConfiguredServer();
+            WatchPollingService.startIfEnabled(this);
         });
 
         TextView note = label("The Android app does not run tmux locally. It loads your private server and keeps the same GUI, raw tmux mode, uploads, and launchers.", 13, "#87918D");
@@ -345,6 +353,20 @@ public final class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
             && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[] { Manifest.permission.POST_NOTIFICATIONS }, NOTIFICATION_PERMISSION_REQUEST);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != NOTIFICATION_PERMISSION_REQUEST || grantResults.length == 0) {
+            return;
+        }
+
+        if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            WatchPollingService.startIfEnabled(this);
+        } else {
+            WatchPollingService.setEnabled(this, false);
         }
     }
 

@@ -126,9 +126,9 @@ deployment is separate. Keep user-specific runtime config out of git.
    - Create or select a tmux session.
    - Send a short prompt through the input.
    - Attach Raw mode, then detach and confirm tmux size is restored.
-   - Enable browser notifications with the bell button if the user wants done
-     alerts. Use HTTPS or localhost; most mobile browsers block notification
-     prompts on plain HTTP LAN/Tailscale origins.
+   - Enable notifications with the bell button if the user wants done alerts.
+     Browser installs need HTTPS or localhost; the Android wrapper can use its
+     native notification bridge against the private server URL.
    - Confirm uploads use a temporary server path and are not kept forever.
    - If setting up Android, build `pnpm android:build`, install the APK from
      `android/app/build/outputs/apk/release/app-release.apk`, and point the
@@ -152,7 +152,8 @@ deployment is separate. Keep user-specific runtime config out of git.
   and whether the URL needs `?token=...`.
 - Raw terminal acts resized after detach: detach from the UI, then check for
   active tmux clients with `tmux list-clients`.
-- Notifications do not fire: browser permission must be granted from the bell
-  button, and the app must see a send/run action before it watches for idle.
+- Notifications do not fire: permission must be granted from the bell button,
+  and the app must see a send/run action before it watches for idle. On Android,
+  leave the foreground watcher notification enabled.
 - CLI launcher does nothing: verify the command exists in the server user's
   `PATH`, not just in an interactive shell.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { looksLikeTmuxWaitingForInput, looksLikeTmuxWorking } from "../tmuxActivity.js";
+import { looksLikeTmuxWaitingForInput, looksLikeTmuxWorking } from "../../shared/tmuxActivity.js";
 
 describe("tmux activity detection", () => {
   it("detects Codex working output", () => {

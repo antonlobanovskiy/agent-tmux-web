@@ -64,6 +64,8 @@ cd android
 - Use a private network path or authenticated reverse proxy; the app is terminal
   access to the server user.
 - File inputs in the web UI open the Android file picker.
-- Browser notifications use a native Android bridge inside the app.
+- Notifications use a native Android bridge. When enabled, the app runs a
+  low-importance foreground watcher that polls the server for completed tmux
+  tasks.
 - The release APK is signed with the standard Android debug key for easy
   sideloading. Use your own signing key before publishing through an app store.

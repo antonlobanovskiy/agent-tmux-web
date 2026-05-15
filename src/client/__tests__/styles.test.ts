@@ -13,6 +13,7 @@ describe("responsive mobile CSS", () => {
     expect(mobileBlock).toContain("#root");
     expect(mobileBlock).toContain("overflow: hidden");
     expect(mobileBlock).toContain("height: 100dvh");
+    expect(css).toContain("env(safe-area-inset-top)");
     expect(mobileBlock).toContain("display: none");
     expect(mobileBlock).toContain("flex: 1 1 auto");
   });

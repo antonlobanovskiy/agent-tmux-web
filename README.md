@@ -58,8 +58,7 @@ For setup details, see [`android/README.md`](./android/README.md).
 - Supports optional per-tool mode toggles for flags such as Codex Yolo mode.
 - Captures tmux panes as either terminal text or a normalized chat-style view.
 - Attaches a raw browser terminal to tmux for exact native CLI behavior.
-- Can send browser notifications when the selected tmux session returns to an
-  input prompt after a send/run action.
+- Can notify when any watched tmux send/run action returns to an input prompt.
 - Uploads files from Android/desktop browsers to a temporary server path and
   inserts that path into the prompt.
 - Optionally starts the Codex app-server for Codex-specific thread/model/skill
@@ -156,10 +155,10 @@ codex -C /workspace/project -m gpt-5.5
 ```
 
 Use the bell button in the tmux toolbar to enable browser notifications. After
-permission is granted, the app watches send/run actions in the selected tmux
-session and notifies when the captured pane looks ready for input again. While a
-watched task is active, capture polling can continue even if the browser tab is
-hidden.
+permission is granted, the server watches tmux send/run actions and emits a done
+event when the captured pane looks ready for input again. In the Android app,
+that also starts a low-importance foreground watcher so notifications can still
+arrive while the WebView is backgrounded or the phone is locked.
 
 Mobile browsers usually require a secure browser context for notifications. Use
 HTTPS, localhost, or an installed/private browser context that your browser
