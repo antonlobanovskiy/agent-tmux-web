@@ -13,6 +13,7 @@ import {
   CircleStop,
   CornerDownLeft,
   Cpu,
+  Download,
   Folder,
   Keyboard,
   Menu,
@@ -1250,7 +1251,7 @@ export function App() {
               <span>{selectedTmux || "no session"}</span>
               <Menu size={15} />
             </button>
-            <button aria-label="Refresh tmux sessions" title="Refresh tmux sessions" type="button" onClick={() => loadTmuxSessions().catch(reportError(setError))}>
+            <button aria-label="Refresh tmux session list" title="Refresh tmux session list" type="button" onClick={() => loadTmuxSessions().catch(reportError(setError))}>
               <RefreshCw size={14} />
             </button>
           </div>
@@ -1305,8 +1306,8 @@ export function App() {
         </div>
         <div className="tmux-workspace">
           <div className="tmux-terminal-toolbar">
-            <button aria-label="Capture tmux output" title="Capture tmux output" type="button" onClick={closeRawTerminal}>
-              <RefreshCw size={15} /> <span>Capture</span>
+            <button aria-label="Force sync selected tmux output" title="Force sync selected tmux output" type="button" onClick={closeRawTerminal}>
+              <Download size={15} /> <span>Force Sync</span>
             </button>
             <button
               aria-label={tmuxGuiActive ? "Show terminal capture" : "Show GUI chat"}
