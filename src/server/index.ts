@@ -51,6 +51,7 @@ const codexAppServerPort = Number(process.env.CODEX_APP_SERVER_PORT ?? 43117);
 const codexAppServerAutostart = process.env.CODEX_APP_SERVER_AUTOSTART === "1";
 const authToken = process.env.AGENT_TMUX_WEB_AUTH_TOKEN ?? process.env.CODEX_WEB_AUTH_TOKEN ?? "";
 const defaultCwd = process.env.CLI_WEB_DEFAULT_CWD ?? process.env.HOME ?? process.cwd();
+const tmuxCaptureHistoryLines = 1000;
 
 const app = express();
 const server = http.createServer(app);
@@ -230,7 +231,7 @@ app.get("/api/tmux/tools", asyncHandler(async (_req, res) => {
 
 app.get("/api/tmux/capture", asyncHandler(async (req, res) => {
   const session = requireString(req.query.session, "session");
-  const lines = typeof req.query.lines === "string" ? Number(req.query.lines) : 160;
+  const lines = typeof req.query.lines === "string" ? Number(req.query.lines) : tmuxCaptureHistoryLines;
   res.json({ session, output: await captureTmuxPane(session, lines) });
 }));
 
@@ -264,7 +265,7 @@ app.post("/api/tmux/open-codex", asyncHandler(async (req, res) => {
   tmuxWatch.startWatch(session, "Codex");
   res.json({
     ok: true,
-    output: await captureTmuxPane(session, 220)
+    output: await captureTmuxPane(session, tmuxCaptureHistoryLines)
   });
 }));
 
@@ -281,7 +282,7 @@ app.post("/api/tmux/open-tool", asyncHandler(async (req, res) => {
   tmuxWatch.startWatch(session, configuredTool?.label ?? command);
   res.json({
     ok: true,
-    output: await captureTmuxPane(session, 220)
+    output: await captureTmuxPane(session, tmuxCaptureHistoryLines)
   });
 }));
 
@@ -308,7 +309,7 @@ app.post("/api/tmux/interrupt", asyncHandler(async (req, res) => {
   tmuxWatch.cancelWatch(session);
   res.json({
     ok: true,
-    output: await captureTmuxPane(session, 220)
+    output: await captureTmuxPane(session, tmuxCaptureHistoryLines)
   });
 }));
 
