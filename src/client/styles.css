@@ -748,6 +748,42 @@ textarea:focus {
   background: #0d0f10;
 }
 
+.tmux-output-shell {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.tmux-output-shell > .tmux-output,
+.tmux-output-shell > .tmux-chat,
+.tmux-output-shell > .tmux-terminal {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+}
+
+.tmux-jump-bottom {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 6;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(84, 179, 153, 0.42);
+  border-radius: 999px;
+  background: rgba(16, 18, 20, 0.92);
+  color: #dff9ef;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(8px);
+}
+
+.tmux-jump-bottom:hover {
+  background: #54b399;
+  color: #07110f;
+}
+
 .tmux-chat {
   display: flex;
   flex-direction: column;

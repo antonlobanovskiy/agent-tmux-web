@@ -236,8 +236,8 @@ export async function openTmuxTool(session: string, tool: Pick<TmuxToolConfig, "
   await sendTmuxText(session, buildTmuxToolCommand(tool, modeIds), true);
 }
 
-export async function captureTmuxPane(session: string, lines = 160): Promise<string> {
-  const safeLines = Math.max(20, Math.min(lines, 1000));
+export async function captureTmuxPane(session: string, lines = 1000): Promise<string> {
+  const safeLines = Math.max(20, Math.min(lines, 5000));
   const { stdout } = await execFileAsync("tmux", [
     "capture-pane",
     "-p",

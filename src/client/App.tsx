@@ -4,6 +4,7 @@ import "@xterm/xterm/css/xterm.css";
 import {
   Activity,
   ArrowDown,
+  ArrowDownToLine,
   ArrowLeft,
   ArrowRight,
   ArrowUp,
@@ -71,6 +72,7 @@ type WsPayload = {
 };
 
 const defaultCwd = "";
+const TMUX_CAPTURE_HISTORY_LINES = 1000;
 const TMUX_TERMINAL_SUBMIT_DELAY_MS = 350;
 const TMUX_NOTIFICATION_STORAGE_KEY = "agent-tmux-web.notify";
 const demoMode = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("demo");
@@ -180,6 +182,7 @@ export function App() {
   const [tmuxGuiActive, setTmuxGuiActive] = useState(demoMode);
   const [tmuxMenuOpen, setTmuxMenuOpen] = useState(false);
   const [tmuxNotificationsEnabled, setTmuxNotificationsEnabled] = useState(readTmuxNotificationPreference);
+  const [tmuxAtBottom, setTmuxAtBottom] = useState(true);
   const [uploadingTmuxFiles, setUploadingTmuxFiles] = useState(false);
   const [terminalStatus, setTerminalStatus] = useState(demoMode ? "gui view for agent-demo" : "");
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -195,6 +198,7 @@ export function App() {
   const tmuxNotificationsEnabledRef = useRef(tmuxNotificationsEnabled);
   const tmuxStickToBottomRef = useRef(true);
   const forceTmuxScrollBottomRef = useRef(false);
+  const tmuxScrollTopSnapshotRef = useRef<number | null>(null);
 
   const modelEfforts = useMemo(() => {
     const found = models.find((entry) => entry.id === model || entry.model === model);
@@ -286,12 +290,12 @@ export function App() {
       return;
     }
     if (demoMode) {
-      setTmuxOutput(DEMO_TMUX_OUTPUT);
+      setCapturedTmuxOutput(DEMO_TMUX_OUTPUT);
       return;
     }
-    const result = await api<{ output: string }>(`/api/tmux/capture?session=${encodeURIComponent(session)}&lines=220`);
-    setTmuxOutput(result.output);
-  }, [selectedTmux]);
+    const result = await api<{ output: string }>(`/api/tmux/capture?session=${encodeURIComponent(session)}&lines=${TMUX_CAPTURE_HISTORY_LINES}`);
+    setCapturedTmuxOutput(result.output);
+  }, [selectedTmux, tmuxGuiActive]);
 
   useEffect(() => {
     loadStatus().catch(reportError(setError));
@@ -331,13 +335,25 @@ export function App() {
       return;
     }
 
-    const node = tmuxGuiActive ? tmuxChatRef.current : tmuxOutputRef.current;
-    if (!node || (!forceTmuxScrollBottomRef.current && !tmuxStickToBottomRef.current)) {
+    const node = currentTmuxScrollNode();
+    if (!node) {
       return;
     }
 
-    node.scrollTop = node.scrollHeight;
-    forceTmuxScrollBottomRef.current = false;
+    if (forceTmuxScrollBottomRef.current || tmuxStickToBottomRef.current) {
+      node.scrollTop = node.scrollHeight;
+      forceTmuxScrollBottomRef.current = false;
+      updateTmuxBottomState(node);
+      tmuxScrollTopSnapshotRef.current = null;
+      return;
+    }
+
+    if (tmuxScrollTopSnapshotRef.current !== null) {
+      const maxScrollTop = Math.max(0, node.scrollHeight - node.clientHeight);
+      node.scrollTop = Math.min(tmuxScrollTopSnapshotRef.current, maxScrollTop);
+    }
+    tmuxScrollTopSnapshotRef.current = null;
+    updateTmuxBottomState(node);
   }, [terminalActive, tmuxGuiActive, tmuxOutput]);
 
   useLayoutEffect(() => {
@@ -588,7 +604,7 @@ export function App() {
     queueTmuxOutputBottomScroll();
 
     if (demoMode) {
-      setTmuxOutput(`${DEMO_TMUX_OUTPUT}\n\n› ${text}\n\n• Demo input captured without touching a real tmux session.`);
+      setCapturedTmuxOutput(`${DEMO_TMUX_OUTPUT}\n\n› ${text}\n\n• Demo input captured without touching a real tmux session.`);
       setTmuxInput("");
       resizeTmuxInput(tmuxInputRef.current);
       setTerminalStatus(`sent to ${session}; following output`);
@@ -632,7 +648,7 @@ export function App() {
       method: "POST",
       body: JSON.stringify({ session: selectedTmux })
     });
-    setTmuxOutput(result.output);
+    setCapturedTmuxOutput(result.output);
     setTerminalStatus(`stop sent to ${selectedTmux}`);
     scheduleTmuxFollow(selectedTmux);
   }
@@ -711,6 +727,20 @@ export function App() {
     queueTmuxOutputBottomScroll();
     setTerminalStatus(selectedTmux);
     void captureTmux(selectedTmux).catch(reportError(setError));
+  }
+
+  function forceSyncTmuxOutput() {
+    if (!selectedTmux) {
+      return;
+    }
+    if (terminalActive) {
+      closeRawTerminal();
+      return;
+    }
+    setTerminalStatus(`syncing ${selectedTmux}`);
+    void captureTmux(selectedTmux)
+      .then(() => setTerminalStatus(`synced ${selectedTmux}`))
+      .catch(reportError(setError));
   }
 
   function toggleTmuxGui() {
@@ -843,7 +873,7 @@ export function App() {
       const nextSession = remaining[0] ?? null;
       setTmuxSessions(remaining);
       setSelectedTmux(nextSession?.name ?? "");
-      setTmuxOutput(nextSession ? DEMO_TMUX_OUTPUT : "");
+      setCapturedTmuxOutput(nextSession ? DEMO_TMUX_OUTPUT : "");
       setTmuxMenuOpen(false);
       setTerminalStatus(nextSession?.name ?? "no session selected");
       return;
@@ -856,7 +886,7 @@ export function App() {
     const nextSession = result.data.find((session) => session.attached) ?? result.data[0] ?? null;
     setTmuxSessions(result.data);
     setSelectedTmux(nextSession?.name ?? "");
-    setTmuxOutput("");
+    setCapturedTmuxOutput("");
     setTmuxMenuOpen(false);
     setTerminalStatus(nextSession?.name ?? "no session selected");
   }
@@ -874,7 +904,8 @@ export function App() {
     }
 
     if (demoMode) {
-      setTmuxOutput(`${DEMO_TMUX_OUTPUT}\n\n› ${command}\n\n• Started ${tool?.label ?? command} in ${selectedTmux}.`);
+      queueTmuxOutputBottomScroll();
+      setCapturedTmuxOutput(`${DEMO_TMUX_OUTPUT}\n\n› ${command}\n\n• Started ${tool?.label ?? command} in ${selectedTmux}.`);
       setTerminalActive(false);
       setTmuxGuiActive(true);
       setTmuxMenuOpen(false);
@@ -892,7 +923,8 @@ export function App() {
         modeIds: selectedTmuxTool === "custom" ? [] : currentTmuxToolModeIds
       })
     });
-    setTmuxOutput(result.output);
+    queueTmuxOutputBottomScroll();
+    setCapturedTmuxOutput(result.output);
     setTerminalActive(false);
     setTmuxGuiActive(false);
     setTmuxMenuOpen(false);
@@ -1087,14 +1119,47 @@ export function App() {
     }
   }
 
+  function setCapturedTmuxOutput(output: string) {
+    rememberTmuxScrollPosition();
+    setTmuxOutput(output);
+  }
+
+  function currentTmuxScrollNode() {
+    return tmuxGuiActive ? tmuxChatRef.current : tmuxOutputRef.current;
+  }
+
+  function rememberTmuxScrollPosition() {
+    const node = currentTmuxScrollNode();
+    tmuxScrollTopSnapshotRef.current = node && !forceTmuxScrollBottomRef.current && !tmuxStickToBottomRef.current
+      ? node.scrollTop
+      : null;
+  }
+
   function queueTmuxOutputBottomScroll() {
     forceTmuxScrollBottomRef.current = true;
     tmuxStickToBottomRef.current = true;
+    setTmuxAtBottom(true);
   }
 
   function handleTmuxOutputScroll(event: UIEvent<HTMLElement>) {
-    const node = event.currentTarget;
-    tmuxStickToBottomRef.current = node.scrollHeight - node.scrollTop - node.clientHeight < 24;
+    updateTmuxBottomState(event.currentTarget);
+  }
+
+  function updateTmuxBottomState(node: HTMLElement) {
+    const atBottom = node.scrollHeight - node.scrollTop - node.clientHeight < 24;
+    tmuxStickToBottomRef.current = atBottom;
+    setTmuxAtBottom(atBottom);
+  }
+
+  function jumpTmuxOutputToBottom() {
+    const node = currentTmuxScrollNode();
+    if (!node) {
+      return;
+    }
+    tmuxScrollTopSnapshotRef.current = null;
+    tmuxStickToBottomRef.current = true;
+    setTmuxAtBottom(true);
+    node.scrollTo({ top: node.scrollHeight, behavior: "smooth" });
   }
 
   return (
@@ -1306,7 +1371,7 @@ export function App() {
         </div>
         <div className="tmux-workspace">
           <div className="tmux-terminal-toolbar">
-            <button aria-label="Force sync selected tmux output" title="Force sync selected tmux output" type="button" onClick={closeRawTerminal}>
+            <button aria-label="Force sync selected tmux output" title="Force sync selected tmux output" type="button" onClick={forceSyncTmuxOutput}>
               <Download size={15} /> <span>Force Sync</span>
             </button>
             <button
@@ -1340,17 +1405,24 @@ export function App() {
             </button>
             <span>{terminalStatus || selectedTmux || "no session selected"}</span>
           </div>
-          {terminalActive && demoMode ? (
-            <div className="tmux-terminal tmux-terminal-demo">
-              <pre>{DEMO_RAW_TERMINAL_OUTPUT}</pre>
-            </div>
-          ) : terminalActive ? (
-            <div ref={terminalHostRef} className="tmux-terminal" />
-          ) : tmuxGuiActive ? (
-            <TmuxChatView ref={tmuxChatRef} messages={tmuxChatMessages} onScroll={handleTmuxOutputScroll} />
-          ) : (
-            <pre ref={tmuxOutputRef} className="tmux-output" onScroll={handleTmuxOutputScroll}>{tmuxOutput || "No tmux output captured."}</pre>
-          )}
+          <div className="tmux-output-shell">
+            {terminalActive && demoMode ? (
+              <div className="tmux-terminal tmux-terminal-demo">
+                <pre>{DEMO_RAW_TERMINAL_OUTPUT}</pre>
+              </div>
+            ) : terminalActive ? (
+              <div ref={terminalHostRef} className="tmux-terminal" />
+            ) : tmuxGuiActive ? (
+              <TmuxChatView ref={tmuxChatRef} messages={tmuxChatMessages} onScroll={handleTmuxOutputScroll} />
+            ) : (
+              <pre ref={tmuxOutputRef} className="tmux-output" onScroll={handleTmuxOutputScroll}>{tmuxOutput || "No tmux output captured."}</pre>
+            )}
+            {!terminalActive && !tmuxAtBottom && (
+              <button className="tmux-jump-bottom" aria-label="Jump to latest tmux output" title="Jump to latest tmux output" type="button" onClick={jumpTmuxOutputToBottom}>
+                <ArrowDownToLine size={17} />
+              </button>
+            )}
+          </div>
           {terminalActive && (
             <div className="tmux-soft-keys" aria-label="Raw terminal keys">
               <button type="button" title="Escape" onClick={() => sendRawTerminalData("\x1b")}>Esc</button>
