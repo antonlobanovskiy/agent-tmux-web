@@ -109,6 +109,13 @@ button:disabled {
   font-weight: 800;
 }
 
+.tmux-title img {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  object-fit: cover;
+}
+
 .tmux-session-menu-button {
   min-width: 0;
 }
@@ -139,8 +146,14 @@ button:disabled {
   width: 38px;
   height: 38px;
   border-radius: 8px;
-  background: #2f6f5f;
-  color: white;
+  overflow: hidden;
+  background: #101315;
+}
+
+.brand-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .brand h1,

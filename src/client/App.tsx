@@ -9,7 +9,6 @@ import {
   ArrowRight,
   ArrowUp,
   Bell,
-  Bot,
   ChevronRight,
   CircleStop,
   CornerDownLeft,
@@ -1166,7 +1165,7 @@ export function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark"><Bot size={20} /></div>
+          <div className="brand-mark"><img alt="" src="/agent-tmux-logo.png" /></div>
           <div>
             <h1>Agent Tmux</h1>
             <span>{status?.codex.initialized ? "codex connected" : "tmux ready"}</span>
@@ -1309,7 +1308,7 @@ export function App() {
         <div className="tmux-control-rail">
           <div className="tmux-compact-bar">
             <div className="tmux-title">
-              <TerminalIcon size={15} />
+              <img alt="" src="/agent-tmux-logo.png" />
               Tmux
             </div>
             <button className="tmux-session-menu-button" type="button" onClick={() => setTmuxMenuOpen((current) => !current)}>
