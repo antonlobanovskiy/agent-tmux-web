@@ -43,10 +43,14 @@ public final class WatchPollingService extends Service {
     private SharedPreferences preferences;
 
     public static void setEnabled(Context context, boolean enabled) {
-        SharedPreferences.Editor editor = preferences(context).edit()
+        SharedPreferences prefs = preferences(context);
+        boolean wasEnabled = prefs.getBoolean(PREF_WATCH_POLLING_ENABLED, false);
+        SharedPreferences.Editor editor = prefs.edit()
             .putBoolean(PREF_WATCH_POLLING_ENABLED, enabled);
         if (enabled) {
-            editor.putLong(PREF_WATCH_ENABLED_AT_MS, System.currentTimeMillis());
+            if (!wasEnabled || !prefs.contains(PREF_WATCH_ENABLED_AT_MS)) {
+                editor.putLong(PREF_WATCH_ENABLED_AT_MS, System.currentTimeMillis());
+            }
         } else {
             editor.remove(PREF_WATCH_ENABLED_AT_MS);
         }
@@ -147,7 +151,6 @@ public final class WatchPollingService extends Service {
         }
 
         long lastEventId = preferences.getLong(PREF_WATCH_LAST_EVENT_ID, 0);
-        boolean initialized = preferences.contains(PREF_WATCH_LAST_EVENT_ID);
         long enabledAtMs = preferences.getLong(PREF_WATCH_ENABLED_AT_MS, System.currentTimeMillis());
         PollResult result = fetchEvents(lastEventId);
         long nextEventId = Math.max(lastEventId, result.latestEventId);
@@ -157,7 +160,7 @@ public final class WatchPollingService extends Service {
                 continue;
             }
             nextEventId = Math.max(nextEventId, event.id);
-            if (!initialized && event.finishedAtMs < enabledAtMs) {
+            if (event.finishedAtMs < enabledAtMs) {
                 continue;
             }
             AgentNotifications.postTaskNotification(

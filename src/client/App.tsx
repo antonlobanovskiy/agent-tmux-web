@@ -42,7 +42,7 @@ import {
 } from "./slashCommands.js";
 import { parseTmuxChatOutput, splitTmuxChatMessage, type TmuxChatMessage } from "./tmuxGui.js";
 import { shouldAutoCaptureTmux, TMUX_CAPTURE_POLL_INTERVAL_MS, TMUX_SEND_FOLLOW_DELAYS_MS } from "./tmuxFollow.js";
-import { canShowBrowserNotifications, getBrowserNotificationAvailability, getBrowserNotificationSnapshot, setAndroidWatchPollingEnabled, showAgentNotification } from "./browserNotifications.js";
+import { canShowBrowserNotifications, canShowWebSocketTaskNotifications, getBrowserNotificationAvailability, getBrowserNotificationSnapshot, setAndroidWatchPollingEnabled, showAgentNotification } from "./browserNotifications.js";
 
 type TimelineEntry = {
   id: string;
@@ -397,7 +397,7 @@ export function App() {
     socket.onmessage = (event) => {
       const payload = JSON.parse(event.data) as WsPayload;
       if (payload.type === "tmux-watch-done" && isTmuxWatchEvent(payload.event)) {
-        if (tmuxNotificationsEnabledRef.current) {
+        if (tmuxNotificationsEnabledRef.current && canShowWebSocketTaskNotifications()) {
           showTmuxDoneNotification(payload.event.session, payload.event.label);
         }
         setTerminalStatus(`${payload.event.session} is waiting for input`);
@@ -789,11 +789,6 @@ export function App() {
       setTmuxNotificationsEnabled(true);
       writeTmuxNotificationPreference(true);
       setAndroidWatchPollingEnabled(true);
-      showAgentNotification(
-        "Agent Tmux notifications",
-        "Background task notifications are enabled.",
-        "agent-tmux-watch-enabled"
-      );
       setTerminalStatus("app notifications on");
       return;
     }
@@ -811,11 +806,6 @@ export function App() {
     if (permission === "granted") {
       setTmuxNotificationsEnabled(true);
       writeTmuxNotificationPreference(true);
-      showAgentNotification(
-        "Agent Tmux notifications",
-        "Task notifications are enabled.",
-        "agent-tmux-watch-enabled"
-      );
       setTerminalStatus("browser notifications on");
       return;
     }
