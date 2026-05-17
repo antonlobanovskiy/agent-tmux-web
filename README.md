@@ -1,5 +1,9 @@
 # Agent Tmux Web
 
+<p>
+  <img src="./public/agent-tmux-logo.png" alt="" width="72">
+</p>
+
 Run long-lived Codex, Claude, Gemini, and custom terminal agents from your phone
 without keeping an SSH client open.
 
@@ -19,6 +23,9 @@ The session keeps running either way.
 
 [MP4 showcase](./docs/assets/agent-tmux-web-showcase.mp4)
 
+The showcase walks through the mobile GUI, stable scroll behavior, TTY capture,
+raw tmux attach, launcher menu, Android wrapper, and desktop layout.
+
 ## What It Solves
 
 - Keeps terminal agents alive on the server even if your browser disconnects.
@@ -26,8 +33,12 @@ The session keeps running either way.
 - Launches Codex, Claude, Gemini, or custom commands in the selected
   tmux session.
 - Gives you both a readable chat-style transcript and raw tmux attach mode.
+- Lets you scroll back through tmux output while new capture updates keep
+  running, with a jump-to-latest button when you are ready to return.
 - Uploads files from Android, iOS, or desktop browsers to temporary server paths
   you can paste into prompts.
+- Sends browser or Android notifications when watched tasks return to an input
+  prompt.
 - Works over Tailscale, a VPN, an SSH tunnel, a LAN bind, or a private reverse
   proxy.
 
@@ -45,7 +56,8 @@ for task-done notifications.
 The APK is sideload-only. It is not published through Google Play, does not run
 tmux locally, and does not include any maintainer server credentials in public
 builds. Install it, enter your own private server URL on the setup screen, then
-enable `Notify` if you want background task-complete alerts.
+enable `Notify` if you want background task-complete alerts. The Android build
+uses the same minimal Agent Tmux icon as the browser favicon and app header.
 
 ```bash
 pnpm android:build:public
@@ -60,8 +72,12 @@ For setup details, see [`android/README.md`](./android/README.md).
 - Launches configured CLI tools inside the selected tmux session.
 - Ships with default launchers for Codex and Claude.
 - Supports custom launch commands from the UI.
-- Supports optional per-tool mode toggles for flags such as Codex Yolo mode.
+- Supports optional per-tool mode toggles for extra CLI flags.
 - Captures tmux panes as either terminal text or a normalized chat-style view.
+- Captures a deeper 1000-line tmux history so older context stays reachable.
+- Preserves your scroll position while sessions are active and shows a
+  jump-to-latest button when you are not at the bottom.
+- Includes Force Sync for manually refreshing the current pane capture.
 - Attaches a raw browser terminal to tmux for exact native CLI behavior.
 - Can notify when any watched tmux send/run action returns to an input prompt.
 - Uploads files from Android/desktop browsers to a temporary server path and

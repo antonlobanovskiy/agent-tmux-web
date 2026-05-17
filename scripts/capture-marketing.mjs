@@ -25,15 +25,23 @@ const showcaseScenes = [
     eyebrow: "GUI mode",
     title: "Read terminal agents like a chat thread",
     body: "Use the normalized GUI when the CLI is waiting, summarizing, or showing command output you want to scan quickly.",
-    bullets: ["readable bubbles", "code blocks", "bottom-following scroll"],
+    bullets: ["readable bubbles", "code blocks", "terminal output sections"],
     media: "../mobile-chat.png",
     layout: "phone"
   },
   {
+    eyebrow: "Stable scrolling",
+    title: "Scroll back without losing your place",
+    body: "Auto-capture keeps updating tmux output, but it will not yank you to the bottom while you are reading earlier history.",
+    bullets: ["position stays put", "jump-to-latest button", "deeper 1000-line capture"],
+    media: "../mobile-scroll.png",
+    layout: "phone"
+  },
+  {
     eyebrow: "TTY mode",
-    title: "Keep the plain terminal capture one tap away",
-    body: "Switch back to text capture when you want the raw pane output without attaching to the interactive terminal.",
-    bullets: ["exact pane text", "fast capture", "easy copy context"],
+    title: "Keep plain pane capture one tap away",
+    body: "Switch back to text capture when you want raw pane output without attaching to the interactive terminal.",
+    bullets: ["exact pane text", "Force Sync", "easy copy context"],
     media: "../mobile-tty.png",
     layout: "phone"
   },
@@ -56,7 +64,7 @@ const showcaseScenes = [
   {
     eyebrow: "Android app",
     title: "Sideload the wrapper and keep done alerts native",
-    body: "The public APK is a generic setup wrapper. Enter your private server URL, upload files with Android's picker, and let the native watcher notify when tmux is waiting.",
+    body: "The public APK is a generic setup wrapper with its own launcher icon. Enter your private server URL, upload files with Android's picker, and let the native watcher notify when tmux is waiting.",
     bullets: ["sideload-only APK", "no embedded public secrets", "native completion alerts"],
     media: "../mobile-chat.png",
     layout: "phone"
@@ -130,6 +138,21 @@ try {
   await pageCdp.send("Page.navigate", { url: demoUrl });
   await delay(1200);
   await capture(pageCdp, path.join(assetsDir, "mobile-chat.png"));
+
+  await evaluate(pageCdp, `
+    (() => {
+      const chat = document.querySelector('.tmux-chat');
+      if (!chat) {
+        return;
+      }
+      chat.scrollTop = 0;
+      chat.dispatchEvent(new Event('scroll', { bubbles: true }));
+    })()
+  `);
+  await delay(300);
+  await capture(pageCdp, path.join(assetsDir, "mobile-scroll.png"));
+  await evaluate(pageCdp, "document.querySelector('.tmux-jump-bottom')?.click()");
+  await delay(350);
 
   await evaluate(pageCdp, "document.querySelector('[aria-label=\"Show terminal capture\"]')?.click()");
   await delay(250);
@@ -479,15 +502,12 @@ function buildShowcaseHtml() {
     }
 
     .brand-mark {
-      display: grid;
-      place-items: center;
       width: 38px;
       height: 38px;
       border: 1px solid rgba(255,255,255,0.2);
       border-radius: 8px;
-      background: #121719;
-      color: #67d2b5;
-      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      background: #101315;
+      object-fit: cover;
     }
 
     .eyebrow {
@@ -612,7 +632,7 @@ function buildShowcaseHtml() {
 <body>
   <main class="stage">
     <section class="copy">
-      <div class="brand"><span class="brand-mark">&gt;_</span><span>Agent Tmux Web</span></div>
+      <div class="brand"><img class="brand-mark" alt="" src="../../../public/agent-tmux-logo.png"><span>Agent Tmux Web</span></div>
       <p class="eyebrow"></p>
       <h1></h1>
       <p class="body"></p>
@@ -632,7 +652,7 @@ function buildShowcaseHtml() {
     const body = document.querySelector(".body");
     const bullets = document.querySelector(".bullets");
     const shell = document.querySelector(".media-shell");
-    const image = document.querySelector("img");
+    const image = document.querySelector(".media-shell img");
     const progressBar = document.querySelector(".progress span");
 
     function ease(progress) {
