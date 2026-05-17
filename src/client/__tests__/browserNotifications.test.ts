@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getBrowserNotificationAvailability, type BrowserNotificationSnapshot } from "../browserNotifications.js";
+import { canShowWebSocketTaskNotifications, getBrowserNotificationAvailability, type BrowserNotificationSnapshot } from "../browserNotifications.js";
 
 function snapshot(overrides: Partial<BrowserNotificationSnapshot>): BrowserNotificationSnapshot {
   return {
@@ -57,5 +57,19 @@ describe("browser notification availability", () => {
       available: false,
       message: "app notifications blocked in Android settings"
     });
+  });
+
+  it("uses browser WebSocket task notifications only outside the Android wrapper", () => {
+    expect(canShowWebSocketTaskNotifications(snapshot({
+      permission: "granted"
+    }))).toBe(true);
+    expect(canShowWebSocketTaskNotifications(snapshot({
+      permission: "default"
+    }))).toBe(false);
+    expect(canShowWebSocketTaskNotifications(snapshot({
+      androidBridge: true,
+      androidNotificationsEnabled: true,
+      permission: "granted"
+    }))).toBe(false);
   });
 });

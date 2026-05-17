@@ -65,6 +65,13 @@ export function canShowBrowserNotifications(): boolean {
   return getBrowserNotificationAvailability(snapshot).available && snapshot.permission === "granted";
 }
 
+export function canShowWebSocketTaskNotifications(snapshot = getBrowserNotificationSnapshot()): boolean {
+  if (snapshot.androidBridge) {
+    return false;
+  }
+  return getBrowserNotificationAvailability(snapshot).available && snapshot.permission === "granted";
+}
+
 export function showAgentNotification(title: string, body: string, tag: string): void {
   if (!canShowBrowserNotifications()) {
     return;

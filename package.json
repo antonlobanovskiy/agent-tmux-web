@@ -1,6 +1,6 @@
 {
   "name": "agent-tmux-web",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Mobile-friendly browser control panel for terminal agent CLIs running inside tmux.",
   "license": "MIT",
   "type": "module",
