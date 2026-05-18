@@ -4,7 +4,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const apkPath = path.resolve(root, process.argv[2] ?? "android/app/build/outputs/apk/release/app-release.apk");
+const version = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).version;
+const defaultApkPath = `android/app/build/outputs/apk/release/agent-tmux-web-v${version}-release.apk`;
+const apkPath = path.resolve(root, process.argv[2] ?? defaultApkPath);
 const buildConfigPath = path.join(root, "android/app/build/generated/source/buildConfig/release/com/agenttmux/web/BuildConfig.java");
 
 if (!existsSync(apkPath)) {

@@ -28,8 +28,8 @@ android {
         applicationId "com.agenttmux.web"
         minSdk 26
         targetSdk 35
-        versionCode 7
-        versionName "0.1.6"
+        versionCode 8
+        versionName "0.1.7"
 
         buildConfigField "String", "DEFAULT_SERVER_URL", quotedBuildConfig(configValue("agentTmuxDefaultUrl"))
         buildConfigField "String", "DEFAULT_AUTH_TOKEN", quotedBuildConfig(configValue("agentTmuxDefaultToken"))
@@ -44,6 +44,12 @@ android {
             signingConfig signingConfigs.debug
             minifyEnabled false
             debuggable false
+        }
+    }
+
+    applicationVariants.all { variant ->
+        variant.outputs.all {
+            outputFileName = "agent-tmux-web-v${variant.versionName}-${variant.buildType.name}.apk"
         }
     }
 }

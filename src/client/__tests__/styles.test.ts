@@ -17,4 +17,24 @@ describe("responsive mobile CSS", () => {
     expect(mobileBlock).toContain("display: none");
     expect(mobileBlock).toContain("flex: 1 1 auto");
   });
+
+  it("keeps the mobile tmux toolbar stable with five action buttons", () => {
+    const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");
+    const mobileBlock = css.slice(css.indexOf("@media (max-width: 760px)"));
+
+    expect(mobileBlock).toContain("grid-template-columns: 38px 38px 38px 38px 38px minmax(0, 1fr)");
+  });
+});
+
+describe("color theme CSS", () => {
+  it("defines light and dark palettes with shared tokens", () => {
+    const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");
+
+    expect(css).toContain(":root[data-theme=\"light\"]");
+    expect(css).toContain("color-scheme: dark");
+    expect(css).toContain("color-scheme: light");
+    expect(css).toContain("--surface-base");
+    expect(css).toContain("background: var(--surface-base)");
+    expect(css).toContain("color: var(--text-primary)");
+  });
 });

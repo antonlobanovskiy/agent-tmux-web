@@ -131,7 +131,7 @@ deployment is separate. Keep user-specific runtime config out of git.
      native notification bridge against the private server URL.
    - Confirm uploads use a temporary server path and are not kept forever.
    - If setting up Android for one private device, build `pnpm android:build`,
-     install the APK from `android/app/build/outputs/apk/release/app-release.apk`,
+     install the APK from `android/app/build/outputs/apk/release/agent-tmux-web-v<version>-release.apk`,
      and point the setup screen at the private server URL.
    - If creating an APK to share or upload publicly, build
      `pnpm android:build:public`. Do not share APKs built with
