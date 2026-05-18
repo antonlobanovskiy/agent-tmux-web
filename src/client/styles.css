@@ -831,11 +831,11 @@ textarea:focus {
 @media (min-width: 1121px) {
   .tmux-chat-message.assistant,
   .tmux-chat-message.terminal {
-    width: min(100%, 980px);
+    width: min(100%, 1280px);
   }
 
   .tmux-chat-message.user {
-    max-width: min(88%, 860px);
+    max-width: min(88%, 1040px);
   }
 }
 

@@ -11,6 +11,7 @@ import { type AppStatus } from "../shared/api.js";
 import { describeCodexNotification } from "../shared/codexEvents.js";
 import { CodexBridge } from "./codexBridge.js";
 import {
+  buildTmuxCaptureSizeFromClientWidth,
   buildScriptArgsForTmuxAttach,
   buildTmuxDisplayWindowSizeArgs,
   buildTmuxResizeWindowArgs,
@@ -232,6 +233,13 @@ app.get("/api/tmux/tools", asyncHandler(async (_req, res) => {
 app.get("/api/tmux/capture", asyncHandler(async (req, res) => {
   const session = requireString(req.query.session, "session");
   const lines = typeof req.query.lines === "string" ? Number(req.query.lines) : tmuxCaptureHistoryLines;
+  const captureSize = buildTmuxCaptureSizeFromClientWidth(req.query.clientWidth);
+  const preserveExistingClientSize = await hasAttachedTmuxClients(session).catch(() => false);
+  if (!preserveExistingClientSize) {
+    await execFileAsync("tmux", buildTmuxResizeWindowArgs(session, captureSize)).catch(() => {
+      // Best-effort: capture remains useful even if tmux rejects a resize.
+    });
+  }
   res.json({ session, output: await captureTmuxPane(session, lines) });
 }));
 

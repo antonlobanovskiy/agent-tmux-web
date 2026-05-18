@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildScriptArgsForTmuxAttach,
   buildTmuxAttachShellCommand,
+  buildTmuxCaptureSizeFromClientWidth,
   buildTmuxDisplayWindowSizeArgs,
   buildTmuxRestoreManualSizeArgs,
   buildTmuxRestoreWindowStateCommandSequence,
@@ -34,6 +35,12 @@ describe("browser tmux terminal helpers", () => {
     expect(normalizeTerminalSize(10, 4)).toEqual({ cols: 20, rows: 8 });
     expect(normalizeTerminalSize(999, 999)).toEqual({ cols: 240, rows: 80 });
     expect(normalizeTerminalSize(132, 36)).toEqual({ cols: 132, rows: 36 });
+  });
+
+  it("maps wide GUI/TTY capture surfaces to tmux columns", () => {
+    expect(buildTmuxCaptureSizeFromClientWidth(640)).toEqual({ cols: 80, rows: 40 });
+    expect(buildTmuxCaptureSizeFromClientWidth(1280)).toEqual({ cols: 154, rows: 40 });
+    expect(buildTmuxCaptureSizeFromClientWidth(2200)).toEqual({ cols: 240, rows: 40 });
   });
 
   it("builds commands for restoring tmux window size state after detach", () => {
