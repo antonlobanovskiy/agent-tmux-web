@@ -18,12 +18,14 @@ import {
   Keyboard,
   Menu,
   MessageSquare,
+  Moon,
   Paperclip,
   Play,
   Plus,
   RefreshCw,
   Send,
   Sparkles,
+  Sun,
   Terminal as TerminalIcon,
   Trash2,
   X,
@@ -40,6 +42,7 @@ import {
   slashQueryForMessage,
   type SlashCommand
 } from "./slashCommands.js";
+import { COLOR_THEME_STORAGE_KEY, nextColorTheme, resolveInitialColorTheme, type ColorTheme } from "./theme.js";
 import { parseTmuxChatOutput, splitTmuxChatMessage, type TmuxChatMessage } from "./tmuxGui.js";
 import { shouldAutoCaptureTmux, TMUX_CAPTURE_POLL_INTERVAL_MS, TMUX_SEND_FOLLOW_DELAYS_MS } from "./tmuxFollow.js";
 import { canShowBrowserNotifications, canShowWebSocketTaskNotifications, getBrowserNotificationAvailability, getBrowserNotificationSnapshot, setAndroidWatchPollingEnabled, showAgentNotification } from "./browserNotifications.js";
@@ -195,6 +198,7 @@ export function App() {
   const [tmuxGuiActive, setTmuxGuiActive] = useState(demoMode);
   const [tmuxMenuOpen, setTmuxMenuOpen] = useState(false);
   const [tmuxNotificationsEnabled, setTmuxNotificationsEnabled] = useState(readTmuxNotificationPreference);
+  const [colorTheme, setColorTheme] = useState(readInitialColorTheme);
   const [tmuxAtBottom, setTmuxAtBottom] = useState(true);
   const [uploadingTmuxFiles, setUploadingTmuxFiles] = useState(false);
   const [terminalStatus, setTerminalStatus] = useState(demoMode ? "gui view for agent-demo" : "");
@@ -336,6 +340,11 @@ export function App() {
     loadSkills().catch(reportError(setError));
   }, [loadSkills, status?.codex.initialized]);
 
+  useLayoutEffect(() => {
+    document.documentElement.dataset.theme = colorTheme;
+    writeColorThemePreference(colorTheme);
+  }, [colorTheme]);
+
   useEffect(() => {
     tmuxNotificationsEnabledRef.current = tmuxNotificationsEnabled;
     setAndroidWatchPollingEnabled(tmuxNotificationsEnabled);
@@ -445,12 +454,7 @@ export function App() {
       fontFamily: "\"SFMono-Regular\", Consolas, \"Liberation Mono\", monospace",
       fontSize: 12,
       scrollback: 6000,
-      theme: {
-        background: "#0d0f10",
-        foreground: "#d8dee2",
-        cursor: "#54b399",
-        selectionBackground: "#2f6f5f"
-      }
+      theme: terminalThemeForColorTheme(colorTheme)
     });
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
@@ -542,7 +546,7 @@ export function App() {
       socket.close();
       terminal.dispose();
     };
-  }, [selectedTmux, terminalActive]);
+  }, [colorTheme, selectedTmux, terminalActive]);
 
   async function sendMessage(event: FormEvent) {
     event.preventDefault();
@@ -773,6 +777,12 @@ export function App() {
     queueTmuxOutputBottomScroll();
     setTerminalStatus(nextActive ? `gui view for ${selectedTmux}` : selectedTmux);
     void captureTmux(selectedTmux).catch(reportError(setError));
+  }
+
+  function toggleColorTheme() {
+    const nextTheme = nextColorTheme(colorTheme);
+    setColorTheme(nextTheme);
+    setTerminalStatus(nextTheme === "light" ? "light mode on" : "dark mode on");
   }
 
   async function toggleTmuxNotifications() {
@@ -1406,6 +1416,15 @@ export function App() {
               <span>{terminalActive ? "Detach" : "Raw"}</span>
             </button>
             <button
+              aria-label={colorTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              title={colorTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              type="button"
+              onClick={toggleColorTheme}
+            >
+              {colorTheme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
+              <span>{colorTheme === "dark" ? "Light" : "Dark"}</span>
+            </button>
+            <button
               aria-label={tmuxNotificationsEnabled ? "Disable browser notifications" : "Enable browser notifications"}
               className={tmuxNotificationsEnabled ? "active" : ""}
               title={tmuxNotificationsEnabled ? "Disable browser notifications" : "Enable browser notifications"}
@@ -1621,6 +1640,47 @@ function buildTmuxToolCommandPreview(tool: TmuxToolDto, modeIds: string[]): stri
     .map((mode) => mode.args.trim())
     .filter(Boolean) ?? [];
   return [tool.command.trim(), ...args].filter(Boolean).join(" ");
+}
+
+function readInitialColorTheme(): ColorTheme {
+  if (typeof window === "undefined") {
+    return "dark";
+  }
+  let storedTheme: string | null = null;
+  try {
+    storedTheme = window.localStorage.getItem(COLOR_THEME_STORAGE_KEY);
+  } catch {
+    storedTheme = null;
+  }
+  const prefersLight = window.matchMedia?.("(prefers-color-scheme: light)").matches ?? false;
+  return resolveInitialColorTheme(storedTheme, prefersLight);
+}
+
+function writeColorThemePreference(theme: ColorTheme) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(COLOR_THEME_STORAGE_KEY, theme);
+  } catch {
+    // Some private browser modes block localStorage; the in-memory theme still applies.
+  }
+}
+
+function terminalThemeForColorTheme(theme: ColorTheme) {
+  return theme === "light"
+    ? {
+      background: "#ffffff",
+      foreground: "#172026",
+      cursor: "#087f6b",
+      selectionBackground: "#b7e4d8"
+    }
+    : {
+      background: "#0d0f10",
+      foreground: "#d8dee2",
+      cursor: "#54b399",
+      selectionBackground: "#2f6f5f"
+    };
 }
 
 function readTmuxNotificationPreference(): boolean {

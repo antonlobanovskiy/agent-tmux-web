@@ -145,7 +145,7 @@ That command forces blank Android defaults and runs
 `scripts/verify-public-apk.mjs` against the release APK. The resulting APK is:
 
 ```text
-android/app/build/outputs/apk/release/app-release.apk
+android/app/build/outputs/apk/release/agent-tmux-web-v<version>-release.apk
 ```
 
 For private personal builds, you may prefill the setup screen with

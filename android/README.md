@@ -34,8 +34,8 @@ pnpm android:build:public
 The APKs are written to:
 
 ```text
-android/app/build/outputs/apk/debug/app-debug.apk
-android/app/build/outputs/apk/release/app-release.apk
+android/app/build/outputs/apk/debug/agent-tmux-web-v<version>-debug.apk
+android/app/build/outputs/apk/release/agent-tmux-web-v<version>-release.apk
 ```
 
 Install on a connected Android device:
