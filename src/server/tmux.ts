@@ -43,6 +43,8 @@ const DEFAULT_TMUX_TOOLS: TmuxToolConfig[] = [
     defaultSessionName: "claude"
   }
 ];
+const DEFAULT_DETACHED_TMUX_COLS = 160;
+const DEFAULT_DETACHED_TMUX_ROWS = 40;
 
 export function normalizeTmuxSessionName(name: string): string {
   const normalized = name
@@ -131,7 +133,16 @@ export function listTmuxTools(): TmuxToolConfig[] {
 }
 
 export function buildTmuxNewSessionArgs(name: string, cwd?: string | null): string[] {
-  const args = ["new-session", "-d", "-s", normalizeTmuxSessionName(name)];
+  const args = [
+    "new-session",
+    "-d",
+    "-x",
+    String(DEFAULT_DETACHED_TMUX_COLS),
+    "-y",
+    String(DEFAULT_DETACHED_TMUX_ROWS),
+    "-s",
+    normalizeTmuxSessionName(name)
+  ];
   if (cwd) {
     args.push("-c", cwd);
   }

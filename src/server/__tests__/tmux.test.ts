@@ -69,6 +69,10 @@ describe("tmux command builders", () => {
     expect(buildTmuxNewSessionArgs("agent-ui", "/workspace/agent-tmux-web")).toEqual([
       "new-session",
       "-d",
+      "-x",
+      "160",
+      "-y",
+      "40",
       "-s",
       "agent-ui",
       "-c",

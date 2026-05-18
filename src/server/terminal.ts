@@ -32,6 +32,12 @@ export function buildTmuxResizeWindowArgs(session: string, size: TerminalSize): 
   ];
 }
 
+export function buildTmuxCaptureSizeFromClientWidth(clientWidth: unknown): TerminalSize {
+  const width = toInteger(clientWidth, 1280);
+  const cols = Math.max(80, Math.floor((Math.max(320, width) - 24) / 8.15));
+  return normalizeTerminalSize(cols, 40);
+}
+
 export function buildTmuxDisplayWindowSizeArgs(session: string): string[] {
   return ["display-message", "-p", "-t", session, "#{window_width} #{window_height}"];
 }

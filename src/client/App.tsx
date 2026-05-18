@@ -306,7 +306,12 @@ export function App() {
       setCapturedTmuxOutput(DEMO_TMUX_OUTPUT);
       return;
     }
-    const result = await api<{ output: string }>(`/api/tmux/capture?session=${encodeURIComponent(session)}&lines=${TMUX_CAPTURE_HISTORY_LINES}`);
+    const params = new URLSearchParams({
+      session,
+      lines: String(TMUX_CAPTURE_HISTORY_LINES),
+      clientWidth: String(resolveTmuxCaptureClientWidth())
+    });
+    const result = await api<{ output: string }>(`/api/tmux/capture?${params.toString()}`);
     setCapturedTmuxOutput(result.output);
   }, [selectedTmux, tmuxGuiActive]);
 
@@ -1129,6 +1134,10 @@ export function App() {
 
   function currentTmuxScrollNode() {
     return tmuxGuiActive ? tmuxChatRef.current : tmuxOutputRef.current;
+  }
+
+  function resolveTmuxCaptureClientWidth(): number {
+    return currentTmuxScrollNode()?.clientWidth || window.innerWidth || 1280;
   }
 
   function rememberTmuxScrollPosition() {
