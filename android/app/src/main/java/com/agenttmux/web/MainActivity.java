@@ -70,9 +70,16 @@ public final class MainActivity extends Activity {
         if (serverUrl().isEmpty()) {
             showSetup();
         } else {
-            loadConfiguredServer();
+            loadConfiguredServer(requestedTmuxSession(getIntent()));
         }
         WatchPollingService.startIfEnabled(this);
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        openRequestedTmuxSession(intent);
     }
 
     @Override
@@ -292,12 +299,33 @@ public final class MainActivity extends Activity {
     }
 
     private void loadConfiguredServer() {
-        String url = buildLaunchUrl(serverUrl(), authToken());
+        loadConfiguredServer("");
+    }
+
+    private void loadConfiguredServer(String tmuxSession) {
+        String url = buildLaunchUrl(serverUrl(), authToken(), tmuxSession);
         if (url.isEmpty()) {
             showSetup();
             return;
         }
         webView.loadUrl(url);
+    }
+
+    private void openRequestedTmuxSession(Intent intent) {
+        String tmuxSession = requestedTmuxSession(intent);
+        if (tmuxSession.isEmpty()) {
+            return;
+        }
+        if (serverUrl().isEmpty()) {
+            showSetup();
+            return;
+        }
+        hideSetup();
+        if (webView.getUrl() == null || webView.getUrl().trim().isEmpty()) {
+            loadConfiguredServer(tmuxSession);
+            return;
+        }
+        webView.evaluateJavascript(NotificationTarget.openSessionScript(tmuxSession), null);
     }
 
     private String serverUrl() {
@@ -316,7 +344,7 @@ public final class MainActivity extends Activity {
         return stored.trim();
     }
 
-    private static String buildLaunchUrl(String serverUrl, String token) {
+    private static String buildLaunchUrl(String serverUrl, String token, String tmuxSession) {
         String normalized = normalizeServerUrl(serverUrl);
         if (normalized.isEmpty()) {
             return "";
@@ -326,7 +354,15 @@ public final class MainActivity extends Activity {
         if (token != null && !token.trim().isEmpty()) {
             builder.appendQueryParameter("token", token.trim());
         }
+        String safeSession = NotificationTarget.clean(tmuxSession);
+        if (!safeSession.isEmpty()) {
+            builder.appendQueryParameter(NotificationTarget.QUERY_TMUX_SESSION, safeSession);
+        }
         return builder.build().toString();
+    }
+
+    private static String requestedTmuxSession(Intent intent) {
+        return intent == null ? "" : NotificationTarget.clean(intent.getStringExtra(NotificationTarget.EXTRA_TMUX_SESSION));
     }
 
     private static String normalizeServerUrl(String value) {

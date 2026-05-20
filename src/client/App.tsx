@@ -45,6 +45,8 @@ import {
 import { COLOR_THEME_STORAGE_KEY, nextColorTheme, resolveInitialColorTheme, type ColorTheme } from "./theme.js";
 import { parseTmuxChatOutput, splitTmuxChatMessage, type TmuxChatMessage } from "./tmuxGui.js";
 import { shouldAutoCaptureTmux, TMUX_CAPTURE_POLL_INTERVAL_MS, TMUX_SEND_FOLLOW_DELAYS_MS } from "./tmuxFollow.js";
+import { buildTmuxDoneNotification } from "./tmuxNotifications.js";
+import { normalizeRequestedTmuxSession, readRequestedTmuxSession, removeRequestedTmuxSession } from "./tmuxSessionTarget.js";
 import { canShowBrowserNotifications, canShowWebSocketTaskNotifications, getBrowserNotificationAvailability, getBrowserNotificationSnapshot, setAndroidWatchPollingEnabled, showAgentNotification } from "./browserNotifications.js";
 
 type TimelineEntry = {
@@ -199,6 +201,7 @@ export function App() {
   const [tmuxMenuOpen, setTmuxMenuOpen] = useState(false);
   const [tmuxNotificationsEnabled, setTmuxNotificationsEnabled] = useState(readTmuxNotificationPreference);
   const [colorTheme, setColorTheme] = useState(readInitialColorTheme);
+  const [requestedTmuxSession, setRequestedTmuxSession] = useState(readInitialRequestedTmuxSession);
   const [tmuxAtBottom, setTmuxAtBottom] = useState(true);
   const [uploadingTmuxFiles, setUploadingTmuxFiles] = useState(false);
   const [terminalStatus, setTerminalStatus] = useState(demoMode ? "gui view for agent-demo" : "");
@@ -349,6 +352,33 @@ export function App() {
     tmuxNotificationsEnabledRef.current = tmuxNotificationsEnabled;
     setAndroidWatchPollingEnabled(tmuxNotificationsEnabled);
   }, [tmuxNotificationsEnabled]);
+
+  useEffect(() => {
+    const handleOpenSession = (event: Event) => {
+      const session = normalizeRequestedTmuxSession((event as CustomEvent<{ session?: unknown }>).detail?.session);
+      if (session) {
+        setRequestedTmuxSession(session);
+      }
+    };
+    window.addEventListener("agent-tmux-open-session", handleOpenSession);
+    return () => window.removeEventListener("agent-tmux-open-session", handleOpenSession);
+  }, []);
+
+  useEffect(() => {
+    if (!requestedTmuxSession) {
+      return;
+    }
+
+    clearTmuxFollowTimers(tmuxFollowTimersRef);
+    setTerminalActive(false);
+    setTmuxMenuOpen(false);
+    setSelectedTmux(requestedTmuxSession);
+    setTerminalStatus(`${requestedTmuxSession} is waiting for input`);
+    queueTmuxOutputBottomScroll();
+    void captureTmux(requestedTmuxSession).catch(reportError(setError));
+    clearRequestedTmuxSessionFromAddressBar();
+    setRequestedTmuxSession("");
+  }, [captureTmux, requestedTmuxSession]);
 
   useEffect(() => {
     if (selectedTmux) {
@@ -1642,6 +1672,21 @@ function buildTmuxToolCommandPreview(tool: TmuxToolDto, modeIds: string[]): stri
   return [tool.command.trim(), ...args].filter(Boolean).join(" ");
 }
 
+function readInitialRequestedTmuxSession(): string {
+  return typeof window === "undefined" ? "" : readRequestedTmuxSession(window.location.search);
+}
+
+function clearRequestedTmuxSessionFromAddressBar() {
+  if (typeof window === "undefined") {
+    return;
+  }
+  const current = new URL(window.location.href);
+  const next = removeRequestedTmuxSession(current);
+  if (next !== window.location.href) {
+    window.history.replaceState(window.history.state, "", next);
+  }
+}
+
 function readInitialColorTheme(): ColorTheme {
   if (typeof window === "undefined") {
     return "dark";
@@ -1706,10 +1751,12 @@ function writeTmuxNotificationPreference(enabled: boolean) {
 }
 
 function showTmuxDoneNotification(session: string, label: string) {
+  const notification = buildTmuxDoneNotification(session, label);
   showAgentNotification(
-    `${session} is waiting`,
-    `${label} finished and is waiting for input.`,
-    `agent-tmux-web-${session}`
+    notification.title,
+    notification.body,
+    notification.tag,
+    { tmuxSession: notification.tmuxSession }
   );
 }
 

@@ -13,7 +13,12 @@ export type BrowserNotificationAvailability =
 type AndroidNotificationBridge = {
   notificationsEnabled?: () => boolean;
   notify?: (title: string, body: string, tag: string) => void;
+  notifyForSession?: (title: string, body: string, tag: string, tmuxSession: string) => void;
   setWatchPollingEnabled?: (enabled: boolean) => void;
+};
+
+export type AgentNotificationOptions = {
+  tmuxSession?: string;
 };
 
 declare global {
@@ -72,14 +77,18 @@ export function canShowWebSocketTaskNotifications(snapshot = getBrowserNotificat
   return getBrowserNotificationAvailability(snapshot).available && snapshot.permission === "granted";
 }
 
-export function showAgentNotification(title: string, body: string, tag: string): void {
+export function showAgentNotification(title: string, body: string, tag: string, options: AgentNotificationOptions = {}): void {
   if (!canShowBrowserNotifications()) {
     return;
   }
 
   if (hasAndroidNotificationBridge()) {
     try {
-      window.AgentTmuxAndroid?.notify?.(title, body, tag);
+      if (options.tmuxSession && typeof window.AgentTmuxAndroid?.notifyForSession === "function") {
+        window.AgentTmuxAndroid.notifyForSession(title, body, tag, options.tmuxSession);
+      } else {
+        window.AgentTmuxAndroid?.notify?.(title, body, tag);
+      }
     } catch {
       // The native bridge can disappear if the WebView is being torn down.
     }
