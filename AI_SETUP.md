@@ -130,12 +130,15 @@ deployment is separate. Keep user-specific runtime config out of git.
      Browser installs need HTTPS or localhost; the Android wrapper can use its
      native notification bridge against the private server URL.
    - Confirm uploads use a temporary server path and are not kept forever.
-   - If setting up Android for one private device, build `pnpm android:build`,
-     install the APK from `android/app/build/outputs/apk/release/agent-tmux-web-v<version>-release.apk`,
-     and point the setup screen at the private server URL.
+   - If setting up Android for one private device, build
+     `pnpm android:build:private` to create a separate private package, then
+     use `pnpm android:stage-apk` to serve it from the private server over LAN,
+     VPN, or Tailscale.
    - If creating an APK to share or upload publicly, build
      `pnpm android:build:public`. Do not share APKs built with
      `android/local.properties` because they may embed a private URL/token.
+   - Do not send APKs or ZIPs containing APKs through email; mobile mail clients
+     often block executable attachments before they reach the phone.
 
 10. Handoff summary.
     - URL to open.
@@ -161,5 +164,7 @@ deployment is separate. Keep user-specific runtime config out of git.
 - Public APK contains a private URL/token: rebuild with
   `pnpm android:build:public` and verify `android/local.properties` values were
   not used.
+- Android blocks APK update: use `pnpm android:build:private` for a separate
+  package, or rebuild with the same signing key and a higher version code.
 - CLI launcher does nothing: verify the command exists in the server user's
   `PATH`, not just in an interactive shell.

@@ -56,6 +56,14 @@ Download the latest public APK from
 Public APKs are generic WebView wrappers and should open to a setup screen where
 you enter your private server URL and optional auth token.
 
+Do not email APKs or ZIP files containing APKs. Gmail and some mobile clients
+block executable attachments and executable archives. For private APKs, serve
+the file from your Agent Tmux Web server over LAN, VPN, or Tailscale:
+
+```bash
+pnpm android:stage-apk android/app/build/outputs/apk/release/agent-tmux-web-v<version>-release.apk
+```
+
 You can also build the APK yourself:
 
 ```bash
@@ -67,6 +75,16 @@ The generated release APK is written to:
 ```text
 android/app/build/outputs/apk/release/agent-tmux-web-v<version>-release.apk
 ```
+
+For a private APK with an embedded server URL/token and a separate package id,
+use:
+
+```bash
+pnpm android:build:private
+```
+
+See [android/README.md](android/README.md) for private package ids, signing, and
+APK delivery details.
 
 ## Manual Install
 

@@ -15,5 +15,9 @@ uploads/
 android/.gradle/
 android/build/
 android/local.properties
+android/*.jks
+android/*.keystore
+android/app/*.jks
+android/app/*.keystore
 android/app/build/
 .DS_Store

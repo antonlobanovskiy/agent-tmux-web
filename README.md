@@ -56,8 +56,10 @@ for task-done notifications.
 The APK is sideload-only. It is not published through Google Play, does not run
 tmux locally, and does not include any maintainer server credentials in public
 builds. Install it, enter your own private server URL on the setup screen, then
-enable `Notify` if you want background task-complete alerts. The Android build
-uses the same minimal Agent Tmux icon as the browser favicon and app header.
+enable `Notify` if you want background task-complete alerts. Private builds can
+use a separate package id and local signing key so they install next to the
+public app without Android signature conflicts. The Android build uses the same
+minimal Agent Tmux icon as the browser favicon and app header.
 
 ```bash
 pnpm android:build:public
@@ -165,7 +167,10 @@ android/app/build/outputs/apk/release/agent-tmux-web-v<version>-release.apk
 ```
 
 For private personal builds, you may prefill the setup screen with
-`android/local.properties`, but do not upload or publish those APKs. Public APKs
+`android/local.properties`, but do not upload or publish those APKs. Use
+`pnpm android:build:private` when you want a separate private package, and use
+`pnpm android:stage-apk` to serve the APK over LAN, VPN, or Tailscale. Do not
+email APKs or ZIPs containing APKs; many mail clients block them. Public APKs
 should always show the setup screen first.
 
 ## Configuration
