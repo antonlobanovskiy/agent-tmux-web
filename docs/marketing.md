@@ -29,6 +29,14 @@ temporary file uploads over a private network path.
 - Shared minimal icon for the browser tab, app header, and Android launcher.
 - Designed for private networks, not public internet exposure.
 
+## Distribution
+
+- Linux quick installer:
+  `curl -fsSL https://raw.githubusercontent.com/antonlobanovskiy/agent-tmux-web/main/scripts/install-linux.sh | bash`
+- Public APK releases:
+  `https://github.com/antonlobanovskiy/agent-tmux-web/releases`
+- Full install guide: `INSTALL.md`
+
 ## Assets
 
 - Showcase GIF: `docs/assets/agent-tmux-web-showcase.gif`

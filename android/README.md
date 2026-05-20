@@ -18,6 +18,10 @@ Prerequisites:
 - Android SDK build-tools 35
 - Android platform-tools if you want to install with `adb`
 
+For most users, download the latest public APK from
+[GitHub Releases](https://github.com/antonlobanovskiy/agent-tmux-web/releases).
+Build locally only when you want to verify the source or create a private APK.
+
 Build installable APKs:
 
 ```bash
