@@ -94,6 +94,20 @@ For setup details, see [`android/README.md`](./android/README.md).
   script
 - Optional: Tailscale or another private network path to the server
 
+## Quick Install
+
+On Linux, inspect and run the installer:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/antonlobanovskiy/agent-tmux-web/main/scripts/install-linux.sh
+curl -fsSL https://raw.githubusercontent.com/antonlobanovskiy/agent-tmux-web/main/scripts/install-linux.sh | bash
+```
+
+It clones or updates the app, installs dependencies, builds the server, writes a
+private `.env` with a generated auth token, and starts a systemd user service
+when available. See [`INSTALL.md`](./INSTALL.md) for options such as binding to
+a Tailscale IP for phone access.
+
 ## Setup
 
 For AI-assisted setup, point your assistant at [AI_SETUP.md](./AI_SETUP.md) and
@@ -135,7 +149,9 @@ http://100.x.y.z:6174/?token=<the generated token>
 
 ## Sideload APK
 
-Public APKs should be built without a default server URL or auth token:
+Download the latest public APK from
+[GitHub Releases](https://github.com/antonlobanovskiy/agent-tmux-web/releases),
+or build one locally without a default server URL or auth token:
 
 ```bash
 pnpm android:build:public
