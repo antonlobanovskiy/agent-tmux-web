@@ -17,6 +17,11 @@ public final class AgentNotificationBridge {
 
     @JavascriptInterface
     public void notify(String title, String body, String tag) {
+        notifyForSession(title, body, tag, "");
+    }
+
+    @JavascriptInterface
+    public void notifyForSession(String title, String body, String tag, String tmuxSession) {
         if (!notificationsEnabled()) {
             return;
         }
@@ -24,7 +29,8 @@ public final class AgentNotificationBridge {
         activity.runOnUiThread(() -> postNotification(
             clean(title, "Agent Tmux"),
             clean(body, "Task is waiting for input."),
-            clean(tag, "agent-tmux-web")
+            clean(tag, "agent-tmux-web"),
+            clean(tmuxSession, "")
         ));
     }
 
@@ -39,8 +45,8 @@ public final class AgentNotificationBridge {
         });
     }
 
-    private void postNotification(String title, String body, String tag) {
-        AgentNotifications.postTaskNotification(activity, title, body, tag);
+    private void postNotification(String title, String body, String tag, String tmuxSession) {
+        AgentNotifications.postTaskNotification(activity, title, body, tag, tmuxSession);
     }
 
     private static String clean(String value, String fallback) {

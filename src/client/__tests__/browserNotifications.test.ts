@@ -1,6 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
-import { canShowWebSocketTaskNotifications, getBrowserNotificationAvailability, type BrowserNotificationSnapshot } from "../browserNotifications.js";
+import { canShowWebSocketTaskNotifications, getBrowserNotificationAvailability, showAgentNotification, type BrowserNotificationSnapshot } from "../browserNotifications.js";
+
+const originalWindow = globalThis.window;
+
+afterEach(() => {
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: originalWindow
+  });
+});
 
 function snapshot(overrides: Partial<BrowserNotificationSnapshot>): BrowserNotificationSnapshot {
   return {
@@ -71,5 +80,33 @@ describe("browser notification availability", () => {
       androidNotificationsEnabled: true,
       permission: "granted"
     }))).toBe(false);
+  });
+
+  it("passes the tmux session target to the Android bridge", () => {
+    const calls: unknown[][] = [];
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        AgentTmuxAndroid: {
+          notificationsEnabled: () => true,
+          notify: () => {
+            throw new Error("session-specific notifications should use notifyForSession");
+          },
+          notifyForSession: (...args: unknown[]) => calls.push(args)
+        },
+        isSecureContext: false
+      }
+    });
+
+    showAgentNotification("agent-demo tab is waiting", "Claude finished.", "agent-tmux-web-agent-demo", {
+      tmuxSession: "agent-demo"
+    });
+
+    expect(calls).toEqual([[
+      "agent-demo tab is waiting",
+      "Claude finished.",
+      "agent-tmux-web-agent-demo",
+      "agent-demo"
+    ]]);
   });
 });

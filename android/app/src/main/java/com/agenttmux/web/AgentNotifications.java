@@ -34,6 +34,10 @@ final class AgentNotifications {
     }
 
     static void postTaskNotification(Context context, String title, String body, String tag) {
+        postTaskNotification(context, title, body, tag, "");
+    }
+
+    static void postTaskNotification(Context context, String title, String body, String tag, String tmuxSession) {
         if (!notificationsEnabled(context)) {
             return;
         }
@@ -48,17 +52,18 @@ final class AgentNotifications {
             ? new Notification.Builder(context, TASK_CHANNEL_ID)
             : new Notification.Builder(context);
         String safeBody = clean(body, "Task is waiting for input.");
+        String safeTag = clean(tag, "agent-tmux-web");
+        String safeSession = NotificationTarget.clean(tmuxSession);
 
         builder
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(clean(title, "Agent Tmux"))
             .setContentText(safeBody)
             .setStyle(new Notification.BigTextStyle().bigText(safeBody))
-            .setContentIntent(mainActivityIntent(context))
+            .setContentIntent(mainActivityIntent(context, safeSession, NotificationTarget.requestCode(safeTag, safeSession)))
             .setAutoCancel(true)
             .setShowWhen(true);
 
-        String safeTag = clean(tag, "agent-tmux-web");
         notificationManager.notify(safeTag, Math.abs(safeTag.hashCode()), builder.build());
     }
 
@@ -72,7 +77,7 @@ final class AgentNotifications {
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Agent Tmux notifications")
             .setContentText("Watching tmux sessions for completed tasks.")
-            .setContentIntent(mainActivityIntent(context))
+            .setContentIntent(mainActivityIntent(context, "", 0))
             .setOngoing(true)
             .setShowWhen(false)
             .build();
@@ -116,12 +121,15 @@ final class AgentNotifications {
         notificationManager.createNotificationChannel(channel);
     }
 
-    private static PendingIntent mainActivityIntent(Context context) {
+    private static PendingIntent mainActivityIntent(Context context, String tmuxSession, int requestCode) {
         Intent intent = new Intent(context, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        if (!tmuxSession.isEmpty()) {
+            intent.putExtra(NotificationTarget.EXTRA_TMUX_SESSION, tmuxSession);
+        }
         return PendingIntent.getActivity(
             context,
-            0,
+            requestCode,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );

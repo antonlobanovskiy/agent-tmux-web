@@ -165,9 +165,10 @@ public final class WatchPollingService extends Service {
             }
             AgentNotifications.postTaskNotification(
                 this,
-                event.session + " is waiting",
-                event.label + " finished and is waiting for input.",
-                "agent-tmux-watch-" + event.session
+                NotificationTarget.title(event.session),
+                NotificationTarget.body(event.label, event.session),
+                NotificationTarget.tag(event.session),
+                event.session
             );
         }
 
