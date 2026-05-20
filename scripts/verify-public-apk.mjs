@@ -15,6 +15,7 @@ if (!existsSync(apkPath)) {
 
 if (existsSync(buildConfigPath)) {
   const buildConfig = readFileSync(buildConfigPath, "utf8");
+  requireBuildConfigValue(buildConfig, "APPLICATION_ID", "com.agenttmux.web");
   requireEmptyBuildConfig(buildConfig, "DEFAULT_SERVER_URL");
   requireEmptyBuildConfig(buildConfig, "DEFAULT_AUTH_TOKEN");
 }
@@ -54,13 +55,17 @@ function dexStrings(file) {
 }
 
 function requireEmptyBuildConfig(source, key) {
+  requireBuildConfigValue(source, key, "");
+}
+
+function requireBuildConfigValue(source, key, expected) {
   const pattern = new RegExp(`public static final String ${key} = "([^"]*)";`);
   const match = source.match(pattern);
   if (!match) {
     fail(`Could not verify BuildConfig.${key}`);
   }
-  if (match[1] !== "") {
-    fail(`BuildConfig.${key} must be empty for a public APK`);
+  if (match[1] !== expected) {
+    fail(`BuildConfig.${key} must be ${JSON.stringify(expected)} for a public APK`);
   }
 }
 

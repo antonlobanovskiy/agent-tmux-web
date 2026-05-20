@@ -49,6 +49,105 @@ cd android
 ./gradlew installDebug
 ```
 
+## Private APKs
+
+Private APKs can embed your server URL/token and can install next to the public
+app by using a separate package id. This avoids Android update failures caused
+by installing the same package name with a different local signing key.
+
+Set your private defaults in `android/local.properties`:
+
+```properties
+# android/local.properties
+sdk.dir=/path/to/android-sdk
+agentTmuxDefaultUrl=http://YOUR_PRIVATE_SERVER:6174
+agentTmuxDefaultToken=optional-token
+```
+
+Build a private APK:
+
+```bash
+pnpm android:build:private
+```
+
+The private build defaults to:
+
+- package id: `com.agenttmux.web.private`
+- app label: `Agent Tmux Private`
+- version code: public `versionCode` + `20000`
+- version name: `<package.json version>-private`
+
+Override those defaults when needed:
+
+```bash
+AGENT_TMUX_ANDROID_ID_SUFFIX=.work \
+AGENT_TMUX_ANDROID_APP_LABEL="Agent Tmux Work" \
+AGENT_TMUX_ANDROID_VERSION_CODE=20042 \
+AGENT_TMUX_ANDROID_VERSION_NAME=0.1.9-work \
+pnpm android:build:private
+```
+
+For repeat private installs on the same device, keep using the same package id
+and signing key, and increase `AGENT_TMUX_ANDROID_VERSION_CODE` whenever you
+want Android to treat the APK as an update.
+
+Optional local release signing can be configured in `android/local.properties`.
+Keystores under `android/` and `android/app/` are ignored by git.
+
+```bash
+cd android
+keytool -genkeypair -v \
+  -keystore private-release.jks \
+  -storetype JKS \
+  -alias agent-tmux-private \
+  -keyalg RSA \
+  -keysize 2048 \
+  -validity 10000
+```
+
+```properties
+# android/local.properties
+agentTmuxReleaseStoreFile=private-release.jks
+agentTmuxReleaseStorePassword=your-store-password
+agentTmuxReleaseKeyAlias=agent-tmux-private
+agentTmuxReleaseKeyPassword=your-key-password
+```
+
+Without those signing properties, release APKs use the local Android debug key.
+That is fine for personal testing, but it is not stable across machines.
+
+## APK Delivery
+
+Do not email APKs, or ZIP files containing APKs. Gmail and some mobile clients
+block executable attachments and executable archives before they reach the
+device.
+
+Recommended options:
+
+- Download public builds from GitHub Releases.
+- Serve private builds from your Agent Tmux Web server over LAN, VPN, or
+  Tailscale.
+- Install directly with `adb install` when the phone is connected over USB.
+
+To serve a built APK through the running Agent Tmux Web server:
+
+```bash
+pnpm android:stage-apk android/app/build/outputs/apk/release/agent-tmux-web-v<version>-release.apk
+```
+
+The staging command copies the APK to `dist/client/assets/` and prints a URL
+like:
+
+```text
+http://YOUR_TAILSCALE_OR_LAN_HOST:6174/assets/agent-tmux-web-v<version>-release.apk
+```
+
+Verify the URL before sharing it:
+
+```bash
+curl -I http://YOUR_TAILSCALE_OR_LAN_HOST:6174/assets/agent-tmux-web-v<version>-release.apk
+```
+
 ## Default Server
 
 The app shows a setup screen when no server is configured. For private builds,
@@ -88,5 +187,6 @@ cd android
 - Notifications use a native Android bridge. When enabled, the app runs a
   low-importance foreground watcher that polls the server for completed tmux
   tasks.
-- The release APK is signed with the standard Android debug key for easy
-  sideloading. Use your own signing key before publishing through an app store.
+- Release APKs use the standard Android debug key unless local release signing
+  properties are configured. Use your own signing key before publishing through
+  an app store or distributing updates from multiple machines.

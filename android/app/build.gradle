@@ -20,16 +20,45 @@ def quotedBuildConfig = { String value ->
     return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 }
 
+def applicationIdSuffixValue = configValue("agentTmuxApplicationIdSuffix").trim()
+def normalizedApplicationIdSuffix = applicationIdSuffixValue
+    ? (applicationIdSuffixValue.startsWith(".") ? applicationIdSuffixValue : "." + applicationIdSuffixValue)
+    : ""
+def appLabel = configValue("agentTmuxAppLabel").trim() ?: "Agent Tmux"
+def configuredVersionCode = configValue("agentTmuxVersionCode").trim()
+def configuredVersionName = configValue("agentTmuxVersionName").trim()
+def releaseStoreFile = configValue("agentTmuxReleaseStoreFile").trim()
+def releaseStorePassword = configValue("agentTmuxReleaseStorePassword").trim()
+def releaseKeyAlias = configValue("agentTmuxReleaseKeyAlias").trim()
+def releaseKeyPassword = configValue("agentTmuxReleaseKeyPassword").trim()
+def hasReleaseSigning = releaseStoreFile || releaseStorePassword || releaseKeyAlias || releaseKeyPassword
+if (hasReleaseSigning && !(releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword)) {
+    throw new GradleException("Set agentTmuxReleaseStoreFile, agentTmuxReleaseStorePassword, agentTmuxReleaseKeyAlias, and agentTmuxReleaseKeyPassword together.")
+}
+
 android {
     namespace "com.agenttmux.web"
     compileSdk 35
 
+    signingConfigs {
+        localRelease {
+            if (hasReleaseSigning) {
+                def storePath = new File(releaseStoreFile)
+                storeFile storePath.isAbsolute() ? storePath : rootProject.file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
+
     defaultConfig {
-        applicationId "com.agenttmux.web"
+        applicationId "com.agenttmux.web${normalizedApplicationIdSuffix}"
         minSdk 26
         targetSdk 35
-        versionCode 9
-        versionName "0.1.8"
+        versionCode configuredVersionCode ? configuredVersionCode.toInteger() : 10
+        versionName configuredVersionName ?: "0.1.9"
+        manifestPlaceholders = [agentTmuxAppLabel: appLabel]
 
         buildConfigField "String", "DEFAULT_SERVER_URL", quotedBuildConfig(configValue("agentTmuxDefaultUrl"))
         buildConfigField "String", "DEFAULT_AUTH_TOKEN", quotedBuildConfig(configValue("agentTmuxDefaultToken"))
@@ -41,7 +70,7 @@ android {
 
     buildTypes {
         release {
-            signingConfig signingConfigs.debug
+            signingConfig hasReleaseSigning ? signingConfigs.localRelease : signingConfigs.debug
             minifyEnabled false
             debuggable false
         }
