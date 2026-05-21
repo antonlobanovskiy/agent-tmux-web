@@ -219,6 +219,8 @@ export function App() {
   const tmuxStickToBottomRef = useRef(true);
   const forceTmuxScrollBottomRef = useRef(false);
   const tmuxScrollTopSnapshotRef = useRef<number | null>(null);
+  const selectedTmuxRef = useRef(selectedTmux);
+  const tmuxCaptureRequestIdRef = useRef(0);
 
   const modelEfforts = useMemo(() => {
     const found = models.find((entry) => entry.id === model || entry.model === model);
@@ -309,8 +311,11 @@ export function App() {
     if (!session) {
       return;
     }
+    const requestId = ++tmuxCaptureRequestIdRef.current;
     if (demoMode) {
-      setCapturedTmuxOutput(DEMO_TMUX_OUTPUT);
+      if (tmuxCaptureRequestIdRef.current === requestId) {
+        setCapturedTmuxOutput(DEMO_TMUX_OUTPUT);
+      }
       return;
     }
     const params = new URLSearchParams({
@@ -319,8 +324,15 @@ export function App() {
       clientWidth: String(resolveTmuxCaptureClientWidth())
     });
     const result = await api<{ output: string }>(`/api/tmux/capture?${params.toString()}`);
+    if (tmuxCaptureRequestIdRef.current !== requestId || selectedTmuxRef.current !== session) {
+      return;
+    }
     setCapturedTmuxOutput(result.output);
   }, [selectedTmux, tmuxGuiActive]);
+
+  useEffect(() => {
+    selectedTmuxRef.current = selectedTmux;
+  }, [selectedTmux]);
 
   useEffect(() => {
     loadStatus().catch(reportError(setError));
@@ -553,12 +565,26 @@ export function App() {
       }
     });
 
-    const resize = () => {
+    let lastSentDimensions = dimensions;
+    let resizeFrame = 0;
+    const sendResize = () => {
       const nextDimensions = fitTerminal();
-      if (socket.readyState === WebSocket.OPEN) {
+      const dimensionsChanged = nextDimensions.cols !== lastSentDimensions.cols || nextDimensions.rows !== lastSentDimensions.rows;
+      if (dimensionsChanged && socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ type: "resize", ...nextDimensions }));
+        lastSentDimensions = nextDimensions;
       }
     };
+    const resize = () => {
+      if (resizeFrame) {
+        return;
+      }
+      resizeFrame = window.requestAnimationFrame(() => {
+        resizeFrame = 0;
+        sendResize();
+      });
+    };
+    socket.addEventListener("open", sendResize);
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(node);
     window.addEventListener("resize", resize);
@@ -566,6 +592,10 @@ export function App() {
 
     return () => {
       window.clearTimeout(resizeTimer);
+      if (resizeFrame) {
+        window.cancelAnimationFrame(resizeFrame);
+      }
+      socket.removeEventListener("open", sendResize);
       window.removeEventListener("resize", resize);
       resizeObserver.disconnect();
       inputDisposable.dispose();
