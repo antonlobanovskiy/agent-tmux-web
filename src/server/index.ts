@@ -17,8 +17,10 @@ import {
   buildTmuxResizeWindowArgs,
   buildTmuxRestoreWindowStateCommandSequence,
   buildTmuxShowWindowSizeOptionArgs,
+  isSameTerminalSize,
   normalizeTerminalSize,
   parseTmuxWindowSize,
+  type TerminalSize,
   type TmuxWindowState
 } from "./terminal.js";
 import {
@@ -236,7 +238,7 @@ app.get("/api/tmux/capture", asyncHandler(async (req, res) => {
   const captureSize = buildTmuxCaptureSizeFromClientWidth(req.query.clientWidth);
   const preserveExistingClientSize = await hasAttachedTmuxClients(session).catch(() => false);
   if (!preserveExistingClientSize) {
-    await execFileAsync("tmux", buildTmuxResizeWindowArgs(session, captureSize)).catch(() => {
+    await resizeTmuxWindowIfNeeded(session, captureSize).catch(() => {
       // Best-effort: capture remains useful even if tmux rejects a resize.
     });
   }
@@ -465,7 +467,7 @@ tmuxWss.on("connection", async (socket, req) => {
 
     if (message.type === "resize" && !preserveExistingClientSize) {
       const nextSize = normalizeTerminalSize(message.cols, message.rows);
-      execFileAsync("tmux", buildTmuxResizeWindowArgs(session, nextSize)).catch(() => {
+      resizeTmuxWindowIfNeeded(session, nextSize).catch(() => {
         // Best-effort resize; the tmux attachment remains usable if this fails.
       });
     }
@@ -575,14 +577,27 @@ function parseTerminalMessage(raw: RawData): Record<string, unknown> | null {
 }
 
 async function readTmuxWindowState(session: string): Promise<TmuxWindowState> {
-  const [{ stdout: sizeStdout }, { stdout: optionStdout }] = await Promise.all([
-    execFileAsync("tmux", buildTmuxDisplayWindowSizeArgs(session)),
+  const [size, { stdout: optionStdout }] = await Promise.all([
+    readTmuxWindowSize(session),
     execFileAsync("tmux", buildTmuxShowWindowSizeOptionArgs(session))
   ]);
   return {
-    size: parseTmuxWindowSize(sizeStdout),
+    size,
     windowSizeOption: optionStdout.trim() || "latest"
   };
+}
+
+async function readTmuxWindowSize(session: string): Promise<TerminalSize> {
+  const { stdout } = await execFileAsync("tmux", buildTmuxDisplayWindowSizeArgs(session));
+  return parseTmuxWindowSize(stdout);
+}
+
+async function resizeTmuxWindowIfNeeded(session: string, nextSize: TerminalSize): Promise<void> {
+  const currentSize = await readTmuxWindowSize(session);
+  if (isSameTerminalSize(currentSize, nextSize)) {
+    return;
+  }
+  await execFileAsync("tmux", buildTmuxResizeWindowArgs(session, nextSize));
 }
 
 async function hasAttachedTmuxClients(session: string): Promise<boolean> {

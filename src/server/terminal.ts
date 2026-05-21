@@ -73,6 +73,10 @@ export function normalizeTerminalSize(cols: unknown, rows: unknown): TerminalSiz
   };
 }
 
+export function isSameTerminalSize(left: TerminalSize, right: TerminalSize): boolean {
+  return left.cols === right.cols && left.rows === right.rows;
+}
+
 function toInteger(value: unknown, fallback: number): number {
   const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
   return Number.isFinite(parsed) ? Math.trunc(parsed) : fallback;

@@ -9,6 +9,7 @@ import {
   buildTmuxRestoreWindowStateCommandSequence,
   buildTmuxSetWindowSizeOptionArgs,
   buildTmuxShowWindowSizeOptionArgs,
+  isSameTerminalSize,
   normalizeTerminalSize
 } from "../terminal.js";
 
@@ -35,6 +36,12 @@ describe("browser tmux terminal helpers", () => {
     expect(normalizeTerminalSize(10, 4)).toEqual({ cols: 20, rows: 8 });
     expect(normalizeTerminalSize(999, 999)).toEqual({ cols: 240, rows: 80 });
     expect(normalizeTerminalSize(132, 36)).toEqual({ cols: 132, rows: 36 });
+  });
+
+  it("detects unchanged terminal dimensions", () => {
+    expect(isSameTerminalSize({ cols: 132, rows: 36 }, { cols: 132, rows: 36 })).toBe(true);
+    expect(isSameTerminalSize({ cols: 132, rows: 36 }, { cols: 133, rows: 36 })).toBe(false);
+    expect(isSameTerminalSize({ cols: 132, rows: 36 }, { cols: 132, rows: 37 })).toBe(false);
   });
 
   it("maps wide GUI/TTY capture surfaces to tmux columns", () => {
