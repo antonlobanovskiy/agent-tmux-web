@@ -1611,12 +1611,10 @@ const TmuxChatView = forwardRef<HTMLDivElement, {
       messages.map((message, index) => (
         <article
           className={`tmux-chat-message ${message.role}`}
-          data-tmux-anchor-index={index}
-          data-tmux-scroll-anchor=""
           key={message.id}
         >
           <span className="tmux-chat-label">{message.role === "user" ? "You" : message.role === "assistant" ? "Agent" : "Terminal"}</span>
-          <TmuxChatBubble message={message} />
+          <TmuxChatBubble message={message} messageIndex={index} />
         </article>
       ))
     )}
@@ -1637,23 +1635,52 @@ function TmuxOutputLines({ output }: { output: string }) {
   ));
 }
 
-function TmuxChatBubble({ message }: { message: TmuxChatMessage }) {
+function TmuxChatBubble({ message, messageIndex }: { message: TmuxChatMessage; messageIndex: number }) {
   const parts = message.role === "user"
     ? [{ id: "part-0", kind: "text" as const, text: message.text }]
     : splitTmuxChatMessage(message.text);
 
   return (
     <div className="tmux-chat-bubble">
-      {parts.map((part) => part.kind === "code" ? (
+      {parts.map((part, partIndex) => part.kind === "code" ? (
         <pre className="tmux-chat-code" key={part.id}>
           {part.label && <span>{part.label}</span>}
-          <code>{part.text}</code>
+          <code>
+            <TmuxChatAnchorLines
+              anchorBase={tmuxChatAnchorBase(messageIndex, partIndex)}
+              className="tmux-chat-code-line"
+              text={part.text}
+            />
+          </code>
         </pre>
       ) : (
-        <p className="tmux-chat-text" key={part.id}>{part.text}</p>
+        <p className="tmux-chat-text" key={part.id}>
+          <TmuxChatAnchorLines
+            anchorBase={tmuxChatAnchorBase(messageIndex, partIndex)}
+            className="tmux-chat-text-line"
+            text={part.text}
+          />
+        </p>
       ))}
     </div>
   );
+}
+
+function TmuxChatAnchorLines({ anchorBase, className, text }: { anchorBase: number; className: string; text: string }) {
+  return text.split(/\r?\n/).map((line, index) => (
+    <span
+      className={className}
+      data-tmux-anchor-index={anchorBase + index}
+      data-tmux-scroll-anchor=""
+      key={`${index}-${line}`}
+    >
+      {line || "\u00a0"}
+    </span>
+  ));
+}
+
+function tmuxChatAnchorBase(messageIndex: number, partIndex: number): number {
+  return (messageIndex * 100_000) + (partIndex * 1_000);
 }
 
 async function api<T = unknown>(url: string, init?: RequestInit): Promise<T> {
