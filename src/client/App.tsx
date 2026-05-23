@@ -75,10 +75,18 @@ type WsPayload = {
   event?: TmuxWatchEvent;
 };
 
+type TmuxScrollSnapshot = {
+  anchorIndex: number;
+  anchorOffsetTop: number;
+  anchorText: string;
+  scrollTop: number;
+};
+
 const defaultCwd = "";
 const TMUX_CAPTURE_HISTORY_LINES = 1000;
 const TMUX_TERMINAL_SUBMIT_DELAY_MS = 350;
 const TMUX_NOTIFICATION_STORAGE_KEY = "agent-tmux-web.notify";
+const TMUX_SCROLL_ANCHOR_SELECTOR = "[data-tmux-scroll-anchor]";
 const demoMode = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("demo");
 const DEMO_STATUS: AppStatus = {
   bindHost: "127.0.0.1",
@@ -218,7 +226,7 @@ export function App() {
   const tmuxNotificationsEnabledRef = useRef(tmuxNotificationsEnabled);
   const tmuxStickToBottomRef = useRef(true);
   const forceTmuxScrollBottomRef = useRef(false);
-  const tmuxScrollTopSnapshotRef = useRef<number | null>(null);
+  const tmuxScrollSnapshotRef = useRef<TmuxScrollSnapshot | null>(null);
   const selectedTmuxRef = useRef(selectedTmux);
   const tmuxCaptureRequestIdRef = useRef(0);
 
@@ -413,15 +421,14 @@ export function App() {
       node.scrollTop = node.scrollHeight;
       forceTmuxScrollBottomRef.current = false;
       updateTmuxBottomState(node);
-      tmuxScrollTopSnapshotRef.current = null;
+      tmuxScrollSnapshotRef.current = null;
       return;
     }
 
-    if (tmuxScrollTopSnapshotRef.current !== null) {
-      const maxScrollTop = Math.max(0, node.scrollHeight - node.clientHeight);
-      node.scrollTop = Math.min(tmuxScrollTopSnapshotRef.current, maxScrollTop);
+    if (tmuxScrollSnapshotRef.current) {
+      restoreTmuxScrollSnapshot(node, tmuxScrollSnapshotRef.current);
     }
-    tmuxScrollTopSnapshotRef.current = null;
+    tmuxScrollSnapshotRef.current = null;
     updateTmuxBottomState(node);
   }, [terminalActive, tmuxGuiActive, tmuxOutput]);
 
@@ -1212,8 +1219,8 @@ export function App() {
 
   function rememberTmuxScrollPosition() {
     const node = currentTmuxScrollNode();
-    tmuxScrollTopSnapshotRef.current = node && !forceTmuxScrollBottomRef.current && !tmuxStickToBottomRef.current
-      ? node.scrollTop
+    tmuxScrollSnapshotRef.current = node && !forceTmuxScrollBottomRef.current && !tmuxStickToBottomRef.current
+      ? readTmuxScrollSnapshot(node)
       : null;
   }
 
@@ -1238,7 +1245,7 @@ export function App() {
     if (!node) {
       return;
     }
-    tmuxScrollTopSnapshotRef.current = null;
+    tmuxScrollSnapshotRef.current = null;
     tmuxStickToBottomRef.current = true;
     setTmuxAtBottom(true);
     node.scrollTo({ top: node.scrollHeight, behavior: "smooth" });
@@ -1506,7 +1513,9 @@ export function App() {
             ) : tmuxGuiActive ? (
               <TmuxChatView ref={tmuxChatRef} messages={tmuxChatMessages} onScroll={handleTmuxOutputScroll} />
             ) : (
-              <pre ref={tmuxOutputRef} className="tmux-output" onScroll={handleTmuxOutputScroll}>{tmuxOutput || "No tmux output captured."}</pre>
+              <pre ref={tmuxOutputRef} className="tmux-output" onScroll={handleTmuxOutputScroll}>
+                <TmuxOutputLines output={tmuxOutput || "No tmux output captured."} />
+              </pre>
             )}
             {!terminalActive && !tmuxAtBottom && (
               <button className="tmux-jump-bottom" aria-label="Jump to latest tmux output" title="Jump to latest tmux output" type="button" onClick={jumpTmuxOutputToBottom}>
@@ -1599,8 +1608,13 @@ const TmuxChatView = forwardRef<HTMLDivElement, {
         <div className="tmux-chat-bubble">No tmux output captured.</div>
       </article>
     ) : (
-      messages.map((message) => (
-        <article className={`tmux-chat-message ${message.role}`} key={message.id}>
+      messages.map((message, index) => (
+        <article
+          className={`tmux-chat-message ${message.role}`}
+          data-tmux-anchor-index={index}
+          data-tmux-scroll-anchor=""
+          key={message.id}
+        >
           <span className="tmux-chat-label">{message.role === "user" ? "You" : message.role === "assistant" ? "Agent" : "Terminal"}</span>
           <TmuxChatBubble message={message} />
         </article>
@@ -1609,6 +1623,19 @@ const TmuxChatView = forwardRef<HTMLDivElement, {
   </div>
 ));
 TmuxChatView.displayName = "TmuxChatView";
+
+function TmuxOutputLines({ output }: { output: string }) {
+  return output.split(/\r?\n/).map((line, index) => (
+    <span
+      className="tmux-output-line"
+      data-tmux-anchor-index={index}
+      data-tmux-scroll-anchor=""
+      key={`${index}-${line}`}
+    >
+      {line || "\u00a0"}
+    </span>
+  ));
+}
 
 function TmuxChatBubble({ message }: { message: TmuxChatMessage }) {
   const parts = message.role === "user"
@@ -1715,6 +1742,60 @@ function clearRequestedTmuxSessionFromAddressBar() {
   if (next !== window.location.href) {
     window.history.replaceState(window.history.state, "", next);
   }
+}
+
+function readTmuxScrollSnapshot(node: HTMLElement): TmuxScrollSnapshot {
+  const anchor = findFirstVisibleTmuxAnchor(node);
+  const nodeTop = node.getBoundingClientRect().top;
+  return {
+    anchorIndex: anchor ? readTmuxAnchorIndex(anchor) : 0,
+    anchorOffsetTop: anchor ? anchor.getBoundingClientRect().top - nodeTop : 0,
+    anchorText: anchor?.textContent ?? "",
+    scrollTop: node.scrollTop
+  };
+}
+
+function restoreTmuxScrollSnapshot(node: HTMLElement, snapshot: TmuxScrollSnapshot): void {
+  const anchor = findMatchingTmuxAnchor(node, snapshot);
+  if (anchor) {
+    const currentOffsetTop = anchor.getBoundingClientRect().top - node.getBoundingClientRect().top;
+    node.scrollTop += currentOffsetTop - snapshot.anchorOffsetTop;
+    return;
+  }
+
+  const maxScrollTop = Math.max(0, node.scrollHeight - node.clientHeight);
+  node.scrollTop = Math.min(snapshot.scrollTop, maxScrollTop);
+}
+
+function findFirstVisibleTmuxAnchor(node: HTMLElement): HTMLElement | null {
+  const anchors = Array.from(node.querySelectorAll<HTMLElement>(TMUX_SCROLL_ANCHOR_SELECTOR));
+  if (anchors.length === 0) {
+    return null;
+  }
+
+  const nodeRect = node.getBoundingClientRect();
+  const visible = anchors.filter((anchor) => {
+    const anchorRect = anchor.getBoundingClientRect();
+    return anchorRect.bottom > nodeRect.top && anchorRect.top < nodeRect.bottom;
+  });
+  return visible.find((anchor) => anchor.textContent?.trim()) ?? visible[0] ?? anchors[0] ?? null;
+}
+
+function findMatchingTmuxAnchor(node: HTMLElement, snapshot: TmuxScrollSnapshot): HTMLElement | null {
+  const anchors = Array.from(node.querySelectorAll<HTMLElement>(TMUX_SCROLL_ANCHOR_SELECTOR));
+  const matching = anchors.filter((anchor) => (anchor.textContent ?? "") === snapshot.anchorText);
+  if (matching.length === 0) {
+    return null;
+  }
+  return matching.sort((left, right) => (
+    Math.abs(readTmuxAnchorIndex(left) - snapshot.anchorIndex)
+      - Math.abs(readTmuxAnchorIndex(right) - snapshot.anchorIndex)
+  ))[0] ?? null;
+}
+
+function readTmuxAnchorIndex(anchor: HTMLElement): number {
+  const parsed = Number(anchor.dataset.tmuxAnchorIndex);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function readInitialColorTheme(): ColorTheme {
