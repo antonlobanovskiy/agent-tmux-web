@@ -990,6 +990,12 @@ textarea:focus {
   overflow-wrap: anywhere;
 }
 
+.tmux-chat-text-line,
+.tmux-chat-code-line {
+  display: block;
+  min-height: 1em;
+}
+
 .tmux-chat-text + .tmux-chat-text,
 .tmux-chat-text + .tmux-chat-code,
 .tmux-chat-code + .tmux-chat-text,
