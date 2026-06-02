@@ -1,0 +1,537 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "agent-tmux-web",
+  "homepage": "https://github.com/antonlobanovskiy/agent-tmux-web",
+  "items": [
+    {
+      "name": "full-project",
+      "type": "registry:item",
+      "title": "Agent Tmux Web Project",
+      "description": "Composable source bundle for the Agent Tmux Web app, deployment assets, Android wrapper, and registry guide.",
+      "registryDependencies": [
+        "antonlobanovskiy/agent-tmux-web/web-app",
+        "antonlobanovskiy/agent-tmux-web/vps-deploy",
+        "antonlobanovskiy/agent-tmux-web/android-wrapper"
+      ],
+      "files": [
+        {
+          "path": "README.md",
+          "type": "registry:file",
+          "target": "~/README.md"
+        },
+        {
+          "path": "LICENSE",
+          "type": "registry:file",
+          "target": "~/LICENSE"
+        },
+        {
+          "path": "docs/registry.md",
+          "type": "registry:file",
+          "target": "~/docs/registry.md"
+        },
+        {
+          "path": "docs/marketing.md",
+          "type": "registry:file",
+          "target": "~/docs/marketing.md"
+        }
+      ],
+      "docs": "Install into an empty project directory or inspect first with --dry-run, --diff, or view. Binary media assets, launcher images, and the Gradle wrapper jar are intentionally omitted from registry items; clone the repository for the complete asset set. Keep runtime .env files, auth tokens, uploads, APKs, and machine-specific service files out of git.",
+      "categories": ["tmux", "terminal-agents", "mobile"],
+      "meta": {
+        "requires": ["Node.js 22+", "pnpm", "tmux"],
+        "security": "Use Tailscale, a VPN, an SSH tunnel, LAN-only access, or an authenticated reverse proxy."
+      }
+    },
+    {
+      "name": "web-app",
+      "type": "registry:item",
+      "title": "Agent Tmux Web App",
+      "description": "Core Vite, React, Express, tmux, upload, and optional Codex app-server bridge source.",
+      "dependencies": [
+        "@vitejs/plugin-react@^5.1.1",
+        "@xterm/addon-fit@^0.11.0",
+        "@xterm/xterm@^6.0.0",
+        "express@^5.2.1",
+        "lucide-react@^0.561.0",
+        "react@^19.2.3",
+        "react-dom@^19.2.3",
+        "vite@^7.2.7",
+        "ws@^8.18.3"
+      ],
+      "devDependencies": [
+        "@types/express@^5.0.6",
+        "@types/node@^25.0.3",
+        "@types/react@^19.2.7",
+        "@types/react-dom@^19.2.3",
+        "@types/ws@^8.18.1",
+        "tsx@^4.21.0",
+        "typescript@^5.9.3",
+        "vitest@^4.0.16"
+      ],
+      "files": [
+        {
+          "path": "package.json",
+          "type": "registry:file",
+          "target": "~/package.json"
+        },
+        {
+          "path": "pnpm-lock.yaml",
+          "type": "registry:file",
+          "target": "~/pnpm-lock.yaml"
+        },
+        {
+          "path": "index.html",
+          "type": "registry:file",
+          "target": "~/index.html"
+        },
+        {
+          "path": "vite.config.ts",
+          "type": "registry:file",
+          "target": "~/vite.config.ts"
+        },
+        {
+          "path": "tsconfig.json",
+          "type": "registry:file",
+          "target": "~/tsconfig.json"
+        },
+        {
+          "path": "tsconfig.server.json",
+          "type": "registry:file",
+          "target": "~/tsconfig.server.json"
+        },
+        {
+          "path": "src/client/App.tsx",
+          "type": "registry:file",
+          "target": "~/src/client/App.tsx"
+        },
+        {
+          "path": "src/client/browserNotifications.ts",
+          "type": "registry:file",
+          "target": "~/src/client/browserNotifications.ts"
+        },
+        {
+          "path": "src/client/main.tsx",
+          "type": "registry:file",
+          "target": "~/src/client/main.tsx"
+        },
+        {
+          "path": "src/client/slashCommands.ts",
+          "type": "registry:file",
+          "target": "~/src/client/slashCommands.ts"
+        },
+        {
+          "path": "src/client/styles.css",
+          "type": "registry:file",
+          "target": "~/src/client/styles.css"
+        },
+        {
+          "path": "src/client/theme.ts",
+          "type": "registry:file",
+          "target": "~/src/client/theme.ts"
+        },
+        {
+          "path": "src/client/tmuxActivity.ts",
+          "type": "registry:file",
+          "target": "~/src/client/tmuxActivity.ts"
+        },
+        {
+          "path": "src/client/tmuxFollow.ts",
+          "type": "registry:file",
+          "target": "~/src/client/tmuxFollow.ts"
+        },
+        {
+          "path": "src/client/tmuxGui.ts",
+          "type": "registry:file",
+          "target": "~/src/client/tmuxGui.ts"
+        },
+        {
+          "path": "src/client/tmuxNotifications.ts",
+          "type": "registry:file",
+          "target": "~/src/client/tmuxNotifications.ts"
+        },
+        {
+          "path": "src/client/tmuxSessionTarget.ts",
+          "type": "registry:file",
+          "target": "~/src/client/tmuxSessionTarget.ts"
+        },
+        {
+          "path": "src/client/__tests__/browserNotifications.test.ts",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/browserNotifications.test.ts"
+        },
+        {
+          "path": "src/client/__tests__/slashCommands.test.ts",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/slashCommands.test.ts"
+        },
+        {
+          "path": "src/client/__tests__/styles.test.ts",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/styles.test.ts"
+        },
+        {
+          "path": "src/client/__tests__/theme.test.ts",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/theme.test.ts"
+        },
+        {
+          "path": "src/client/__tests__/tmuxActivity.test.ts",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/tmuxActivity.test.ts"
+        },
+        {
+          "path": "src/client/__tests__/tmuxFollow.test.ts",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/tmuxFollow.test.ts"
+        },
+        {
+          "path": "src/client/__tests__/tmuxGui.test.ts",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/tmuxGui.test.ts"
+        },
+        {
+          "path": "src/client/__tests__/tmuxNotifications.test.ts",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/tmuxNotifications.test.ts"
+        },
+        {
+          "path": "src/client/__tests__/tmuxSessionTarget.test.ts",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/tmuxSessionTarget.test.ts"
+        },
+        {
+          "path": "src/server/codexBridge.ts",
+          "type": "registry:file",
+          "target": "~/src/server/codexBridge.ts"
+        },
+        {
+          "path": "src/server/index.ts",
+          "type": "registry:file",
+          "target": "~/src/server/index.ts"
+        },
+        {
+          "path": "src/server/terminal.ts",
+          "type": "registry:file",
+          "target": "~/src/server/terminal.ts"
+        },
+        {
+          "path": "src/server/tmux.ts",
+          "type": "registry:file",
+          "target": "~/src/server/tmux.ts"
+        },
+        {
+          "path": "src/server/tmuxWatch.ts",
+          "type": "registry:file",
+          "target": "~/src/server/tmuxWatch.ts"
+        },
+        {
+          "path": "src/server/uploads.ts",
+          "type": "registry:file",
+          "target": "~/src/server/uploads.ts"
+        },
+        {
+          "path": "src/server/__tests__/terminal.test.ts",
+          "type": "registry:file",
+          "target": "~/src/server/__tests__/terminal.test.ts"
+        },
+        {
+          "path": "src/server/__tests__/tmux.test.ts",
+          "type": "registry:file",
+          "target": "~/src/server/__tests__/tmux.test.ts"
+        },
+        {
+          "path": "src/server/__tests__/tmuxWatch.test.ts",
+          "type": "registry:file",
+          "target": "~/src/server/__tests__/tmuxWatch.test.ts"
+        },
+        {
+          "path": "src/server/__tests__/uploads.test.ts",
+          "type": "registry:file",
+          "target": "~/src/server/__tests__/uploads.test.ts"
+        },
+        {
+          "path": "src/shared/api.ts",
+          "type": "registry:file",
+          "target": "~/src/shared/api.ts"
+        },
+        {
+          "path": "src/shared/codexEvents.ts",
+          "type": "registry:file",
+          "target": "~/src/shared/codexEvents.ts"
+        },
+        {
+          "path": "src/shared/tmuxActivity.ts",
+          "type": "registry:file",
+          "target": "~/src/shared/tmuxActivity.ts"
+        },
+        {
+          "path": "src/shared/__tests__/codexEvents.test.ts",
+          "type": "registry:file",
+          "target": "~/src/shared/__tests__/codexEvents.test.ts"
+        }
+      ],
+      "docs": "After installing source files, run pnpm install, copy .env.example to .env, and build with pnpm build. The app needs tmux and at least one terminal agent CLI on the server.",
+      "categories": ["tmux", "react", "express"]
+    },
+    {
+      "name": "vps-deploy",
+      "type": "registry:item",
+      "title": "VPS Deploy Kit",
+      "description": "Private VPS, Tailscale, systemd, and AI-assisted setup materials for Agent Tmux Web.",
+      "files": [
+        {
+          "path": "INSTALL.md",
+          "type": "registry:file",
+          "target": "~/INSTALL.md"
+        },
+        {
+          "path": "AI_SETUP.md",
+          "type": "registry:file",
+          "target": "~/AI_SETUP.md"
+        },
+        {
+          "path": ".env.example",
+          "type": "registry:file",
+          "target": "~/.env.example"
+        },
+        {
+          "path": "scripts/install-linux.sh",
+          "type": "registry:file",
+          "target": "~/scripts/install-linux.sh"
+        },
+        {
+          "path": "scripts/stage-apk-download.mjs",
+          "type": "registry:file",
+          "target": "~/scripts/stage-apk-download.mjs"
+        },
+        {
+          "path": "scripts/verify-public-apk.mjs",
+          "type": "registry:file",
+          "target": "~/scripts/verify-public-apk.mjs"
+        },
+        {
+          "path": "ops/systemd/agent-tmux-web.service",
+          "type": "registry:file",
+          "target": "~/ops/systemd/agent-tmux-web.service"
+        },
+        {
+          "path": "ops/systemd/codex-web.service",
+          "type": "registry:file",
+          "target": "~/ops/systemd/codex-web.service"
+        }
+      ],
+      "docs": "Keep Agent Tmux Web private. Bind to localhost for testing, then use Tailscale, a VPN, an SSH tunnel, LAN-only access, or an authenticated reverse proxy for phone access.",
+      "categories": ["vps", "systemd", "tailscale"]
+    },
+    {
+      "name": "android-wrapper",
+      "type": "registry:item",
+      "title": "Android Wrapper",
+      "description": "Sideload-only Android WebView wrapper, native upload bridge, and notification watcher source.",
+      "files": [
+        {
+          "path": "android/README.md",
+          "type": "registry:file",
+          "target": "~/android/README.md"
+        },
+        {
+          "path": "android/build.gradle",
+          "type": "registry:file",
+          "target": "~/android/build.gradle"
+        },
+        {
+          "path": "android/settings.gradle",
+          "type": "registry:file",
+          "target": "~/android/settings.gradle"
+        },
+        {
+          "path": "android/gradle.properties",
+          "type": "registry:file",
+          "target": "~/android/gradle.properties"
+        },
+        {
+          "path": "android/gradlew",
+          "type": "registry:file",
+          "target": "~/android/gradlew"
+        },
+        {
+          "path": "android/gradlew.bat",
+          "type": "registry:file",
+          "target": "~/android/gradlew.bat"
+        },
+        {
+          "path": "android/gradle/wrapper/gradle-wrapper.properties",
+          "type": "registry:file",
+          "target": "~/android/gradle/wrapper/gradle-wrapper.properties"
+        },
+        {
+          "path": "android/app/build.gradle",
+          "type": "registry:file",
+          "target": "~/android/app/build.gradle"
+        },
+        {
+          "path": "android/app/src/main/AndroidManifest.xml",
+          "type": "registry:file",
+          "target": "~/android/app/src/main/AndroidManifest.xml"
+        },
+        {
+          "path": "android/app/src/main/java/com/agenttmux/web/AgentNotificationBridge.java",
+          "type": "registry:file",
+          "target": "~/android/app/src/main/java/com/agenttmux/web/AgentNotificationBridge.java"
+        },
+        {
+          "path": "android/app/src/main/java/com/agenttmux/web/AgentNotifications.java",
+          "type": "registry:file",
+          "target": "~/android/app/src/main/java/com/agenttmux/web/AgentNotifications.java"
+        },
+        {
+          "path": "android/app/src/main/java/com/agenttmux/web/MainActivity.java",
+          "type": "registry:file",
+          "target": "~/android/app/src/main/java/com/agenttmux/web/MainActivity.java"
+        },
+        {
+          "path": "android/app/src/main/java/com/agenttmux/web/NotificationTarget.java",
+          "type": "registry:file",
+          "target": "~/android/app/src/main/java/com/agenttmux/web/NotificationTarget.java"
+        },
+        {
+          "path": "android/app/src/main/java/com/agenttmux/web/WatchPollingService.java",
+          "type": "registry:file",
+          "target": "~/android/app/src/main/java/com/agenttmux/web/WatchPollingService.java"
+        },
+        {
+          "path": "android/app/src/main/res/drawable/ic_launcher_foreground.xml",
+          "type": "registry:file",
+          "target": "~/android/app/src/main/res/drawable/ic_launcher_foreground.xml"
+        },
+        {
+          "path": "android/app/src/main/res/drawable/ic_notification.xml",
+          "type": "registry:file",
+          "target": "~/android/app/src/main/res/drawable/ic_notification.xml"
+        },
+        {
+          "path": "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
+          "type": "registry:file",
+          "target": "~/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml"
+        },
+        {
+          "path": "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml",
+          "type": "registry:file",
+          "target": "~/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml"
+        },
+        {
+          "path": "android/app/src/main/res/values/colors.xml",
+          "type": "registry:file",
+          "target": "~/android/app/src/main/res/values/colors.xml"
+        },
+        {
+          "path": "android/app/src/main/res/values/strings.xml",
+          "type": "registry:file",
+          "target": "~/android/app/src/main/res/values/strings.xml"
+        },
+        {
+          "path": "android/app/src/main/res/values/styles.xml",
+          "type": "registry:file",
+          "target": "~/android/app/src/main/res/values/styles.xml"
+        },
+        {
+          "path": "android/app/src/main/res/xml/network_security_config.xml",
+          "type": "registry:file",
+          "target": "~/android/app/src/main/res/xml/network_security_config.xml"
+        },
+        {
+          "path": "android/app/src/test/java/com/agenttmux/web/NotificationTargetTest.java",
+          "type": "registry:file",
+          "target": "~/android/app/src/test/java/com/agenttmux/web/NotificationTargetTest.java"
+        },
+        {
+          "path": "scripts/build-private-apk.mjs",
+          "type": "registry:file",
+          "target": "~/scripts/build-private-apk.mjs"
+        }
+      ],
+      "docs": "Public APKs must not include a default server URL or auth token. Private APKs should use a separate package id and should be delivered over LAN, VPN, or Tailscale instead of email. Clone the repository for binary launcher images and the Gradle wrapper jar.",
+      "categories": ["android", "webview", "notifications"]
+    },
+    {
+      "name": "notifications",
+      "type": "registry:item",
+      "title": "Waiting Tab Notifications",
+      "description": "Browser, server, shared, and Android notification routing source for task-done alerts that open the waiting tab.",
+      "files": [
+        {
+          "path": "src/client/browserNotifications.ts",
+          "type": "registry:file",
+          "target": "~/src/client/browserNotifications.ts"
+        },
+        {
+          "path": "src/client/tmuxNotifications.ts",
+          "type": "registry:file",
+          "target": "~/src/client/tmuxNotifications.ts"
+        },
+        {
+          "path": "src/client/tmuxSessionTarget.ts",
+          "type": "registry:file",
+          "target": "~/src/client/tmuxSessionTarget.ts"
+        },
+        {
+          "path": "src/server/tmuxWatch.ts",
+          "type": "registry:file",
+          "target": "~/src/server/tmuxWatch.ts"
+        },
+        {
+          "path": "src/shared/tmuxActivity.ts",
+          "type": "registry:file",
+          "target": "~/src/shared/tmuxActivity.ts"
+        },
+        {
+          "path": "src/client/__tests__/browserNotifications.test.ts",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/browserNotifications.test.ts"
+        },
+        {
+          "path": "src/client/__tests__/tmuxNotifications.test.ts",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/tmuxNotifications.test.ts"
+        },
+        {
+          "path": "src/client/__tests__/tmuxSessionTarget.test.ts",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/tmuxSessionTarget.test.ts"
+        },
+        {
+          "path": "src/server/__tests__/tmuxWatch.test.ts",
+          "type": "registry:file",
+          "target": "~/src/server/__tests__/tmuxWatch.test.ts"
+        },
+        {
+          "path": "android/app/src/main/java/com/agenttmux/web/AgentNotificationBridge.java",
+          "type": "registry:file",
+          "target": "~/android/app/src/main/java/com/agenttmux/web/AgentNotificationBridge.java"
+        },
+        {
+          "path": "android/app/src/main/java/com/agenttmux/web/AgentNotifications.java",
+          "type": "registry:file",
+          "target": "~/android/app/src/main/java/com/agenttmux/web/AgentNotifications.java"
+        },
+        {
+          "path": "android/app/src/main/java/com/agenttmux/web/NotificationTarget.java",
+          "type": "registry:file",
+          "target": "~/android/app/src/main/java/com/agenttmux/web/NotificationTarget.java"
+        },
+        {
+          "path": "android/app/src/main/java/com/agenttmux/web/WatchPollingService.java",
+          "type": "registry:file",
+          "target": "~/android/app/src/main/java/com/agenttmux/web/WatchPollingService.java"
+        },
+        {
+          "path": "android/app/src/test/java/com/agenttmux/web/NotificationTargetTest.java",
+          "type": "registry:file",
+          "target": "~/android/app/src/test/java/com/agenttmux/web/NotificationTargetTest.java"
+        }
+      ],
+      "docs": "This is a source slice for review and adaptation. In the full app, notifications depend on the tmux watch API, session target parsing, browser permission flow, and the Android bridge.",
+      "categories": ["notifications", "android", "tmux"]
+    }
+  ]
+}
