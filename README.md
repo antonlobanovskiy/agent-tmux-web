@@ -110,6 +110,24 @@ private `.env` with a generated auth token, and starts a systemd user service
 when available. See [`INSTALL.md`](./INSTALL.md) for options such as binding to
 a Tailscale IP for phone access.
 
+## Source Registry
+
+Agent Tmux Web also ships a shadcn-compatible GitHub source registry for
+developers and agents that want to inspect, dry-run, or adapt source bundles
+from this repo:
+
+```bash
+pnpm dlx shadcn@latest list antonlobanovskiy/agent-tmux-web
+pnpm dlx shadcn@latest view antonlobanovskiy/agent-tmux-web/full-project
+pnpm dlx shadcn@latest add antonlobanovskiy/agent-tmux-web/full-project --dry-run
+```
+
+Available registry items are `full-project`, `web-app`, `vps-deploy`,
+`android-wrapper`, and `notifications`. The registry is source-oriented and
+intentionally omits binary media assets, launcher images, and the Gradle wrapper
+jar; clone the repo when you need the complete asset set. See
+[`docs/registry.md`](./docs/registry.md) for search, pinning, and usage details.
+
 ## Setup
 
 For AI-assisted setup, point your assistant at [AI_SETUP.md](./AI_SETUP.md) and
