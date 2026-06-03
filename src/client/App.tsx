@@ -31,7 +31,7 @@ import {
   X,
   Wrench
 } from "lucide-react";
-import { FormEvent, KeyboardEvent, UIEvent, forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ClipboardEvent, FormEvent, KeyboardEvent, UIEvent, forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { AppStatus, CodexModel, CodexSkill, TmuxSessionDto, TmuxToolDto, TmuxWatchEvent, UploadedFileDto } from "../shared/api.js";
 import { describeThreadItem, type UiEventDescription } from "../shared/codexEvents.js";
@@ -43,6 +43,7 @@ import {
   type SlashCommand
 } from "./slashCommands.js";
 import { COLOR_THEME_STORAGE_KEY, nextColorTheme, resolveInitialColorTheme, type ColorTheme } from "./theme.js";
+import { applyTextareaPaste, shouldSubmitTextareaEnter } from "./inputBehavior.js";
 import { parseTmuxChatOutput, splitTmuxChatMessage, type TmuxChatMessage } from "./tmuxGui.js";
 import { shouldAutoCaptureTmux, TMUX_CAPTURE_POLL_INTERVAL_MS, TMUX_SEND_FOLLOW_DELAYS_MS } from "./tmuxFollow.js";
 import { buildTmuxDoneNotification } from "./tmuxNotifications.js";
@@ -85,6 +86,7 @@ type TmuxScrollSnapshot = {
 const defaultCwd = "";
 const TMUX_CAPTURE_HISTORY_LINES = 1000;
 const TMUX_TERMINAL_SUBMIT_DELAY_MS = 350;
+const RAW_TERMINAL_INPUT_CHUNK_SIZE = 16_000;
 const TMUX_NOTIFICATION_STORAGE_KEY = "agent-tmux-web.notify";
 const TMUX_SCROLL_ANCHOR_SELECTOR = "[data-tmux-scroll-anchor]";
 const demoMode = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("demo");
@@ -920,7 +922,7 @@ export function App() {
       return false;
     }
 
-    socket.send(JSON.stringify({ type: "input", data: text }));
+    sendTerminalSocketInput(socket, text);
     window.setTimeout(() => {
       if (terminalSocketRef.current === socket && socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ type: "input", data: "\r" }));
@@ -1151,7 +1153,7 @@ export function App() {
 
   function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (!slashQuery || slashMatches.length === 0) {
-      if (event.key === "Enter" && !event.shiftKey) {
+      if (shouldSubmitTextareaEnter(event)) {
         event.preventDefault();
         event.currentTarget.form?.requestSubmit();
       }
@@ -1170,7 +1172,7 @@ export function App() {
       return;
     }
 
-    if (event.key === "Tab" || event.key === "Enter") {
+    if (event.key === "Tab" || shouldSubmitTextareaEnter(event)) {
       event.preventDefault();
       chooseSlashCommand(slashMatches[slashIndex] ?? slashMatches[0]);
       return;
@@ -1179,6 +1181,50 @@ export function App() {
     if (event.key === "Escape") {
       event.preventDefault();
       setComposerCaret(-1);
+    }
+  }
+
+  function handleComposerPaste(event: ClipboardEvent<HTMLTextAreaElement>) {
+    const pastedText = event.clipboardData.getData("text/plain");
+    if (!pastedText) {
+      return;
+    }
+
+    event.preventDefault();
+    const input = event.currentTarget;
+    const next = applyTextareaPaste(input.value, input.selectionStart, input.selectionEnd, pastedText);
+    input.value = next.value;
+    setMessage(next.value);
+    setComposerCaret(next.selectionStart);
+    window.requestAnimationFrame(() => {
+      input.focus();
+      input.setSelectionRange(next.selectionStart, next.selectionEnd);
+    });
+  }
+
+  function handleTmuxInputPaste(event: ClipboardEvent<HTMLTextAreaElement>) {
+    const pastedText = event.clipboardData.getData("text/plain");
+    if (!pastedText) {
+      return;
+    }
+
+    event.preventDefault();
+    const input = event.currentTarget;
+    const next = applyTextareaPaste(input.value, input.selectionStart, input.selectionEnd, pastedText);
+    input.value = next.value;
+    setTmuxInput(next.value);
+    resizeTmuxInput(input);
+    window.requestAnimationFrame(() => {
+      input.focus();
+      input.setSelectionRange(next.selectionStart, next.selectionEnd);
+      resizeTmuxInput(input);
+    });
+  }
+
+  function handleTmuxInputKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (shouldSubmitTextareaEnter(event)) {
+      event.preventDefault();
+      event.currentTarget.form?.requestSubmit();
     }
   }
 
@@ -1367,6 +1413,7 @@ export function App() {
             onClick={(event) => setComposerCaret(event.currentTarget.selectionStart)}
             onKeyDown={handleComposerKeyDown}
             onKeyUp={(event) => setComposerCaret(event.currentTarget.selectionStart)}
+            onPaste={handleComposerPaste}
             onSelect={(event) => setComposerCaret(event.currentTarget.selectionStart)}
             placeholder="Ask an agent to work in this repo..."
           />
@@ -1570,12 +1617,8 @@ export function App() {
                 setTmuxInput(event.target.value);
                 resizeTmuxInput(event.currentTarget);
               }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  event.currentTarget.form?.requestSubmit();
-                }
-              }}
+              onKeyDown={handleTmuxInputKeyDown}
+              onPaste={handleTmuxInputPaste}
               placeholder="send keys + Enter"
             />
             <button aria-label="Send to tmux" title="Send to tmux" type="submit"><Play size={15} /></button>
@@ -1823,6 +1866,12 @@ function findMatchingTmuxAnchor(node: HTMLElement, snapshot: TmuxScrollSnapshot)
 function readTmuxAnchorIndex(anchor: HTMLElement): number {
   const parsed = Number(anchor.dataset.tmuxAnchorIndex);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function sendTerminalSocketInput(socket: WebSocket, data: string): void {
+  for (let index = 0; index < data.length; index += RAW_TERMINAL_INPUT_CHUNK_SIZE) {
+    socket.send(JSON.stringify({ type: "input", data: data.slice(index, index + RAW_TERMINAL_INPUT_CHUNK_SIZE) }));
+  }
 }
 
 function readInitialColorTheme(): ColorTheme {

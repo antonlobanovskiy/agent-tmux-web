@@ -8,6 +8,7 @@ import {
   buildTmuxPaneInModeArgs,
   buildTmuxSubmitKeysArgs,
   buildTmuxToolCommand,
+  chunkTmuxLiteralText,
   buildTmuxNewSessionArgs,
   detectTmuxInterruptKey,
   detectTmuxSubmitKey,
@@ -183,5 +184,13 @@ describe("tmux command builders", () => {
     expect(tmuxSubmitDelayMs("enter", "printf ok")).toBeGreaterThanOrEqual(250);
     expect(tmuxSubmitDelayMs("codex-enter", "")).toBe(0);
     expect(tmuxSubmitDelayMs("enter", "")).toBe(0);
+  });
+
+  it("chunks large tmux literal sends without splitting surrogate pairs", () => {
+    const chunks = chunkTmuxLiteralText(`abcd🙂efgh`, 5);
+
+    expect(chunks).toEqual(["abcd", "🙂efg", "h"]);
+    expect(chunkTmuxLiteralText("abcdef", 3)).toEqual(["abc", "def"]);
+    expect(() => chunkTmuxLiteralText("abc", 0)).toThrow("maxChunkLength");
   });
 });

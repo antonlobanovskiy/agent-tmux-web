@@ -54,6 +54,7 @@ const codexAppServerPort = Number(process.env.CODEX_APP_SERVER_PORT ?? 43117);
 const codexAppServerAutostart = process.env.CODEX_APP_SERVER_AUTOSTART === "1";
 const authToken = process.env.AGENT_TMUX_WEB_AUTH_TOKEN ?? process.env.CODEX_WEB_AUTH_TOKEN ?? "";
 const defaultCwd = process.env.CLI_WEB_DEFAULT_CWD ?? process.env.HOME ?? process.cwd();
+const jsonBodyLimit = process.env.AGENT_TMUX_WEB_JSON_LIMIT ?? "25mb";
 const tmuxCaptureHistoryLines = 1000;
 
 const app = express();
@@ -77,7 +78,7 @@ const tmuxWatch = new TmuxWatchStore({
     }
   }
 });
-const jsonBodyParser = express.json({ limit: "2mb" });
+const jsonBodyParser = express.json({ limit: jsonBodyLimit });
 
 app.disable("x-powered-by");
 

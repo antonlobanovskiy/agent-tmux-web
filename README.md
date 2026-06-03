@@ -204,6 +204,8 @@ Useful variables:
   launcher can define optional `modes`; each enabled mode appends its `args` to
   the base command.
 - `AGENT_TMUX_WEB_AUTH_TOKEN`: optional shared token for browser access.
+- `AGENT_TMUX_WEB_JSON_LIMIT`: optional request body limit for pasted prompts
+  and tmux sends. Defaults to `25mb`.
 - `AGENT_TMUX_WEB_UPLOAD_DIR`: optional upload directory. Defaults to
   `/tmp/agent-tmux-web/uploads`.
 - `AGENT_TMUX_WEB_UPLOAD_TTL_MS`: upload expiry. Defaults to 24 hours.
