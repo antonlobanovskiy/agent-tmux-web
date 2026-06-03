@@ -25,6 +25,11 @@
           "target": "~/LICENSE"
         },
         {
+          "path": "CHANGELOG.md",
+          "type": "registry:file",
+          "target": "~/CHANGELOG.md"
+        },
+        {
           "path": "docs/registry.md",
           "type": "registry:file",
           "target": "~/docs/registry.md"
