@@ -191,6 +191,19 @@ For private personal builds, you may prefill the setup screen with
 email APKs or ZIPs containing APKs; many mail clients block them. Public APKs
 should always show the setup screen first.
 
+## Versioning
+
+Agent Tmux Web is open source. Public release versions are tracked in
+`package.json` and `android/app/build.gradle`; the Android APK filename includes
+that version as `agent-tmux-web-v<version>-release.apk`. Keep public releases
+generic: no private server URL, auth token, local `.env`, staged APK, upload, or
+machine-specific service file should be committed.
+
+Private APKs may use their own package id, version code, and version name for a
+single device or tailnet, but those artifacts and local signing details should
+stay out of the public repository. See [`CHANGELOG.md`](./CHANGELOG.md) for
+release notes.
+
 ## Configuration
 
 Copy `.env.example` or set environment variables in your service manager.

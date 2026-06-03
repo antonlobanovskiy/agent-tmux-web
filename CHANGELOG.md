@@ -1,0 +1,26 @@
+# Changelog
+
+All notable public changes to Agent Tmux Web are documented here.
+
+This is an open-source repository. Public releases must stay generic and must
+not include private server URLs, auth tokens, local `.env` files, staged APKs,
+uploads, machine-specific service edits, or private signing material.
+
+## 0.1.10 - 2026-06-03
+
+- Reduced tmux refresh jitter and preserved scroll position in terminal and GUI
+  views while sessions continue producing output.
+- Added a shadcn-compatible source registry with installable source bundles for
+  the full project, web app, VPS deploy kit, Android wrapper, and notifications.
+- Documented the source registry in the README.
+- Improved large paste handling for Codex composer and tmux prompt inputs.
+- Kept desktop Enter-to-send behavior while making mobile keyboard Enter insert
+  a newline; mobile users send with the button.
+- Chunked large tmux sends and raised the configurable JSON request limit for
+  pasted prompts and tmux input.
+- Bumped the public Android version defaults to `0.1.10` / version code `11`.
+
+## 0.1.9 - 2026-05-30
+
+- Fixed Android CI public APK artifact naming and verification flow.
+- Hardened public/private APK distribution docs and checks.
