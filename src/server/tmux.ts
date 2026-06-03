@@ -45,6 +45,7 @@ const DEFAULT_TMUX_TOOLS: TmuxToolConfig[] = [
 ];
 const DEFAULT_DETACHED_TMUX_COLS = 160;
 const DEFAULT_DETACHED_TMUX_ROWS = 40;
+export const TMUX_LITERAL_SEND_CHUNK_SIZE = 16_000;
 
 export function normalizeTmuxSessionName(name: string): string {
   const normalized = name
@@ -181,6 +182,27 @@ export function tmuxSubmitDelayMs(submitKey: TmuxSubmitKey, text: string): numbe
   return text.length > 0 ? 350 : 0;
 }
 
+export function chunkTmuxLiteralText(text: string, maxChunkLength = TMUX_LITERAL_SEND_CHUNK_SIZE): string[] {
+  if (maxChunkLength < 1) {
+    throw new Error("maxChunkLength must be at least 1");
+  }
+
+  const chunks: string[] = [];
+  let index = 0;
+  while (index < text.length) {
+    let end = Math.min(index + maxChunkLength, text.length);
+    if (end < text.length && isHighSurrogate(text.charCodeAt(end - 1))) {
+      end -= 1;
+    }
+    if (end <= index) {
+      end = Math.min(index + maxChunkLength, text.length);
+    }
+    chunks.push(text.slice(index, end));
+    index = end;
+  }
+  return chunks;
+}
+
 export function buildCodexTmuxCommand(_options: CodexTmuxCommandOptions): string {
   return "codex";
 }
@@ -264,7 +286,9 @@ export async function sendTmuxText(session: string, text: string, enter: boolean
   await exitTmuxModeIfNeeded(session);
 
   if (text.length > 0) {
-    await execFileAsync("tmux", ["send-keys", "-t", session, "-l", text]);
+    for (const chunk of chunkTmuxLiteralText(text)) {
+      await execFileAsync("tmux", ["send-keys", "-t", session, "-l", chunk]);
+    }
   }
 
   if (enter) {
@@ -295,6 +319,10 @@ async function exitTmuxModeIfNeeded(session: string): Promise<void> {
       throw error;
     }
   }
+}
+
+function isHighSurrogate(value: number): boolean {
+  return value >= 0xd800 && value <= 0xdbff;
 }
 
 function isCodexTmuxOutput(output: string): boolean {
