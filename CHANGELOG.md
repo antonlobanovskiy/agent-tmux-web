@@ -6,6 +6,12 @@ This is an open-source repository. Public releases must stay generic and must
 not include private server URLs, auth tokens, local `.env` files, staged APKs,
 uploads, machine-specific service edits, or private signing material.
 
+## 0.1.12 - 2026-06-19
+
+- Made raw terminal mode direct-input only by hiding the tmux send form while
+  attached and refocusing the xterm surface after terminal taps or soft-key use.
+- Bumped the public Android version defaults to `0.1.12` / version code `13`.
+
 ## 0.1.11 - 2026-06-19
 
 - Made HTTP, HTTPS, and `www.` URLs clickable in the default web chat,
