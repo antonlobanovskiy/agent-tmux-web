@@ -110,6 +110,11 @@
           "target": "~/src/client/App.tsx"
         },
         {
+          "path": "src/client/LinkifiedText.tsx",
+          "type": "registry:file",
+          "target": "~/src/client/LinkifiedText.tsx"
+        },
+        {
           "path": "src/client/browserNotifications.ts",
           "type": "registry:file",
           "target": "~/src/client/browserNotifications.ts"
@@ -165,6 +170,11 @@
           "target": "~/src/client/tmuxNotifications.ts"
         },
         {
+          "path": "src/client/tmuxOutputLines.tsx",
+          "type": "registry:file",
+          "target": "~/src/client/tmuxOutputLines.tsx"
+        },
+        {
           "path": "src/client/tmuxSessionTarget.ts",
           "type": "registry:file",
           "target": "~/src/client/tmuxSessionTarget.ts"
@@ -218,6 +228,11 @@
           "path": "src/client/__tests__/tmuxNotifications.test.ts",
           "type": "registry:file",
           "target": "~/src/client/__tests__/tmuxNotifications.test.ts"
+        },
+        {
+          "path": "src/client/__tests__/tmuxOutputLines.test.tsx",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/tmuxOutputLines.test.tsx"
         },
         {
           "path": "src/client/__tests__/tmuxSessionTarget.test.ts",

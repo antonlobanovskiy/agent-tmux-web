@@ -668,6 +668,7 @@ textarea:focus {
 }
 
 .timeline-card a,
+.tmux-output a,
 .tmux-chat-bubble a {
   color: var(--accent);
   overflow-wrap: anywhere;
@@ -681,11 +682,13 @@ textarea:focus {
 }
 
 .timeline-card a:hover,
+.tmux-output a:hover,
 .tmux-chat-bubble a:hover {
   text-decoration-thickness: 2px;
 }
 
 .timeline-card a:focus-visible,
+.tmux-output a:focus-visible,
 .tmux-chat-bubble a:focus-visible {
   border-radius: 3px;
   outline: 2px solid var(--accent);
