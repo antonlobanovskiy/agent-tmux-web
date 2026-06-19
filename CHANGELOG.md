@@ -6,6 +6,16 @@ This is an open-source repository. Public releases must stay generic and must
 not include private server URLs, auth tokens, local `.env` files, staged APKs,
 uploads, machine-specific service edits, or private signing material.
 
+## 0.1.11 - 2026-06-19
+
+- Made HTTP, HTTPS, and `www.` URLs clickable in the default web chat and
+  Codex timeline views while keeping raw terminal and code block output literal.
+- Added link parsing coverage for URL punctuation, `www.` normalization, and
+  unsafe schemes.
+- Updated the source registry bundle to include all current client helpers and
+  tests.
+- Bumped the public Android version defaults to `0.1.11` / version code `12`.
+
 ## 0.1.10 - 2026-06-03
 
 - Reduced tmux refresh jitter and preserved scroll position in terminal and GUI

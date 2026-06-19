@@ -31,7 +31,7 @@ import {
   X,
   Wrench
 } from "lucide-react";
-import { ClipboardEvent, FormEvent, KeyboardEvent, UIEvent, forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ClipboardEvent, FormEvent, Fragment, KeyboardEvent, UIEvent, forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { AppStatus, CodexModel, CodexSkill, TmuxSessionDto, TmuxToolDto, TmuxWatchEvent, UploadedFileDto } from "../shared/api.js";
 import { describeThreadItem, type UiEventDescription } from "../shared/codexEvents.js";
@@ -44,6 +44,7 @@ import {
 } from "./slashCommands.js";
 import { COLOR_THEME_STORAGE_KEY, nextColorTheme, resolveInitialColorTheme, type ColorTheme } from "./theme.js";
 import { applyTextareaPaste, shouldSubmitTextareaEnter } from "./inputBehavior.js";
+import { linkifyText } from "./linkify.js";
 import { parseTmuxChatOutput, splitTmuxChatMessage, type TmuxChatMessage } from "./tmuxGui.js";
 import { shouldAutoCaptureTmux, TMUX_CAPTURE_POLL_INTERVAL_MS, TMUX_SEND_FOLLOW_DELAYS_MS } from "./tmuxFollow.js";
 import { buildTmuxDoneNotification } from "./tmuxNotifications.js";
@@ -1636,7 +1637,7 @@ function TimelineCard({ entry }: { entry: TimelineEntry }) {
         <strong>{entry.title}</strong>
         {entry.status && <span>{entry.status}</span>}
       </div>
-      <pre>{entry.body || " "}</pre>
+      <pre>{entry.body ? <LinkifiedText text={entry.body} /> : " "}</pre>
     </article>
   );
 }
@@ -1701,6 +1702,7 @@ function TmuxChatBubble({ message, messageIndex }: { message: TmuxChatMessage; m
           <TmuxChatAnchorLines
             anchorBase={tmuxChatAnchorBase(messageIndex, partIndex)}
             className="tmux-chat-text-line"
+            linkify
             text={part.text}
           />
         </p>
@@ -1709,7 +1711,7 @@ function TmuxChatBubble({ message, messageIndex }: { message: TmuxChatMessage; m
   );
 }
 
-function TmuxChatAnchorLines({ anchorBase, className, text }: { anchorBase: number; className: string; text: string }) {
+function TmuxChatAnchorLines({ anchorBase, className, linkify = false, text }: { anchorBase: number; className: string; linkify?: boolean; text: string }) {
   return text.split(/\r?\n/).map((line, index) => (
     <span
       className={className}
@@ -1717,13 +1719,23 @@ function TmuxChatAnchorLines({ anchorBase, className, text }: { anchorBase: numb
       data-tmux-scroll-anchor=""
       key={`${index}-${line}`}
     >
-      {line || "\u00a0"}
+      {linkify ? <LinkifiedText text={line || "\u00a0"} /> : line || "\u00a0"}
     </span>
   ));
 }
 
 function tmuxChatAnchorBase(messageIndex: number, partIndex: number): number {
   return (messageIndex * 100_000) + (partIndex * 1_000);
+}
+
+function LinkifiedText({ text }: { text: string }) {
+  return linkifyText(text).map((part, index) => part.kind === "link" ? (
+    <a href={part.href} key={`${part.href}-${index}`} rel="noreferrer noopener" target="_blank">
+      {part.text}
+    </a>
+  ) : (
+    <Fragment key={`${part.text}-${index}`}>{part.text}</Fragment>
+  ));
 }
 
 async function api<T = unknown>(url: string, init?: RequestInit): Promise<T> {
