@@ -8,8 +8,9 @@ uploads, machine-specific service edits, or private signing material.
 
 ## 0.1.11 - 2026-06-19
 
-- Made HTTP, HTTPS, and `www.` URLs clickable in the default web chat and
-  Codex timeline views while keeping raw terminal and code block output literal.
+- Made HTTP, HTTPS, and `www.` URLs clickable in the default web chat,
+  non-GUI terminal capture, and Codex timeline views while keeping code block
+  output literal.
 - Added link parsing coverage for URL punctuation, `www.` normalization, and
   unsafe schemes.
 - Updated the source registry bundle to include all current client helpers and

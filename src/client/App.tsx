@@ -31,7 +31,7 @@ import {
   X,
   Wrench
 } from "lucide-react";
-import { ClipboardEvent, FormEvent, Fragment, KeyboardEvent, UIEvent, forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ClipboardEvent, FormEvent, KeyboardEvent, UIEvent, forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { AppStatus, CodexModel, CodexSkill, TmuxSessionDto, TmuxToolDto, TmuxWatchEvent, UploadedFileDto } from "../shared/api.js";
 import { describeThreadItem, type UiEventDescription } from "../shared/codexEvents.js";
@@ -44,9 +44,10 @@ import {
 } from "./slashCommands.js";
 import { COLOR_THEME_STORAGE_KEY, nextColorTheme, resolveInitialColorTheme, type ColorTheme } from "./theme.js";
 import { applyTextareaPaste, shouldSubmitTextareaEnter } from "./inputBehavior.js";
-import { linkifyText } from "./linkify.js";
+import { LinkifiedText } from "./LinkifiedText.js";
 import { parseTmuxChatOutput, splitTmuxChatMessage, type TmuxChatMessage } from "./tmuxGui.js";
 import { shouldAutoCaptureTmux, TMUX_CAPTURE_POLL_INTERVAL_MS, TMUX_SEND_FOLLOW_DELAYS_MS } from "./tmuxFollow.js";
+import { TmuxOutputLines } from "./tmuxOutputLines.js";
 import { buildTmuxDoneNotification } from "./tmuxNotifications.js";
 import { normalizeRequestedTmuxSession, readRequestedTmuxSession, removeRequestedTmuxSession } from "./tmuxSessionTarget.js";
 import { canShowBrowserNotifications, canShowWebSocketTaskNotifications, getBrowserNotificationAvailability, getBrowserNotificationSnapshot, setAndroidWatchPollingEnabled, showAgentNotification } from "./browserNotifications.js";
@@ -1666,19 +1667,6 @@ const TmuxChatView = forwardRef<HTMLDivElement, {
 ));
 TmuxChatView.displayName = "TmuxChatView";
 
-function TmuxOutputLines({ output }: { output: string }) {
-  return output.split(/\r?\n/).map((line, index) => (
-    <span
-      className="tmux-output-line"
-      data-tmux-anchor-index={index}
-      data-tmux-scroll-anchor=""
-      key={`${index}-${line}`}
-    >
-      {line || "\u00a0"}
-    </span>
-  ));
-}
-
 function TmuxChatBubble({ message, messageIndex }: { message: TmuxChatMessage; messageIndex: number }) {
   const parts = message.role === "user"
     ? [{ id: "part-0", kind: "text" as const, text: message.text }]
@@ -1726,16 +1714,6 @@ function TmuxChatAnchorLines({ anchorBase, className, linkify = false, text }: {
 
 function tmuxChatAnchorBase(messageIndex: number, partIndex: number): number {
   return (messageIndex * 100_000) + (partIndex * 1_000);
-}
-
-function LinkifiedText({ text }: { text: string }) {
-  return linkifyText(text).map((part, index) => part.kind === "link" ? (
-    <a href={part.href} key={`${part.href}-${index}`} rel="noreferrer noopener" target="_blank">
-      {part.text}
-    </a>
-  ) : (
-    <Fragment key={`${part.text}-${index}`}>{part.text}</Fragment>
-  ));
 }
 
 async function api<T = unknown>(url: string, init?: RequestInit): Promise<T> {
