@@ -130,6 +130,11 @@
           "target": "~/src/client/linkify.ts"
         },
         {
+          "path": "src/client/rawTerminalMode.ts",
+          "type": "registry:file",
+          "target": "~/src/client/rawTerminalMode.ts"
+        },
+        {
           "path": "src/client/main.tsx",
           "type": "registry:file",
           "target": "~/src/client/main.tsx"
@@ -193,6 +198,11 @@
           "path": "src/client/__tests__/linkify.test.ts",
           "type": "registry:file",
           "target": "~/src/client/__tests__/linkify.test.ts"
+        },
+        {
+          "path": "src/client/__tests__/rawTerminalMode.test.ts",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/rawTerminalMode.test.ts"
         },
         {
           "path": "src/client/__tests__/slashCommands.test.ts",

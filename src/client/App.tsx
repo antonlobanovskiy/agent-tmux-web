@@ -45,6 +45,7 @@ import {
 import { COLOR_THEME_STORAGE_KEY, nextColorTheme, resolveInitialColorTheme, type ColorTheme } from "./theme.js";
 import { applyTextareaPaste, shouldSubmitTextareaEnter } from "./inputBehavior.js";
 import { LinkifiedText } from "./LinkifiedText.js";
+import { shouldShowTmuxSendForm } from "./rawTerminalMode.js";
 import { parseTmuxChatOutput, splitTmuxChatMessage, type TmuxChatMessage } from "./tmuxGui.js";
 import { shouldAutoCaptureTmux, TMUX_CAPTURE_POLL_INTERVAL_MS, TMUX_SEND_FOLLOW_DELAYS_MS } from "./tmuxFollow.js";
 import { TmuxOutputLines } from "./tmuxOutputLines.js";
@@ -220,6 +221,7 @@ export function App() {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const terminalHostRef = useRef<HTMLDivElement | null>(null);
+  const rawTerminalRef = useRef<XtermTerminal | null>(null);
   const terminalSocketRef = useRef<WebSocket | null>(null);
   const terminalSessionRef = useRef("");
   const tmuxInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -249,6 +251,7 @@ export function App() {
   const slashQuery = useMemo(() => slashQueryForMessage(message, composerCaret), [composerCaret, message]);
   const slashMatches = useMemo(() => slashQuery ? filterSlashCommands(slashQuery.query) : [], [slashQuery]);
   const tmuxChatMessages = useMemo(() => parseTmuxChatOutput(tmuxOutput), [tmuxOutput]);
+  const showTmuxSendForm = shouldShowTmuxSendForm({ terminalActive });
   const currentTmuxTool = useMemo(() => tmuxTools.find((tool) => tool.id === selectedTmuxTool) ?? null, [selectedTmuxTool, tmuxTools]);
   const currentTmuxToolModeIds = useMemo(() => currentTmuxTool
     ? selectedTmuxToolModes[currentTmuxTool.id] ?? defaultTmuxToolModeIds(currentTmuxTool)
@@ -512,6 +515,12 @@ export function App() {
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
     terminal.open(node);
+    rawTerminalRef.current = terminal;
+
+    const focusTerminal = () => {
+      terminal.focus();
+    };
+    node.addEventListener("pointerdown", focusTerminal);
 
     const fitTerminal = () => {
       try {
@@ -609,10 +618,14 @@ export function App() {
       socket.removeEventListener("open", sendResize);
       window.removeEventListener("resize", resize);
       resizeObserver.disconnect();
+      node.removeEventListener("pointerdown", focusTerminal);
       inputDisposable.dispose();
       if (terminalSocketRef.current === socket) {
         terminalSocketRef.current = null;
         terminalSessionRef.current = "";
+      }
+      if (rawTerminalRef.current === terminal) {
+        rawTerminalRef.current = null;
       }
       socket.close();
       terminal.dispose();
@@ -906,6 +919,7 @@ export function App() {
   }
 
   function sendRawTerminalData(data: string) {
+    focusRawTerminal();
     if (demoMode && terminalActive) {
       setTerminalStatus(`sent ${describeTerminalKey(data)} to ${selectedTmux}`);
       return;
@@ -916,6 +930,11 @@ export function App() {
       return;
     }
     socket.send(JSON.stringify({ type: "input", data }));
+    focusRawTerminal();
+  }
+
+  function focusRawTerminal() {
+    rawTerminalRef.current?.focus();
   }
 
   function sendTmuxViaTerminal(session: string, text: string): boolean {
@@ -1558,7 +1577,13 @@ export function App() {
                 <pre>{DEMO_RAW_TERMINAL_OUTPUT}</pre>
               </div>
             ) : terminalActive ? (
-              <div ref={terminalHostRef} className="tmux-terminal" />
+              <div
+                ref={terminalHostRef}
+                aria-label="Raw interactive tmux terminal"
+                className="tmux-terminal"
+                role="application"
+                onPointerDown={focusRawTerminal}
+              />
             ) : tmuxGuiActive ? (
               <TmuxChatView ref={tmuxChatRef} messages={tmuxChatMessages} onScroll={handleTmuxOutputScroll} />
             ) : (
@@ -1586,45 +1611,47 @@ export function App() {
               <button type="button" title="Enter" onClick={() => sendRawTerminalData("\r")}><CornerDownLeft size={15} /> Enter</button>
             </div>
           )}
-          <form className="tmux-send" onSubmit={(event) => { event.preventDefault(); sendTmux().catch(reportError(setError)); }}>
-            <button aria-label="Stop tmux task" title="Stop tmux task" type="button" onClick={() => interruptTmux().catch(reportError(setError))}>
-              <CircleStop size={15} />
-            </button>
-            <button
-              aria-label="Attach files"
-              disabled={uploadingTmuxFiles}
-              title="Upload files to the server and insert their paths"
-              type="button"
-              onClick={() => tmuxFileInputRef.current?.click()}
-            >
-              <Paperclip size={15} />
-            </button>
-            <input
-              ref={tmuxFileInputRef}
-              className="tmux-file-input"
-              multiple
-              type="file"
-              onChange={(event) => {
-                const input = event.currentTarget;
-                attachTmuxFiles(input.files).catch(reportError(setError)).finally(() => {
-                  input.value = "";
-                });
-              }}
-            />
-            <textarea
-              ref={tmuxInputRef}
-              rows={1}
-              value={tmuxInput}
-              onChange={(event) => {
-                setTmuxInput(event.target.value);
-                resizeTmuxInput(event.currentTarget);
-              }}
-              onKeyDown={handleTmuxInputKeyDown}
-              onPaste={handleTmuxInputPaste}
-              placeholder="send keys + Enter"
-            />
-            <button aria-label="Send to tmux" title="Send to tmux" type="submit"><Play size={15} /></button>
-          </form>
+          {showTmuxSendForm && (
+            <form className="tmux-send" onSubmit={(event) => { event.preventDefault(); sendTmux().catch(reportError(setError)); }}>
+              <button aria-label="Stop tmux task" title="Stop tmux task" type="button" onClick={() => interruptTmux().catch(reportError(setError))}>
+                <CircleStop size={15} />
+              </button>
+              <button
+                aria-label="Attach files"
+                disabled={uploadingTmuxFiles}
+                title="Upload files to the server and insert their paths"
+                type="button"
+                onClick={() => tmuxFileInputRef.current?.click()}
+              >
+                <Paperclip size={15} />
+              </button>
+              <input
+                ref={tmuxFileInputRef}
+                className="tmux-file-input"
+                multiple
+                type="file"
+                onChange={(event) => {
+                  const input = event.currentTarget;
+                  attachTmuxFiles(input.files).catch(reportError(setError)).finally(() => {
+                    input.value = "";
+                  });
+                }}
+              />
+              <textarea
+                ref={tmuxInputRef}
+                rows={1}
+                value={tmuxInput}
+                onChange={(event) => {
+                  setTmuxInput(event.target.value);
+                  resizeTmuxInput(event.currentTarget);
+                }}
+                onKeyDown={handleTmuxInputKeyDown}
+                onPaste={handleTmuxInputPaste}
+                placeholder="send keys + Enter"
+              />
+              <button aria-label="Send to tmux" title="Send to tmux" type="submit"><Play size={15} /></button>
+            </form>
+          )}
         </div>
       </aside>
     </div>
