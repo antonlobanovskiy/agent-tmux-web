@@ -667,6 +667,31 @@ textarea:focus {
   padding: 12px;
 }
 
+.timeline-card a,
+.tmux-chat-bubble a {
+  color: var(--accent);
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.tmux-chat-message.user .tmux-chat-bubble a {
+  color: inherit;
+}
+
+.timeline-card a:hover,
+.tmux-chat-bubble a:hover {
+  text-decoration-thickness: 2px;
+}
+
+.timeline-card a:focus-visible,
+.tmux-chat-bubble a:focus-visible {
+  border-radius: 3px;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .composer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 46px;

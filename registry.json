@@ -115,6 +115,16 @@
           "target": "~/src/client/browserNotifications.ts"
         },
         {
+          "path": "src/client/inputBehavior.ts",
+          "type": "registry:file",
+          "target": "~/src/client/inputBehavior.ts"
+        },
+        {
+          "path": "src/client/linkify.ts",
+          "type": "registry:file",
+          "target": "~/src/client/linkify.ts"
+        },
+        {
           "path": "src/client/main.tsx",
           "type": "registry:file",
           "target": "~/src/client/main.tsx"
@@ -163,6 +173,16 @@
           "path": "src/client/__tests__/browserNotifications.test.ts",
           "type": "registry:file",
           "target": "~/src/client/__tests__/browserNotifications.test.ts"
+        },
+        {
+          "path": "src/client/__tests__/inputBehavior.test.ts",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/inputBehavior.test.ts"
+        },
+        {
+          "path": "src/client/__tests__/linkify.test.ts",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/linkify.test.ts"
         },
         {
           "path": "src/client/__tests__/slashCommands.test.ts",

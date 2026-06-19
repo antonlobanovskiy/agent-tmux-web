@@ -83,7 +83,7 @@ Override those defaults when needed:
 AGENT_TMUX_ANDROID_ID_SUFFIX=.work \
 AGENT_TMUX_ANDROID_APP_LABEL="Agent Tmux Work" \
 AGENT_TMUX_ANDROID_VERSION_CODE=20042 \
-AGENT_TMUX_ANDROID_VERSION_NAME=0.1.10-work \
+AGENT_TMUX_ANDROID_VERSION_NAME=0.1.11-work \
 pnpm android:build:private
 ```
 
