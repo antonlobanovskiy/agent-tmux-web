@@ -214,7 +214,7 @@ export function App() {
   const [customTmuxCommand, setCustomTmuxCommand] = useState("");
   const [slashIndex, setSlashIndex] = useState(0);
   const [terminalActive, setTerminalActive] = useState(false);
-  const [tmuxFocusActive, setTmuxFocusActive] = useState(true);
+  const [tmuxFocusActive, setTmuxFocusActive] = useState(false);
   const [tmuxGuiActive, setTmuxGuiActive] = useState(demoMode);
   const [tmuxMenuOpen, setTmuxMenuOpen] = useState(false);
   const [tmuxWatchEvents, setTmuxWatchEvents] = useState<TmuxWatchEvent[]>([]);
@@ -841,7 +841,7 @@ export function App() {
 
   function closeRawTerminal() {
     setTerminalActive(false);
-    setTmuxFocusActive(true);
+    setTmuxFocusActive(false);
     if (!selectedTmux) {
       return;
     }
@@ -1043,7 +1043,7 @@ export function App() {
       queueTmuxOutputBottomScroll();
       setCapturedTmuxOutput(`${DEMO_TMUX_OUTPUT}\n\n› ${command}\n\n• Started ${tool?.label ?? command} in ${selectedTmux}.`);
       setTerminalActive(false);
-      setTmuxFocusActive(true);
+      setTmuxFocusActive(false);
       setTmuxGuiActive(true);
       setTmuxMenuOpen(false);
       setTerminalStatus(`started ${tool?.label ?? command} in ${selectedTmux}`);
@@ -1063,7 +1063,7 @@ export function App() {
     queueTmuxOutputBottomScroll();
     setCapturedTmuxOutput(result.output);
     setTerminalActive(false);
-    setTmuxFocusActive(true);
+    setTmuxFocusActive(false);
     setTmuxGuiActive(false);
     setTmuxMenuOpen(false);
     setTerminalStatus(`started ${tool?.label ?? command} in ${selectedTmux}`);
@@ -1611,7 +1611,7 @@ export function App() {
             </button>
             <span>{terminalStatus || selectedTmux || "no session selected"}</span>
           </div>
-          {!terminalActive && (
+          {!terminalActive && !tmuxFocusActive && (
             <TmuxAgentSummaryStrip
               events={tmuxWatchEvents}
               selectedSession={selectedTmux}
