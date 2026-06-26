@@ -3,6 +3,7 @@ import { Terminal as XtermTerminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import {
   Activity,
+  AlertTriangle,
   ArrowDown,
   ArrowDownToLine,
   ArrowLeft,
@@ -16,6 +17,7 @@ import {
   Download,
   Folder,
   Keyboard,
+  ListFilter,
   Menu,
   MessageSquare,
   Moon,
@@ -43,6 +45,7 @@ import {
   type SlashCommand
 } from "./slashCommands.js";
 import { COLOR_THEME_STORAGE_KEY, nextColorTheme, resolveInitialColorTheme, type ColorTheme } from "./theme.js";
+import { buildCompactTmuxMessages, summarizeTmuxAgent, type CompactTmuxMessage, type TmuxAgentSummary } from "./agentStatus.js";
 import { applyTextareaPaste, shouldSubmitTextareaEnter } from "./inputBehavior.js";
 import { LinkifiedText } from "./LinkifiedText.js";
 import { shouldShowTmuxSendForm } from "./rawTerminalMode.js";
@@ -77,6 +80,7 @@ type WsPayload = {
   description?: UiEventDescription;
   notification?: unknown;
   event?: TmuxWatchEvent;
+  tmuxWatchEvents?: TmuxWatchEvent[];
 };
 
 type TmuxScrollSnapshot = {
@@ -210,8 +214,10 @@ export function App() {
   const [customTmuxCommand, setCustomTmuxCommand] = useState("");
   const [slashIndex, setSlashIndex] = useState(0);
   const [terminalActive, setTerminalActive] = useState(false);
+  const [tmuxFocusActive, setTmuxFocusActive] = useState(true);
   const [tmuxGuiActive, setTmuxGuiActive] = useState(demoMode);
   const [tmuxMenuOpen, setTmuxMenuOpen] = useState(false);
+  const [tmuxWatchEvents, setTmuxWatchEvents] = useState<TmuxWatchEvent[]>([]);
   const [tmuxNotificationsEnabled, setTmuxNotificationsEnabled] = useState(readTmuxNotificationPreference);
   const [colorTheme, setColorTheme] = useState(readInitialColorTheme);
   const [requestedTmuxSession, setRequestedTmuxSession] = useState(readInitialRequestedTmuxSession);
@@ -251,6 +257,8 @@ export function App() {
   const slashQuery = useMemo(() => slashQueryForMessage(message, composerCaret), [composerCaret, message]);
   const slashMatches = useMemo(() => slashQuery ? filterSlashCommands(slashQuery.query) : [], [slashQuery]);
   const tmuxChatMessages = useMemo(() => parseTmuxChatOutput(tmuxOutput), [tmuxOutput]);
+  const tmuxAgentSummary = useMemo(() => summarizeTmuxAgent(tmuxOutput, tmuxChatMessages), [tmuxChatMessages, tmuxOutput]);
+  const tmuxCompactMessages = useMemo(() => buildCompactTmuxMessages(tmuxChatMessages), [tmuxChatMessages]);
   const showTmuxSendForm = shouldShowTmuxSendForm({ terminalActive });
   const currentTmuxTool = useMemo(() => tmuxTools.find((tool) => tool.id === selectedTmuxTool) ?? null, [selectedTmuxTool, tmuxTools]);
   const currentTmuxToolModeIds = useMemo(() => currentTmuxTool
@@ -437,7 +445,7 @@ export function App() {
     }
     tmuxScrollSnapshotRef.current = null;
     updateTmuxBottomState(node);
-  }, [terminalActive, tmuxGuiActive, tmuxOutput]);
+  }, [terminalActive, tmuxFocusActive, tmuxGuiActive, tmuxOutput]);
 
   useLayoutEffect(() => {
     resizeTmuxInput(tmuxInputRef.current);
@@ -466,6 +474,10 @@ export function App() {
     const socket = new WebSocket(`${protocol}://${window.location.host}/ws${token ? `?token=${encodeURIComponent(token)}` : ""}`);
     socket.onmessage = (event) => {
       const payload = JSON.parse(event.data) as WsPayload;
+      const watchEvents = tmuxWatchEventsFromPayload(payload);
+      if (watchEvents.length > 0) {
+        setTmuxWatchEvents((current) => mergeTmuxWatchEvents(current, watchEvents));
+      }
       if (payload.type === "tmux-watch-done" && isTmuxWatchEvent(payload.event)) {
         if (tmuxNotificationsEnabledRef.current && canShowWebSocketTaskNotifications()) {
           showTmuxDoneNotification(payload.event.session, payload.event.label);
@@ -814,12 +826,14 @@ export function App() {
     }
     if (demoMode) {
       clearTmuxFollowTimers(tmuxFollowTimersRef);
+      setTmuxFocusActive(false);
       setTmuxGuiActive(false);
       setTerminalStatus(`live terminal for ${selectedTmux}`);
       setTerminalActive(true);
       return;
     }
     clearTmuxFollowTimers(tmuxFollowTimersRef);
+    setTmuxFocusActive(false);
     setTmuxGuiActive(false);
     setTerminalStatus(`connecting to ${selectedTmux}`);
     setTerminalActive(true);
@@ -827,6 +841,7 @@ export function App() {
 
   function closeRawTerminal() {
     setTerminalActive(false);
+    setTmuxFocusActive(true);
     if (!selectedTmux) {
       return;
     }
@@ -857,9 +872,22 @@ export function App() {
     const nextActive = !tmuxGuiActive;
     clearTmuxFollowTimers(tmuxFollowTimersRef);
     setTerminalActive(false);
+    setTmuxFocusActive(false);
     setTmuxGuiActive(nextActive);
     queueTmuxOutputBottomScroll();
     setTerminalStatus(nextActive ? `gui view for ${selectedTmux}` : selectedTmux);
+    void captureTmux(selectedTmux).catch(reportError(setError));
+  }
+
+  function toggleTmuxFocus() {
+    if (!selectedTmux) {
+      return;
+    }
+    clearTmuxFollowTimers(tmuxFollowTimersRef);
+    setTerminalActive(false);
+    setTmuxFocusActive((current) => !current);
+    queueTmuxOutputBottomScroll();
+    setTerminalStatus(tmuxFocusActive ? selectedTmux : `focus view for ${selectedTmux}`);
     void captureTmux(selectedTmux).catch(reportError(setError));
   }
 
@@ -1015,6 +1043,7 @@ export function App() {
       queueTmuxOutputBottomScroll();
       setCapturedTmuxOutput(`${DEMO_TMUX_OUTPUT}\n\n› ${command}\n\n• Started ${tool?.label ?? command} in ${selectedTmux}.`);
       setTerminalActive(false);
+      setTmuxFocusActive(true);
       setTmuxGuiActive(true);
       setTmuxMenuOpen(false);
       setTerminalStatus(`started ${tool?.label ?? command} in ${selectedTmux}`);
@@ -1034,6 +1063,7 @@ export function App() {
     queueTmuxOutputBottomScroll();
     setCapturedTmuxOutput(result.output);
     setTerminalActive(false);
+    setTmuxFocusActive(true);
     setTmuxGuiActive(false);
     setTmuxMenuOpen(false);
     setTerminalStatus(`started ${tool?.label ?? command} in ${selectedTmux}`);
@@ -1277,7 +1307,7 @@ export function App() {
   }
 
   function currentTmuxScrollNode() {
-    return tmuxGuiActive ? tmuxChatRef.current : tmuxOutputRef.current;
+    return tmuxFocusActive ? tmuxChatRef.current : tmuxGuiActive ? tmuxChatRef.current : tmuxOutputRef.current;
   }
 
   function resolveTmuxCaptureClientWidth(): number {
@@ -1528,6 +1558,16 @@ export function App() {
         </div>
         <div className="tmux-workspace">
           <div className="tmux-terminal-toolbar">
+            <button
+              aria-label={tmuxFocusActive ? "Show detailed tmux output" : "Show focus view"}
+              className={tmuxFocusActive ? "active" : ""}
+              title={tmuxFocusActive ? "Show detailed tmux output" : "Show focus view"}
+              type="button"
+              onClick={toggleTmuxFocus}
+            >
+              <ListFilter size={15} />
+              <span>Focus</span>
+            </button>
             <button aria-label="Force sync selected tmux output" title="Force sync selected tmux output" type="button" onClick={forceSyncTmuxOutput}>
               <Download size={15} /> <span>Force Sync</span>
             </button>
@@ -1571,6 +1611,14 @@ export function App() {
             </button>
             <span>{terminalStatus || selectedTmux || "no session selected"}</span>
           </div>
+          {!terminalActive && (
+            <TmuxAgentSummaryStrip
+              events={tmuxWatchEvents}
+              selectedSession={selectedTmux}
+              summary={tmuxAgentSummary}
+              onSelectSession={selectTmuxSession}
+            />
+          )}
           <div className="tmux-output-shell">
             {terminalActive && demoMode ? (
               <div className="tmux-terminal tmux-terminal-demo">
@@ -1583,6 +1631,16 @@ export function App() {
                 className="tmux-terminal"
                 role="application"
                 onPointerDown={focusRawTerminal}
+              />
+            ) : tmuxFocusActive ? (
+              <TmuxFocusView
+                ref={tmuxChatRef}
+                events={tmuxWatchEvents}
+                messages={tmuxCompactMessages}
+                selectedSession={selectedTmux}
+                summary={tmuxAgentSummary}
+                onScroll={handleTmuxOutputScroll}
+                onSelectSession={selectTmuxSession}
               />
             ) : tmuxGuiActive ? (
               <TmuxChatView ref={tmuxChatRef} messages={tmuxChatMessages} onScroll={handleTmuxOutputScroll} />
@@ -1669,6 +1727,113 @@ function TimelineCard({ entry }: { entry: TimelineEntry }) {
     </article>
   );
 }
+
+function TmuxAgentSummaryStrip({
+  events,
+  onSelectSession,
+  selectedSession,
+  summary
+}: {
+  events: TmuxWatchEvent[];
+  onSelectSession: (session: string) => void;
+  selectedSession: string;
+  summary: TmuxAgentSummary;
+}) {
+  const recentEvents = events.slice(0, 3);
+
+  return (
+    <section className={`tmux-agent-strip ${summary.kind}`} aria-label="Agent status">
+      <div className="tmux-agent-state">
+        <span className="tmux-agent-dot" />
+        <div>
+          <strong>{summary.title}</strong>
+          <span>{summary.detail}</span>
+        </div>
+      </div>
+      <div className="tmux-agent-action">{summary.action}</div>
+      {recentEvents.length > 0 && (
+        <div className="tmux-attention-list" aria-label="Recent waiting sessions">
+          {recentEvents.map((event) => (
+            <button
+              className={event.session === selectedSession ? "active" : ""}
+              key={event.id}
+              type="button"
+              onClick={() => onSelectSession(event.session)}
+            >
+              <AlertTriangle size={13} />
+              <span>{event.session}</span>
+              <small>{event.label}</small>
+            </button>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+const TmuxFocusView = forwardRef<HTMLDivElement, {
+  events: TmuxWatchEvent[];
+  messages: CompactTmuxMessage[];
+  onScroll: (event: UIEvent<HTMLDivElement>) => void;
+  onSelectSession: (session: string) => void;
+  selectedSession: string;
+  summary: TmuxAgentSummary;
+}>(({ events, messages, onScroll, onSelectSession, selectedSession, summary }, ref) => (
+  <div ref={ref} className="tmux-focus" onScroll={onScroll}>
+    <div className={`tmux-focus-hero ${summary.kind}`}>
+      <div className="tmux-focus-title">
+        <span className="tmux-agent-dot" />
+        <div>
+          <strong>{summary.title}</strong>
+          <span>{summary.detail}</span>
+        </div>
+      </div>
+      <p>{summary.action}</p>
+    </div>
+
+    {events.length > 0 && (
+      <div className="tmux-focus-section">
+        <span className="tmux-focus-section-label">Needs Attention</span>
+        <div className="tmux-focus-events">
+          {events.slice(0, 4).map((event) => (
+            <button
+              className={event.session === selectedSession ? "active" : ""}
+              key={event.id}
+              type="button"
+              onClick={() => onSelectSession(event.session)}
+            >
+              <AlertTriangle size={14} />
+              <span>{event.session}</span>
+              <small>{event.label}</small>
+            </button>
+          ))}
+        </div>
+      </div>
+    )}
+
+    <div className="tmux-focus-section">
+      <span className="tmux-focus-section-label">Recent Conversation</span>
+      {messages.length === 0 ? (
+        <p className="tmux-focus-empty">No compact messages captured yet.</p>
+      ) : (
+        <div className="tmux-focus-messages">
+          {messages.map((message, index) => (
+            <article
+              className={`tmux-focus-message ${message.role}`}
+              data-tmux-anchor-index={index}
+              data-tmux-scroll-anchor=""
+              key={message.id}
+            >
+              <span>{message.role === "user" ? "You" : message.role === "assistant" ? "Agent" : "Terminal"}</span>
+              <p><LinkifiedText text={message.text} /></p>
+            </article>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+));
+TmuxFocusView.displayName = "TmuxFocusView";
 
 const TmuxChatView = forwardRef<HTMLDivElement, {
   messages: TmuxChatMessage[];
@@ -2038,6 +2203,32 @@ function isTmuxWatchEvent(value: unknown): value is TmuxWatchEvent {
     && typeof (value as Record<string, unknown>).session === "string"
     && typeof (value as Record<string, unknown>).label === "string"
   );
+}
+
+function tmuxWatchEventsFromPayload(payload: WsPayload): TmuxWatchEvent[] {
+  const events: TmuxWatchEvent[] = [];
+  for (const event of payload.tmuxWatchEvents ?? []) {
+    if (isTmuxWatchEvent(event)) {
+      events.push(event);
+    }
+  }
+  if (payload.type === "tmux-watch-done" && isTmuxWatchEvent(payload.event)) {
+    events.push(payload.event);
+  }
+  for (const recent of payload.recentEvents ?? []) {
+    events.push(...tmuxWatchEventsFromPayload(recent));
+  }
+  return events;
+}
+
+function mergeTmuxWatchEvents(current: TmuxWatchEvent[], incoming: TmuxWatchEvent[]): TmuxWatchEvent[] {
+  const byId = new Map<number, TmuxWatchEvent>();
+  for (const event of [...incoming, ...current]) {
+    byId.set(event.id, event);
+  }
+  return [...byId.values()]
+    .sort((left, right) => Date.parse(right.finishedAt) - Date.parse(left.finishedAt))
+    .slice(0, 8);
 }
 
 function applyDescription(entries: TimelineEntry[], description: UiEventDescription): TimelineEntry[] {
