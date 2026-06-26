@@ -5,9 +5,9 @@ It does not run tmux or CLI tools on the phone. The server still owns tmux,
 uploads, launchers, and auth; the app stores only the server URL and optional
 token on the device.
 
-This app is sideload-only. It is not distributed through Google Play. Public APK
-builds are generic and should open to the setup screen; private builds may
-prefill a server URL/token for your own device.
+The app can be built as either a sideload APK or a Google Play Android App
+Bundle. Public builds are generic and should open to the setup screen; private
+builds may prefill a server URL/token for your own device.
 
 ## Build
 
@@ -35,11 +35,18 @@ Build a shareable public sideload APK with no embedded server URL or token:
 pnpm android:build:public
 ```
 
+Build a public Google Play upload bundle with no embedded server URL or token:
+
+```bash
+pnpm android:build:play
+```
+
 The APKs are written to:
 
 ```text
 android/app/build/outputs/apk/debug/agent-tmux-web-v<version>-debug.apk
 android/app/build/outputs/apk/release/agent-tmux-web-v<version>-release.apk
+android/app/build/outputs/bundle/release/app-release.aab
 ```
 
 Install on a connected Android device:
@@ -83,7 +90,7 @@ Override those defaults when needed:
 AGENT_TMUX_ANDROID_ID_SUFFIX=.work \
 AGENT_TMUX_ANDROID_APP_LABEL="Agent Tmux Work" \
 AGENT_TMUX_ANDROID_VERSION_CODE=20042 \
-AGENT_TMUX_ANDROID_VERSION_NAME=0.1.12-work \
+AGENT_TMUX_ANDROID_VERSION_NAME=0.1.13-work \
 pnpm android:build:private
 ```
 

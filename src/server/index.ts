@@ -392,7 +392,11 @@ wss.on("connection", async (socket, req) => {
 
   sockets.add(socket);
   socket.on("close", () => sockets.delete(socket));
-  socket.send(JSON.stringify({ type: "hello", status: await getStatus() }));
+  socket.send(JSON.stringify({
+    type: "hello",
+    status: await getStatus(),
+    tmuxWatchEvents: tmuxWatch.getEventsSince(Math.max(0, tmuxWatch.latestEventId() - 10))
+  }));
 });
 
 const tmuxWss = new WebSocketServer({ noServer: true });

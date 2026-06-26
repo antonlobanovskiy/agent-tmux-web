@@ -35,6 +35,11 @@
           "target": "~/docs/registry.md"
         },
         {
+          "path": "docs/play-store.md",
+          "type": "registry:file",
+          "target": "~/docs/play-store.md"
+        },
+        {
           "path": "docs/marketing.md",
           "type": "registry:file",
           "target": "~/docs/marketing.md"
@@ -115,6 +120,11 @@
           "target": "~/src/client/LinkifiedText.tsx"
         },
         {
+          "path": "src/client/agentStatus.ts",
+          "type": "registry:file",
+          "target": "~/src/client/agentStatus.ts"
+        },
+        {
           "path": "src/client/browserNotifications.ts",
           "type": "registry:file",
           "target": "~/src/client/browserNotifications.ts"
@@ -188,6 +198,11 @@
           "path": "src/client/__tests__/browserNotifications.test.ts",
           "type": "registry:file",
           "target": "~/src/client/__tests__/browserNotifications.test.ts"
+        },
+        {
+          "path": "src/client/__tests__/agentStatus.test.ts",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/agentStatus.test.ts"
         },
         {
           "path": "src/client/__tests__/inputBehavior.test.ts",
@@ -385,6 +400,11 @@
           "target": "~/android/README.md"
         },
         {
+          "path": "docs/play-store.md",
+          "type": "registry:file",
+          "target": "~/docs/play-store.md"
+        },
+        {
           "path": "android/build.gradle",
           "type": "registry:file",
           "target": "~/android/build.gradle"
@@ -498,9 +518,14 @@
           "path": "scripts/build-private-apk.mjs",
           "type": "registry:file",
           "target": "~/scripts/build-private-apk.mjs"
+        },
+        {
+          "path": "scripts/verify-public-apk.mjs",
+          "type": "registry:file",
+          "target": "~/scripts/verify-public-apk.mjs"
         }
       ],
-      "docs": "Public APKs must not include a default server URL or auth token. Private APKs should use a separate package id and should be delivered over LAN, VPN, or Tailscale instead of email. Clone the repository for binary launcher images and the Gradle wrapper jar.",
+      "docs": "Public APKs and Play bundles must not include a default server URL or auth token. Private APKs should use a separate package id and should be delivered over LAN, VPN, or Tailscale instead of email. Clone the repository for binary launcher images and the Gradle wrapper jar.",
       "categories": ["android", "webview", "notifications"]
     },
     {

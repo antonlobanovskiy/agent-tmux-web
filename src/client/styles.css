@@ -841,7 +841,7 @@ textarea:focus {
 
 .tmux-terminal-toolbar {
   display: grid;
-  grid-template-columns: auto auto auto auto auto minmax(0, 1fr);
+  grid-template-columns: auto auto auto auto auto auto minmax(0, 1fr);
   gap: 8px;
   align-items: center;
   margin: 10px 0;
@@ -859,6 +859,129 @@ textarea:focus {
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.tmux-agent-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(140px, 0.8fr);
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-card);
+}
+
+.tmux-agent-state {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 9px;
+}
+
+.tmux-agent-state div,
+.tmux-focus-title div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.tmux-agent-state strong,
+.tmux-focus-title strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.tmux-agent-state span:last-child,
+.tmux-focus-title span:last-child,
+.tmux-agent-action {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-soft);
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tmux-agent-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--dot);
+}
+
+.tmux-agent-strip.running .tmux-agent-dot,
+.tmux-focus-hero.running .tmux-agent-dot {
+  background: #4aa3ff;
+}
+
+.tmux-agent-strip.waiting .tmux-agent-dot,
+.tmux-focus-hero.waiting .tmux-agent-dot {
+  background: var(--accent);
+}
+
+.tmux-agent-strip.needs-permission .tmux-agent-dot,
+.tmux-agent-strip.question .tmux-agent-dot,
+.tmux-focus-hero.needs-permission .tmux-agent-dot,
+.tmux-focus-hero.question .tmux-agent-dot {
+  background: #e7b84b;
+}
+
+.tmux-agent-strip.error .tmux-agent-dot,
+.tmux-focus-hero.error .tmux-agent-dot {
+  background: #e06464;
+}
+
+.tmux-attention-list {
+  display: flex;
+  grid-column: 1 / -1;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 1px;
+}
+
+.tmux-attention-list button,
+.tmux-focus-events button {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-control);
+  color: var(--text-control);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tmux-attention-list button.active,
+.tmux-focus-events button.active {
+  border-color: var(--accent);
+  background: var(--accent-muted);
+  color: var(--accent-soft-text);
+}
+
+.tmux-attention-list button span,
+.tmux-focus-events button span,
+.tmux-attention-list button small,
+.tmux-focus-events button small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tmux-attention-list button small,
+.tmux-focus-events button small {
+  color: var(--text-muted);
+  font-size: 11px;
 }
 
 .tmux-terminal {
@@ -916,6 +1039,106 @@ textarea:focus {
   flex: 1 1 auto;
   height: auto;
   min-height: 0;
+}
+
+.tmux-focus {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  height: calc(100vh - 230px);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-chat);
+  color: var(--text-primary);
+}
+
+.tmux-focus-hero {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: var(--surface-card-assistant);
+}
+
+.tmux-focus-hero.needs-permission,
+.tmux-focus-hero.question {
+  border-left-color: #e7b84b;
+}
+
+.tmux-focus-hero.error {
+  border-left-color: #e06464;
+}
+
+.tmux-focus-title {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  min-width: 0;
+}
+
+.tmux-focus-hero p,
+.tmux-focus-empty,
+.tmux-focus-message p {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.tmux-focus-section {
+  display: grid;
+  gap: 8px;
+}
+
+.tmux-focus-section-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.tmux-focus-events {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 1px;
+}
+
+.tmux-focus-messages {
+  display: grid;
+  gap: 8px;
+}
+
+.tmux-focus-message {
+  display: grid;
+  gap: 5px;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-card);
+}
+
+.tmux-focus-message.user {
+  border-color: var(--border-user);
+  background: var(--surface-card-user);
+}
+
+.tmux-focus-message > span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.tmux-focus-message a {
+  color: var(--accent);
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .tmux-jump-bottom {
@@ -1121,6 +1344,12 @@ textarea:focus {
     min-height: 0;
   }
 
+  .tmux-focus {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+  }
+
   .tmux-terminal {
     flex: 1 1 auto;
     height: auto;
@@ -1238,7 +1467,7 @@ textarea:focus {
 
   .tmux-terminal-toolbar {
     flex: none;
-    grid-template-columns: 38px 38px 38px 38px 38px minmax(0, 1fr);
+    grid-template-columns: 38px 38px 38px 38px 38px 38px minmax(0, 1fr);
     margin: 0 0 4px;
   }
 
@@ -1257,6 +1486,7 @@ textarea:focus {
 
   .tmux-output,
   .tmux-chat,
+  .tmux-focus,
   .tmux-terminal {
     flex: 1 1 auto;
     height: auto;
@@ -1264,13 +1494,26 @@ textarea:focus {
   }
 
   .tmux-output,
-  .tmux-chat {
+  .tmux-chat,
+  .tmux-focus {
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
   }
 
-  .tmux-chat {
+  .tmux-chat,
+  .tmux-focus {
     padding: 12px 8px;
+  }
+
+  .tmux-agent-strip {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+    margin-bottom: 6px;
+    padding: 8px 9px;
+  }
+
+  .tmux-agent-action {
+    display: none;
   }
 
   .tmux-chat-message.user {

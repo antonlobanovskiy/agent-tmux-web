@@ -6,6 +6,18 @@ This is an open-source repository. Public releases must stay generic and must
 not include private server URLs, auth tokens, local `.env` files, staged APKs,
 uploads, machine-specific service edits, or private signing material.
 
+## 0.1.13 - 2026-06-26
+
+- Added a Focus tmux view for phone check-ins with agent status, compact recent
+  conversation, and recent waiting-session attention items.
+- Added tmux agent status classification for permission prompts, questions,
+  errors, waiting, running, and idle states.
+- Added a Play Store readiness guide and `pnpm android:build:play` for public
+  Android App Bundle generation.
+- Extended public Android artifact verification to inspect AAB files as well as
+  APKs.
+- Bumped the public Android version defaults to `0.1.13` / version code `14`.
+
 ## 0.1.12 - 2026-06-19
 
 - Made raw terminal mode direct-input only by hiding the tmux send form while

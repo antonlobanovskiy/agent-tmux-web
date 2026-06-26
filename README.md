@@ -33,6 +33,8 @@ raw tmux attach, launcher menu, Android wrapper, and desktop layout.
 - Launches Codex, Claude, Gemini, or custom commands in the selected
   tmux session.
 - Gives you both a readable chat-style transcript and raw tmux attach mode.
+- Adds a Focus view for phone check-ins: current agent status, recent waiting
+  sessions, and compact conversation updates without verbose terminal output.
 - Lets you scroll back through tmux output while new capture updates keep
   running, with a jump-to-latest button when you are ready to return.
 - Uploads files from Android, iOS, or desktop browsers to temporary server paths
@@ -53,18 +55,20 @@ your running Agent Tmux Web server in a WebView, stores the server URL/token on
 the device, supports Android file picking for uploads, and uses a native bridge
 for task-done notifications.
 
-The APK is sideload-only. It is not published through Google Play, does not run
-tmux locally, and does not include any maintainer server credentials in public
-builds. Install it, enter your own private server URL on the setup screen, then
-enable `Notify` if you want background task-complete alerts. Private builds can
-use a separate package id and local signing key so they install next to the
-public app without Android signature conflicts. The Android build uses the same
-minimal Agent Tmux icon as the browser favicon and app header.
+The Android app does not run tmux locally and does not include any maintainer
+server credentials in public builds. Install it, enter your own private server
+URL on the setup screen, then enable `Notify` if you want background
+task-complete alerts. Private builds can use a separate package id and local
+signing key so they install next to the public app without Android signature
+conflicts. The Android build uses the same minimal Agent Tmux icon as the
+browser favicon and app header.
 
 ```bash
 pnpm android:build:public
 ```
 
+For Google Play preparation, build an Android App Bundle with
+`pnpm android:build:play` and follow [`docs/play-store.md`](./docs/play-store.md).
 For setup details, see [`android/README.md`](./android/README.md).
 
 ## Features
@@ -76,6 +80,7 @@ For setup details, see [`android/README.md`](./android/README.md).
 - Supports custom launch commands from the UI.
 - Supports optional per-tool mode toggles for extra CLI flags.
 - Captures tmux panes as either terminal text or a normalized chat-style view.
+- Provides a Focus view for quick phone check-ins and attention triage.
 - Captures a deeper 1000-line tmux history so older context stays reachable.
 - Preserves your scroll position while sessions are active and shows a
   jump-to-latest button when you are not at the bottom.
@@ -190,6 +195,18 @@ For private personal builds, you may prefill the setup screen with
 `pnpm android:stage-apk` to serve the APK over LAN, VPN, or Tailscale. Do not
 email APKs or ZIPs containing APKs; many mail clients block them. Public APKs
 should always show the setup screen first.
+
+## Google Play
+
+Play Store uploads use an Android App Bundle rather than the sideload APK:
+
+```bash
+pnpm android:build:play
+```
+
+See [`docs/play-store.md`](./docs/play-store.md) for the current release
+checklist, including Play App Signing, Data safety, privacy policy, and listing
+requirements.
 
 ## Versioning
 
