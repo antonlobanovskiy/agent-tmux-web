@@ -6,6 +6,15 @@ This is an open-source repository. Public releases must stay generic and must
 not include private server URLs, auth tokens, local `.env` files, staged APKs,
 uploads, machine-specific service edits, or private signing material.
 
+## 0.1.14 - 2026-06-26
+
+- Made Focus tmux mode opt-in instead of the default session view.
+- Cleaned up desktop Focus mode by hiding the duplicate status strip while the
+  Focus panel is open.
+- Filtered source diffs, code snippets, and terminal spinner/status lines out of
+  Focus summaries so code output does not fill the compact cards.
+- Bumped the public Android version defaults to `0.1.14` / version code `15`.
+
 ## 0.1.13 - 2026-06-26
 
 - Added a Focus tmux view for phone check-ins with agent status, compact recent

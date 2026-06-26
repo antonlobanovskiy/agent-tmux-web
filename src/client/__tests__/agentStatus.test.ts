@@ -54,6 +54,36 @@ describe("summarizeTmuxAgent", () => {
     expect(summary.kind).toBe("running");
     expect(summary.detail).toBe("Inspecting screenshots. Running viewport checks.");
   });
+
+  it("does not use raw source diffs as the running summary", () => {
+    const summary = summarizeTmuxAgent("Working... press Ctrl-C to interrupt", [
+      {
+        id: "assistant-1",
+        role: "assistant",
+        text: [
+          "1089 + line-height: 1.45;",
+          "1090 +}",
+          "1092 +.tmux-focus-section {",
+          "1093 +  display: grid;"
+        ].join("\n")
+      }
+    ]);
+
+    expect(summary.kind).toBe("running");
+    expect(summary.detail).toBe("Terminal output captured; open a detailed view for full output.");
+  });
+
+  it("does not treat git status markers as questions", () => {
+    const summary = summarizeTmuxAgent([
+      "Working... press Ctrl-C to interrupt",
+      " M src/client/App.tsx",
+      "?? src/client/agentStatus.ts"
+    ].join("\n"), []);
+
+    expect(summary.kind).toBe("running");
+    expect(summary.title).toBe("Running");
+    expect(summary.detail).toBe("Terminal output captured; open a detailed view for full output.");
+  });
 });
 
 describe("buildCompactTmuxMessages", () => {
@@ -78,5 +108,24 @@ describe("buildCompactTmuxMessages", () => {
       { id: "user-0", role: "user", text: "Run tests" },
       { id: "assistant-1", role: "assistant", text: "Ran pnpm test Everything passed." }
     ]);
+  });
+
+  it("drops unfenced source diff output from compact messages", () => {
+    const messages: TmuxChatMessage[] = [
+      {
+        id: "assistant-1",
+        role: "assistant",
+        text: [
+          "diff --git a/src/client/styles.css b/src/client/styles.css",
+          "@@ -1089,6 +1089,12 @@",
+          "1089 + line-height: 1.45;",
+          "1090 +}",
+          "1092 +.tmux-focus-section {",
+          "1093 +  display: grid;"
+        ].join("\n")
+      }
+    ];
+
+    expect(buildCompactTmuxMessages(messages)).toEqual([]);
   });
 });

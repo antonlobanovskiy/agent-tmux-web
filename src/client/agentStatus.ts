@@ -21,12 +21,15 @@ const ANSI_PATTERN = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
 const OSC_PATTERN = /\u001b\][^\u0007]*(?:\u0007|\u001b\\)/g;
 const MAX_COMPACT_MESSAGES = 6;
 const MAX_COMPACT_TEXT_LENGTH = 360;
+const TERMINAL_OUTPUT_DETAIL = "Terminal output captured; open a detailed view for full output.";
 
 export function summarizeTmuxAgent(output: string, messages: TmuxChatMessage[]): TmuxAgentSummary {
   const lines = meaningfulLines(output);
-  const lastLine = lines.at(-1) ?? "";
-  const tailText = lines.slice(-12).join("\n");
-  const latestSummary = summarizeLatestAssistant(messages) || lastLine || "No recent output.";
+  const signalLines = lines.filter((line) => !isLowSignalLine(line));
+  const lastLine = signalLines.at(-1) ?? "";
+  const signalTailText = signalLines.slice(-12).join("\n");
+  const latestSummary = summarizeLatestAssistant(messages);
+  const summaryDetail = readableDetail(latestSummary || lastLine);
 
   if (lines.length === 0 && messages.length === 0) {
     return {
@@ -38,31 +41,31 @@ export function summarizeTmuxAgent(output: string, messages: TmuxChatMessage[]):
     };
   }
 
-  if (looksLikePermissionPrompt(tailText)) {
+  if (looksLikePermissionPrompt(signalTailText)) {
     return {
       kind: "needs-permission",
       title: "Needs permission",
-      detail: compactText(lastLine || latestSummary),
+      detail: readableDetail(lastLine || latestSummary),
       action: "Review the prompt and approve or reject it.",
       lastLine
     };
   }
 
-  if (looksLikeError(tailText)) {
+  if (looksLikeError(signalTailText)) {
     return {
       kind: "error",
       title: "Error",
-      detail: compactText(lastLine || latestSummary),
+      detail: readableDetail(lastLine || latestSummary),
       action: "Open the session and inspect the failure.",
       lastLine
     };
   }
 
-  if (looksLikeQuestion(tailText)) {
+  if (looksLikeQuestion(signalTailText)) {
     return {
       kind: "question",
       title: "Question waiting",
-      detail: compactText(lastQuestionLine(lines) || lastLine || latestSummary),
+      detail: readableDetail(lastQuestionLine(signalLines) || lastLine || latestSummary),
       action: "Reply with a short answer.",
       lastLine
     };
@@ -72,7 +75,7 @@ export function summarizeTmuxAgent(output: string, messages: TmuxChatMessage[]):
     return {
       kind: "waiting",
       title: "Waiting for input",
-      detail: compactText(latestSummary),
+      detail: summaryDetail,
       action: "Send the next instruction or start another task.",
       lastLine
     };
@@ -82,7 +85,7 @@ export function summarizeTmuxAgent(output: string, messages: TmuxChatMessage[]):
     return {
       kind: "running",
       title: "Running",
-      detail: compactText(latestSummary),
+      detail: summaryDetail,
       action: "Check back when it asks for input or finishes.",
       lastLine
     };
@@ -154,6 +157,10 @@ function compactText(text: string): string {
     : normalized;
 }
 
+function readableDetail(text: string): string {
+  return compactText(text) || TERMINAL_OUTPUT_DETAIL;
+}
+
 function looksLikePermissionPrompt(text: string): boolean {
   return /\b(allow|approve|permission|permissions|authorize|confirm|proceed|continue)\b/i.test(text)
     && /(\?|\[y\/n\]|\[y\/N\]|press enter|yes|no|esc to go back)/i.test(text);
@@ -181,6 +188,17 @@ function isDecorativeLine(line: string): boolean {
 
 function isLowSignalLine(line: string): boolean {
   return /^```/.test(line)
+    || /^diff --git\b/.test(line)
+    || /^index [0-9a-f]+\.\.[0-9a-f]+/.test(line)
+    || /^@@\s/.test(line)
+    || /^[+-]{3}\s/.test(line)
+    || /^\d+\s+[+-]\s*/.test(line)
+    || /^[+-]\s*(?:[{}()[\],;]|\.[\w-]+|#[\w-]+|(?:import|export|const|let|function|return|if|for|while|type|interface|class)\b)/.test(line)
+    || /^[{}()[\],;]+$/.test(line)
+    || /^\?\?\s+\S+/.test(line)
+    || /^[ MADRCU]{1,2}\s+\S+/.test(line)
+    || /(?:working|thinking|running).*?(?:interrupt|esc|ctrl-c)/i.test(line)
+    || /(?:esc|ctrl-c)\s+to\s+interrupt/i.test(line)
     || /^(pnpm|npm|yarn|git|gh|curl|tmux|node|python|python3|pytest|systemctl|journalctl)\b/.test(line)
     || /^Test Files\b/.test(line)
     || /^Tests\b/.test(line)

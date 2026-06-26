@@ -56,8 +56,8 @@ android {
         applicationId "com.agenttmux.web${normalizedApplicationIdSuffix}"
         minSdk 26
         targetSdk 35
-        versionCode configuredVersionCode ? configuredVersionCode.toInteger() : 14
-        versionName configuredVersionName ?: "0.1.13"
+        versionCode configuredVersionCode ? configuredVersionCode.toInteger() : 15
+        versionName configuredVersionName ?: "0.1.14"
         manifestPlaceholders = [agentTmuxAppLabel: appLabel]
 
         buildConfigField "String", "DEFAULT_SERVER_URL", quotedBuildConfig(configValue("agentTmuxDefaultUrl"))
