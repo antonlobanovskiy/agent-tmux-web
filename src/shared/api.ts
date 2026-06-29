@@ -21,7 +21,21 @@ export type TmuxSessionDto = {
   name: string;
   windows: number;
   created: string;
+  createdAtMs?: number;
   attached: boolean;
+  activityAtMs?: number;
+  currentCommand?: string;
+  status?: TmuxSessionStatusDto;
+};
+
+export type TmuxSessionStatusKind = "needs-permission" | "question" | "error" | "waiting" | "running" | "idle";
+
+export type TmuxSessionStatusHealth = "green" | "yellow" | "red";
+
+export type TmuxSessionStatusDto = {
+  kind: TmuxSessionStatusKind;
+  health: TmuxSessionStatusHealth;
+  title: string;
 };
 
 export type TmuxToolDto = {

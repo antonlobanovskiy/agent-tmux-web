@@ -7,8 +7,9 @@ import { promisify } from "node:util";
 import express, { type Request, type Response, type NextFunction } from "express";
 import { WebSocketServer, type RawData, type WebSocket } from "ws";
 
-import { type AppStatus } from "../shared/api.js";
+import { type AppStatus, type TmuxSessionDto } from "../shared/api.js";
 import { describeCodexNotification } from "../shared/codexEvents.js";
+import { classifyTmuxStatus } from "../shared/tmuxStatus.js";
 import { CodexBridge } from "./codexBridge.js";
 import {
   buildTmuxCaptureSizeFromClientWidth,
@@ -226,7 +227,7 @@ app.post("/api/turn/interrupt", asyncHandler(async (req, res) => {
 }));
 
 app.get("/api/tmux/sessions", asyncHandler(async (_req, res) => {
-  res.json({ data: await listTmuxSessions() });
+  res.json({ data: await listTmuxSessionsWithStatus() });
 }));
 
 app.get("/api/tmux/tools", asyncHandler(async (_req, res) => {
@@ -248,21 +249,22 @@ app.get("/api/tmux/capture", asyncHandler(async (req, res) => {
 
 app.post("/api/tmux/create", asyncHandler(async (req, res) => {
   const body = req.body as Record<string, unknown>;
+  await createTmuxSession(
+    requireString(body.name, "name"),
+    stringOrNull(body.cwd)
+  );
   res.json({
-    data: await createTmuxSession(
-      requireString(body.name, "name"),
-      stringOrNull(body.cwd)
-    )
+    data: await listTmuxSessionsWithStatus()
   });
 }));
 
 app.post("/api/tmux/destroy", asyncHandler(async (req, res) => {
   const body = req.body as Record<string, unknown>;
   const session = requireString(body.session, "session");
-  const data = await destroyTmuxSession(session);
+  await destroyTmuxSession(session);
   tmuxWatch.cancelWatch(session);
   res.json({
-    data
+    data: await listTmuxSessionsWithStatus()
   });
 }));
 
@@ -357,6 +359,22 @@ app.get("/api/tmux/watch/status", asyncHandler(async (_req, res) => {
     pollers: listRecentWatchPollers()
   });
 }));
+
+async function listTmuxSessionsWithStatus(): Promise<TmuxSessionDto[]> {
+  const sessions = await listTmuxSessions();
+  const nowMs = Date.now();
+  return Promise.all(sessions.map(async (session) => {
+    const output = await captureTmuxPane(session.name, 220).catch(() => "");
+    return {
+      ...session,
+      status: classifyTmuxStatus({
+        activityAtMs: session.activityAtMs,
+        nowMs,
+        output
+      })
+    };
+  }));
+}
 
 app.post("/api/uploads", asyncHandler(async (req, res) => {
   const originalName = requireString(req.query.filename, "filename");

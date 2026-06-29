@@ -46,13 +46,75 @@ describe("summarizeTmuxAgent", () => {
   });
 
   it("summarizes the latest meaningful assistant message", () => {
-    const summary = summarizeTmuxAgent("Working... press Ctrl-C to interrupt", [
-      { id: "user-0", role: "user", text: "Check the mobile layout" },
-      { id: "assistant-1", role: "assistant", text: "• Inspecting screenshots.\n• Running viewport checks." }
-    ]);
+    const summary = summarizeTmuxAgent(
+      "Working... press Ctrl-C to interrupt",
+      [
+        { id: "user-0", role: "user", text: "Check the mobile layout" },
+        { id: "assistant-1", role: "assistant", text: "• Inspecting screenshots.\n• Running viewport checks." }
+      ],
+      { activityAtMs: 1_000_000, nowMs: 1_000_000 }
+    );
 
     expect(summary.kind).toBe("running");
+    expect(summary.health).toBe("green");
     expect(summary.detail).toBe("Inspecting screenshots. Running viewport checks.");
+  });
+
+  it("treats stale working output as idle", () => {
+    const summary = summarizeTmuxAgent(
+      "Working... press Ctrl-C to interrupt",
+      [],
+      {
+        activityAtMs: 1_000_000,
+        nowMs: 1_000_000 + (24 * 60 * 60 * 1000)
+      }
+    );
+
+    expect(summary.kind).toBe("idle");
+    expect(summary.health).toBe("yellow");
+    expect(summary.title).toBe("Idle");
+  });
+
+  it("does not treat arbitrary recent output as running", () => {
+    const summary = summarizeTmuxAgent(
+      "Ran tests successfully\nagent-demo $",
+      [],
+      { activityAtMs: 1_000_000, nowMs: 1_000_100 }
+    );
+
+    expect(summary.kind).toBe("waiting");
+    expect(summary.health).toBe("yellow");
+  });
+
+  it("does not treat code mentioning needs-permission as a permission prompt", () => {
+    const summary = summarizeTmuxAgent(
+      [
+        "Did you review what you changed above?",
+        "permission, .tmux-focus-hero.running, .tmux-focus-hero.waiting",
+        "const relevantConsole = consoleMessages.filter((message) => !message.includes(\"favicon\"));",
+        "Working (14m 39s • esc to interrupt)"
+      ].join("\n"),
+      [],
+      { activityAtMs: 1_000_000, nowMs: 1_000_100 }
+    );
+
+    expect(summary.kind).toBe("running");
+    expect(summary.health).toBe("green");
+  });
+
+  it("does not let old error text override active working output", () => {
+    const summary = summarizeTmuxAgent(
+      [
+        "Error: Project(s) \"chromium\" not found.",
+        "Running rendered check",
+        "Working (14m 39s • esc to interrupt)"
+      ].join("\n"),
+      [],
+      { activityAtMs: 1_000_000, nowMs: 1_000_100 }
+    );
+
+    expect(summary.kind).toBe("running");
+    expect(summary.health).toBe("green");
   });
 
   it("does not use raw source diffs as the running summary", () => {

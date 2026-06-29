@@ -330,6 +330,11 @@
           "target": "~/src/shared/tmuxActivity.ts"
         },
         {
+          "path": "src/shared/tmuxStatus.ts",
+          "type": "registry:file",
+          "target": "~/src/shared/tmuxStatus.ts"
+        },
+        {
           "path": "src/shared/__tests__/codexEvents.test.ts",
           "type": "registry:file",
           "target": "~/src/shared/__tests__/codexEvents.test.ts"

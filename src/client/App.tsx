@@ -257,7 +257,14 @@ export function App() {
   const slashQuery = useMemo(() => slashQueryForMessage(message, composerCaret), [composerCaret, message]);
   const slashMatches = useMemo(() => slashQuery ? filterSlashCommands(slashQuery.query) : [], [slashQuery]);
   const tmuxChatMessages = useMemo(() => parseTmuxChatOutput(tmuxOutput), [tmuxOutput]);
-  const tmuxAgentSummary = useMemo(() => summarizeTmuxAgent(tmuxOutput, tmuxChatMessages), [tmuxChatMessages, tmuxOutput]);
+  const selectedTmuxSession = useMemo(
+    () => tmuxSessions.find((session) => session.name === selectedTmux) ?? null,
+    [selectedTmux, tmuxSessions]
+  );
+  const tmuxAgentSummary = useMemo(
+    () => summarizeTmuxAgent(tmuxOutput, tmuxChatMessages, { activityAtMs: selectedTmuxSession?.activityAtMs }),
+    [selectedTmuxSession?.activityAtMs, tmuxChatMessages, tmuxOutput]
+  );
   const tmuxCompactMessages = useMemo(() => buildCompactTmuxMessages(tmuxChatMessages), [tmuxChatMessages]);
   const showTmuxSendForm = shouldShowTmuxSendForm({ terminalActive });
   const currentTmuxTool = useMemo(() => tmuxTools.find((tool) => tool.id === selectedTmuxTool) ?? null, [selectedTmuxTool, tmuxTools]);
@@ -362,6 +369,16 @@ export function App() {
     loadTmuxSessions().catch(reportError(setError));
     loadTmuxTools().catch(reportError(setError));
   }, [loadStatus, loadTmuxSessions, loadTmuxTools]);
+
+  useEffect(() => {
+    if (demoMode) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      loadTmuxSessions().catch(reportError(setError));
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [loadTmuxSessions]);
 
   useEffect(() => {
     if (!status?.codex.initialized) {
@@ -1093,6 +1110,12 @@ export function App() {
     setTerminalStatus(session);
   }
 
+  function tmuxStatusForSession(session: TmuxSessionDto) {
+    return session.name === selectedTmux
+      ? tmuxAgentSummary
+      : session.status ?? { kind: "idle" as const, health: "yellow" as const, title: "Idle" };
+  }
+
   function insertSkillName(skillName: string) {
     setMessage((current) => {
       const prefix = current.trimEnd();
@@ -1509,13 +1532,27 @@ export function App() {
           </div>
           <div className={tmuxMenuOpen ? "tmux-menu open" : "tmux-menu"}>
             <div className="tmux-sessions">
-              {tmuxSessions.map((session) => (
-                <button key={session.name} className={selectedTmux === session.name ? "active" : ""} type="button" onClick={() => selectTmuxSession(session.name)}>
-                  <ChevronRight size={14} />
-                  <span className="tmux-session-name">{session.name}</span>
-                  {session.attached && <span className="tmux-session-badge">attached</span>}
-                </button>
-              ))}
+              {tmuxSessions.map((session) => {
+                const sessionStatus = tmuxStatusForSession(session);
+                return (
+                  <button
+                    key={session.name}
+                    className={selectedTmux === session.name ? "active" : ""}
+                    title={`${session.name}: ${sessionStatus.title}`}
+                    type="button"
+                    onClick={() => selectTmuxSession(session.name)}
+                  >
+                    <span
+                      aria-label={`${sessionStatus.title} status`}
+                      className={`tmux-session-status-dot ${sessionStatus.health}`}
+                      title={sessionStatus.title}
+                    />
+                    <ChevronRight size={14} />
+                    <span className="tmux-session-name">{session.name}</span>
+                    {session.attached && <span className="tmux-session-badge">attached</span>}
+                  </button>
+                );
+              })}
             </div>
             <div className="tmux-actions">
               <input value={newTmuxName} onChange={(event) => setNewTmuxName(event.target.value)} placeholder="new session" />
