@@ -1,10 +1,12 @@
-import { looksLikeTmuxWaitingForInput, looksLikeTmuxWorking } from "../shared/tmuxActivity.js";
+import type { TmuxSessionStatusHealth, TmuxSessionStatusKind } from "../shared/api.js";
+import { classifyTmuxStatus, type TmuxStatusInput } from "../shared/tmuxStatus.js";
 import type { TmuxChatMessage } from "./tmuxGui.js";
 
-export type TmuxAgentStatusKind = "needs-permission" | "question" | "error" | "waiting" | "running" | "idle";
+export type TmuxAgentStatusKind = TmuxSessionStatusKind;
 
 export type TmuxAgentSummary = {
   kind: TmuxAgentStatusKind;
+  health: TmuxSessionStatusHealth;
   title: string;
   detail: string;
   action: string;
@@ -23,17 +25,18 @@ const MAX_COMPACT_MESSAGES = 6;
 const MAX_COMPACT_TEXT_LENGTH = 360;
 const TERMINAL_OUTPUT_DETAIL = "Terminal output captured; open a detailed view for full output.";
 
-export function summarizeTmuxAgent(output: string, messages: TmuxChatMessage[]): TmuxAgentSummary {
+export function summarizeTmuxAgent(output: string, messages: TmuxChatMessage[], options: Omit<TmuxStatusInput, "output"> = {}): TmuxAgentSummary {
+  const status = classifyTmuxStatus({ ...options, output });
   const lines = meaningfulLines(output);
   const signalLines = lines.filter((line) => !isLowSignalLine(line));
   const lastLine = signalLines.at(-1) ?? "";
-  const signalTailText = signalLines.slice(-12).join("\n");
   const latestSummary = summarizeLatestAssistant(messages);
   const summaryDetail = readableDetail(latestSummary || lastLine);
 
   if (lines.length === 0 && messages.length === 0) {
     return {
       kind: "idle",
+      health: "yellow",
       title: "Idle",
       detail: "No output captured yet.",
       action: "Start a CLI tool or send a prompt.",
@@ -41,9 +44,10 @@ export function summarizeTmuxAgent(output: string, messages: TmuxChatMessage[]):
     };
   }
 
-  if (looksLikePermissionPrompt(signalTailText)) {
+  if (status.kind === "needs-permission") {
     return {
       kind: "needs-permission",
+      health: status.health,
       title: "Needs permission",
       detail: readableDetail(lastLine || latestSummary),
       action: "Review the prompt and approve or reject it.",
@@ -51,9 +55,10 @@ export function summarizeTmuxAgent(output: string, messages: TmuxChatMessage[]):
     };
   }
 
-  if (looksLikeError(signalTailText)) {
+  if (status.kind === "error") {
     return {
       kind: "error",
+      health: status.health,
       title: "Error",
       detail: readableDetail(lastLine || latestSummary),
       action: "Open the session and inspect the failure.",
@@ -61,9 +66,10 @@ export function summarizeTmuxAgent(output: string, messages: TmuxChatMessage[]):
     };
   }
 
-  if (looksLikeQuestion(signalTailText)) {
+  if (status.kind === "question") {
     return {
       kind: "question",
+      health: status.health,
       title: "Question waiting",
       detail: readableDetail(lastQuestionLine(signalLines) || lastLine || latestSummary),
       action: "Reply with a short answer.",
@@ -71,9 +77,10 @@ export function summarizeTmuxAgent(output: string, messages: TmuxChatMessage[]):
     };
   }
 
-  if (looksLikeTmuxWaitingForInput(output)) {
+  if (status.kind === "waiting") {
     return {
       kind: "waiting",
+      health: status.health,
       title: "Waiting for input",
       detail: summaryDetail,
       action: "Send the next instruction or start another task.",
@@ -81,9 +88,10 @@ export function summarizeTmuxAgent(output: string, messages: TmuxChatMessage[]):
     };
   }
 
-  if (looksLikeTmuxWorking(output) || lines.length > 0) {
+  if (status.kind === "running") {
     return {
       kind: "running",
+      health: status.health,
       title: "Running",
       detail: summaryDetail,
       action: "Check back when it asks for input or finishes.",
@@ -93,8 +101,9 @@ export function summarizeTmuxAgent(output: string, messages: TmuxChatMessage[]):
 
   return {
     kind: "idle",
-    title: "Idle",
-    detail: "No active task detected.",
+    health: status.health,
+    title: status.title,
+    detail: summaryDetail,
     action: "Send a prompt or launch a tool.",
     lastLine
   };
@@ -159,20 +168,6 @@ function compactText(text: string): string {
 
 function readableDetail(text: string): string {
   return compactText(text) || TERMINAL_OUTPUT_DETAIL;
-}
-
-function looksLikePermissionPrompt(text: string): boolean {
-  return /\b(allow|approve|permission|permissions|authorize|confirm|proceed|continue)\b/i.test(text)
-    && /(\?|\[y\/n\]|\[y\/N\]|press enter|yes|no|esc to go back)/i.test(text);
-}
-
-function looksLikeQuestion(text: string): boolean {
-  return /(?:\?|which\s+\w+|what\s+\w+|should i|do you want|please choose)/i.test(text)
-    && !looksLikePermissionPrompt(text);
-}
-
-function looksLikeError(text: string): boolean {
-  return /\b(error|failed|failure|exception|traceback|exit code [1-9]\d*|command not found)\b/i.test(text);
 }
 
 function lastQuestionLine(lines: string[]): string {

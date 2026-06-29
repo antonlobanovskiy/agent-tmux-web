@@ -6,6 +6,15 @@ This is an open-source repository. Public releases must stay generic and must
 not include private server URLs, auth tokens, local `.env` files, staged APKs,
 uploads, machine-specific service edits, or private signing material.
 
+## 0.1.15 - 2026-06-29
+
+- Added green, yellow, and red status dots to the tmux session sidebar.
+- Based tmux status on session activity metadata plus pane output so stale
+  "working" text no longer appears as a live running task.
+- Returned per-session status from `/api/tmux/sessions` and refreshed it
+  periodically in the web UI.
+- Bumped the public Android version defaults to `0.1.15` / version code `16`.
+
 ## 0.1.14 - 2026-06-26
 
 - Made Focus tmux mode opt-in instead of the default session view.

@@ -9,7 +9,10 @@ export type TmuxSession = {
   name: string;
   windows: number;
   created: string;
+  createdAtMs?: number;
   attached: boolean;
+  activityAtMs?: number;
+  currentCommand?: string;
 };
 
 export type CodexTmuxCommandOptions = {
@@ -222,6 +225,11 @@ export function parseTmuxSessions(output: string): TmuxSession[] {
     .map((line) => line.trim())
     .filter(Boolean)
     .flatMap((line) => {
+      const formatted = parseFormattedTmuxSession(line);
+      if (formatted) {
+        return [formatted];
+      }
+
       const match = line.match(/^(.+):\s+(\d+)\s+windows?\s+\(created\s+(.+?)\)(?:\s+\(attached\))?$/);
       if (!match) {
         return [];
@@ -238,6 +246,35 @@ export function parseTmuxSessions(output: string): TmuxSession[] {
     });
 }
 
+function parseFormattedTmuxSession(line: string): TmuxSession | null {
+  const parts = line.split("\t");
+  if (parts.length < 6) {
+    return null;
+  }
+  const [name, windows, created, attached, activity, currentCommand] = parts;
+  const windowCount = Number(windows);
+  const createdAtMs = unixSecondsToMs(created);
+  const activityAtMs = unixSecondsToMs(activity);
+  if (!name || !Number.isFinite(windowCount) || !createdAtMs) {
+    return null;
+  }
+
+  return {
+    name,
+    windows: windowCount,
+    created: new Date(createdAtMs).toISOString(),
+    createdAtMs,
+    attached: attached === "1",
+    ...(activityAtMs ? { activityAtMs } : {}),
+    ...(currentCommand ? { currentCommand } : {})
+  };
+}
+
+function unixSecondsToMs(value: string): number | undefined {
+  const seconds = Number(value);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : undefined;
+}
+
 export async function createTmuxSession(name: string, cwd?: string | null): Promise<TmuxSession[]> {
   await execFileAsync("tmux", buildTmuxNewSessionArgs(name, cwd));
   return listTmuxSessions();
@@ -250,7 +287,11 @@ export async function destroyTmuxSession(session: string): Promise<TmuxSession[]
 
 export async function listTmuxSessions(): Promise<TmuxSession[]> {
   try {
-    const { stdout } = await execFileAsync("tmux", ["list-sessions"]);
+    const { stdout } = await execFileAsync("tmux", [
+      "list-sessions",
+      "-F",
+      "#{session_name}\t#{session_windows}\t#{session_created}\t#{session_attached}\t#{window_activity}\t#{pane_current_command}"
+    ]);
     return parseTmuxSessions(stdout);
   } catch (error) {
     const stderr = error instanceof Error && "stderr" in error ? String(error.stderr) : "";

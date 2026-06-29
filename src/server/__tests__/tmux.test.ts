@@ -49,6 +49,34 @@ describe("parseTmuxSessions", () => {
     ]);
   });
 
+  it("parses formatted session rows with activity metadata", () => {
+    const output = [
+      "agent-tmux-web\t1\t1779925303\t0\t1779925303\tnode",
+      "radchenko-business\t2\t1780351746\t1\t1782255086\tzsh"
+    ].join("\n");
+
+    expect(parseTmuxSessions(output)).toEqual([
+      {
+        name: "agent-tmux-web",
+        windows: 1,
+        created: "2026-05-27T23:41:43.000Z",
+        createdAtMs: 1779925303000,
+        attached: false,
+        activityAtMs: 1779925303000,
+        currentCommand: "node"
+      },
+      {
+        name: "radchenko-business",
+        windows: 2,
+        created: "2026-06-01T22:09:06.000Z",
+        createdAtMs: 1780351746000,
+        attached: true,
+        activityAtMs: 1782255086000,
+        currentCommand: "zsh"
+      }
+    ]);
+  });
+
   it("returns an empty list for no server output", () => {
     expect(parseTmuxSessions("no server running on /tmp/tmux-1000/default")).toEqual([]);
     expect(parseTmuxSessions("")).toEqual([]);
