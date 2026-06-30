@@ -6,6 +6,13 @@ This is an open-source repository. Public releases must stay generic and must
 not include private server URLs, auth tokens, local `.env` files, staged APKs,
 uploads, machine-specific service edits, or private signing material.
 
+## Unreleased
+
+- Cleaned up the public README flow and refreshed the generated demo/screenshot
+  story for the current UI.
+- Prevented the top tmux overview and Focus attention lists from showing the
+  selected session or repeating the same session multiple times.
+
 ## 0.1.15 - 2026-06-29
 
 - Added green, yellow, and red status dots to the tmux session sidebar.

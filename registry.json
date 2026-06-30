@@ -43,6 +43,11 @@
           "path": "docs/marketing.md",
           "type": "registry:file",
           "target": "~/docs/marketing.md"
+        },
+        {
+          "path": "scripts/capture-marketing.mjs",
+          "type": "registry:file",
+          "target": "~/scripts/capture-marketing.mjs"
         }
       ],
       "docs": "Install into an empty project directory or inspect first with --dry-run, --diff, or view. Binary media assets, launcher images, and the Gradle wrapper jar are intentionally omitted from registry items; clone the repository for the complete asset set. Keep runtime .env files, auth tokens, uploads, APKs, and machine-specific service files out of git.",
@@ -74,6 +79,7 @@
         "@types/react@^19.2.7",
         "@types/react-dom@^19.2.3",
         "@types/ws@^8.18.1",
+        "playwright@1.59.1",
         "tsx@^4.21.0",
         "typescript@^5.9.3",
         "vitest@^4.0.16"
@@ -170,6 +176,11 @@
           "target": "~/src/client/tmuxActivity.ts"
         },
         {
+          "path": "src/client/tmuxAttention.ts",
+          "type": "registry:file",
+          "target": "~/src/client/tmuxAttention.ts"
+        },
+        {
           "path": "src/client/tmuxFollow.ts",
           "type": "registry:file",
           "target": "~/src/client/tmuxFollow.ts"
@@ -238,6 +249,11 @@
           "path": "src/client/__tests__/tmuxActivity.test.ts",
           "type": "registry:file",
           "target": "~/src/client/__tests__/tmuxActivity.test.ts"
+        },
+        {
+          "path": "src/client/__tests__/tmuxAttention.test.ts",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/tmuxAttention.test.ts"
         },
         {
           "path": "src/client/__tests__/tmuxFollow.test.ts",
