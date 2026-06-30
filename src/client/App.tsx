@@ -54,6 +54,7 @@ import { shouldAutoCaptureTmux, TMUX_CAPTURE_POLL_INTERVAL_MS, TMUX_SEND_FOLLOW_
 import { TmuxOutputLines } from "./tmuxOutputLines.js";
 import { buildTmuxDoneNotification } from "./tmuxNotifications.js";
 import { normalizeRequestedTmuxSession, readRequestedTmuxSession, removeRequestedTmuxSession } from "./tmuxSessionTarget.js";
+import { buildTmuxAttentionEvents } from "./tmuxAttention.js";
 import { canShowBrowserNotifications, canShowWebSocketTaskNotifications, getBrowserNotificationAvailability, getBrowserNotificationSnapshot, setAndroidWatchPollingEnabled, showAgentNotification } from "./browserNotifications.js";
 
 type TimelineEntry = {
@@ -111,9 +112,25 @@ const DEMO_STATUS: AppStatus = {
   }
 };
 const DEMO_TMUX_SESSIONS: TmuxSessionDto[] = [
-  { name: "agent-demo", windows: 1, created: "Thu May 14 09:00:00 2026", attached: true },
-  { name: "release-notes", windows: 1, created: "Thu May 14 09:10:00 2026", attached: false },
-  { name: "infra-check", windows: 2, created: "Thu May 14 09:20:00 2026", attached: false }
+  { name: "agent-demo", windows: 1, created: "Thu May 14 09:00:00 2026", attached: true, status: { kind: "running", health: "green", title: "Running" } },
+  { name: "release-notes", windows: 1, created: "Thu May 14 09:10:00 2026", attached: false, status: { kind: "waiting", health: "yellow", title: "Waiting for input" } },
+  { name: "infra-check", windows: 2, created: "Thu May 14 09:20:00 2026", attached: false, status: { kind: "needs-permission", health: "yellow", title: "Needs permission" } }
+];
+const DEMO_TMUX_WATCH_EVENTS: TmuxWatchEvent[] = [
+  {
+    id: 2,
+    session: "release-notes",
+    label: "Codex",
+    startedAt: "2026-05-14T13:02:00.000Z",
+    finishedAt: "2026-05-14T13:07:00.000Z"
+  },
+  {
+    id: 1,
+    session: "infra-check",
+    label: "Claude",
+    startedAt: "2026-05-14T13:00:00.000Z",
+    finishedAt: "2026-05-14T13:05:00.000Z"
+  }
 ];
 const DEMO_TMUX_TOOLS: TmuxToolDto[] = [
   { id: "codex", label: "Codex", command: "codex", defaultSessionName: "codex", modes: [{ id: "yolo", label: "Yolo", args: "--yolo" }] },
@@ -152,6 +169,8 @@ const DEMO_TMUX_OUTPUT = [
   "",
   "• Raw tmux mode keeps native arrow keys, Ctrl-C, and exact TUI behavior available.",
   "• Detach returns to the same long-lived session.",
+  "",
+  "Working (2m 14s • esc to interrupt)",
   "",
   "  agent demo · ~/workspace/project"
 ].join("\n");
@@ -217,7 +236,7 @@ export function App() {
   const [tmuxFocusActive, setTmuxFocusActive] = useState(false);
   const [tmuxGuiActive, setTmuxGuiActive] = useState(demoMode);
   const [tmuxMenuOpen, setTmuxMenuOpen] = useState(false);
-  const [tmuxWatchEvents, setTmuxWatchEvents] = useState<TmuxWatchEvent[]>([]);
+  const [tmuxWatchEvents, setTmuxWatchEvents] = useState<TmuxWatchEvent[]>(demoMode ? DEMO_TMUX_WATCH_EVENTS : []);
   const [tmuxNotificationsEnabled, setTmuxNotificationsEnabled] = useState(readTmuxNotificationPreference);
   const [colorTheme, setColorTheme] = useState(readInitialColorTheme);
   const [requestedTmuxSession, setRequestedTmuxSession] = useState(readInitialRequestedTmuxSession);
@@ -1776,7 +1795,7 @@ function TmuxAgentSummaryStrip({
   selectedSession: string;
   summary: TmuxAgentSummary;
 }) {
-  const recentEvents = events.slice(0, 3);
+  const recentEvents = buildTmuxAttentionEvents(events, { selectedSession, limit: 3 });
 
   return (
     <section className={`tmux-agent-strip ${summary.kind}`} aria-label="Agent status">
@@ -1815,61 +1834,65 @@ const TmuxFocusView = forwardRef<HTMLDivElement, {
   onSelectSession: (session: string) => void;
   selectedSession: string;
   summary: TmuxAgentSummary;
-}>(({ events, messages, onScroll, onSelectSession, selectedSession, summary }, ref) => (
-  <div ref={ref} className="tmux-focus" onScroll={onScroll}>
-    <div className={`tmux-focus-hero ${summary.kind}`}>
-      <div className="tmux-focus-title">
-        <span className="tmux-agent-dot" />
-        <div>
-          <strong>{summary.title}</strong>
-          <span>{summary.detail}</span>
-        </div>
-      </div>
-      <p>{summary.action}</p>
-    </div>
+}>(({ events, messages, onScroll, onSelectSession, selectedSession, summary }, ref) => {
+  const attentionEvents = buildTmuxAttentionEvents(events, { selectedSession, limit: 4 });
 
-    {events.length > 0 && (
-      <div className="tmux-focus-section">
-        <span className="tmux-focus-section-label">Needs Attention</span>
-        <div className="tmux-focus-events">
-          {events.slice(0, 4).map((event) => (
-            <button
-              className={event.session === selectedSession ? "active" : ""}
-              key={event.id}
-              type="button"
-              onClick={() => onSelectSession(event.session)}
-            >
-              <AlertTriangle size={14} />
-              <span>{event.session}</span>
-              <small>{event.label}</small>
-            </button>
-          ))}
+  return (
+    <div ref={ref} className="tmux-focus" onScroll={onScroll}>
+      <div className={`tmux-focus-hero ${summary.kind}`}>
+        <div className="tmux-focus-title">
+          <span className="tmux-agent-dot" />
+          <div>
+            <strong>{summary.title}</strong>
+            <span>{summary.detail}</span>
+          </div>
         </div>
+        <p>{summary.action}</p>
       </div>
-    )}
 
-    <div className="tmux-focus-section">
-      <span className="tmux-focus-section-label">Recent Conversation</span>
-      {messages.length === 0 ? (
-        <p className="tmux-focus-empty">No compact messages captured yet.</p>
-      ) : (
-        <div className="tmux-focus-messages">
-          {messages.map((message, index) => (
-            <article
-              className={`tmux-focus-message ${message.role}`}
-              data-tmux-anchor-index={index}
-              data-tmux-scroll-anchor=""
-              key={message.id}
-            >
-              <span>{message.role === "user" ? "You" : message.role === "assistant" ? "Agent" : "Terminal"}</span>
-              <p><LinkifiedText text={message.text} /></p>
-            </article>
-          ))}
+      {attentionEvents.length > 0 && (
+        <div className="tmux-focus-section">
+          <span className="tmux-focus-section-label">Needs Attention</span>
+          <div className="tmux-focus-events">
+            {attentionEvents.map((event) => (
+              <button
+                className={event.session === selectedSession ? "active" : ""}
+                key={event.id}
+                type="button"
+                onClick={() => onSelectSession(event.session)}
+              >
+                <AlertTriangle size={14} />
+                <span>{event.session}</span>
+                <small>{event.label}</small>
+              </button>
+            ))}
+          </div>
         </div>
       )}
+
+      <div className="tmux-focus-section">
+        <span className="tmux-focus-section-label">Recent Conversation</span>
+        {messages.length === 0 ? (
+          <p className="tmux-focus-empty">No compact messages captured yet.</p>
+        ) : (
+          <div className="tmux-focus-messages">
+            {messages.map((message, index) => (
+              <article
+                className={`tmux-focus-message ${message.role}`}
+                data-tmux-anchor-index={index}
+                data-tmux-scroll-anchor=""
+                key={message.id}
+              >
+                <span>{message.role === "user" ? "You" : message.role === "assistant" ? "Agent" : "Terminal"}</span>
+                <p><LinkifiedText text={message.text} /></p>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
-  </div>
-));
+  );
+});
 TmuxFocusView.displayName = "TmuxFocusView";
 
 const TmuxChatView = forwardRef<HTMLDivElement, {

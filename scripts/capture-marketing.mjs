@@ -3,30 +3,37 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import WebSocket from "ws";
+import { chromium } from "playwright";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const assetsDir = path.join(root, "docs", "assets");
 const framesDir = path.join(assetsDir, "frames");
-const chromiumPort = Number(process.env.CHROMIUM_DEBUG_PORT ?? 9510);
 const appPort = Number(process.env.MARKETING_APP_PORT ?? 6180);
 const appUrl = process.env.MARKETING_URL ?? `http://127.0.0.1:${appPort}`;
 const demoUrl = `${appUrl}/?demo=1`;
 const showcaseScenes = [
   {
-    eyebrow: "The issue",
-    title: "Terminal agents should not die when your phone sleeps",
-    body: "Run Codex, Claude, Gemini, and custom CLIs inside tmux on your server. The browser is only the controller.",
-    bullets: ["tmux owns the process", "mobile browser can disconnect", "sessions keep running"],
+    eyebrow: "Private server control",
+    title: "Terminal agents keep running when your phone disconnects",
+    body: "Run Codex, Claude, Gemini, and custom CLIs inside tmux on your own server. The browser or Android app is only the control surface.",
+    bullets: ["tmux owns the process", "phone and laptop can reconnect", "private network friendly"],
     media: "../mobile-chat.png",
     layout: "phone"
   },
   {
     eyebrow: "GUI mode",
-    title: "Read terminal agents like a chat thread",
-    body: "Use the normalized GUI when the CLI is waiting, summarizing, or showing command output you want to scan quickly.",
-    bullets: ["readable bubbles", "code blocks", "terminal output sections"],
+    title: "Read agent output like a chat thread",
+    body: "Use the normalized GUI when the CLI is planning, summarizing, or showing command output you want to scan quickly.",
+    bullets: ["readable prompts", "code and terminal blocks", "clickable links"],
     media: "../mobile-chat.png",
+    layout: "phone"
+  },
+  {
+    eyebrow: "Session overview",
+    title: "See which tmux tab needs attention",
+    body: "Green, yellow, and red dots show running, waiting, and error states. The overview keeps attention targets unique so the same session is not repeated.",
+    bullets: ["per-session status dots", "waiting tabs surfaced", "no duplicate session pills"],
+    media: "../mobile-focus.png",
     layout: "phone"
   },
   {
@@ -48,32 +55,40 @@ const showcaseScenes = [
   {
     eyebrow: "tmux mode",
     title: "Drop into exact tmux control when you need it",
-    body: "Attach to the raw terminal from mobile and keep common keys nearby: arrows, Enter, Escape, Tab, Ctrl-C, and Ctrl-D.",
-    bullets: ["native TUI behavior", "soft terminal keys", "detach without killing work"],
+    body: "Attach to the raw terminal from mobile or desktop and type directly into tmux when you need exact shell or TUI behavior.",
+    bullets: ["native TUI behavior", "soft terminal keys on mobile", "detach without killing work"],
     media: "../mobile-raw-terminal.png",
     layout: "phone"
   },
   {
     eyebrow: "Session control",
     title: "See live tmux sessions and launch the right tool",
-    body: "Switch between active sessions, create a new one, or start Codex, Claude, Gemini, or a custom command.",
-    bullets: ["session tabs", "tool launcher menu", "destroy sessions when done"],
+    body: "Switch between active sessions, create a new one, or start Codex, Claude, Gemini, or a custom command from the same panel.",
+    bullets: ["session list", "tool launcher menu", "custom commands"],
     media: "../mobile-launchers.png",
     layout: "phone"
   },
   {
+    eyebrow: "Light and dark",
+    title: "Use the theme that fits where you are",
+    body: "Toggle between dark mode and a bright light mode when you are outside or working from a laptop in direct light.",
+    bullets: ["one-tap theme switch", "mobile and desktop", "preference saved locally"],
+    media: "../mobile-light.png",
+    layout: "phone"
+  },
+  {
     eyebrow: "Android app",
-    title: "Sideload the wrapper and keep done alerts native",
-    body: "The public APK is a generic setup wrapper with its own launcher icon. Enter your private server URL, upload files with Android's picker, and let the native watcher notify when tmux is waiting.",
-    bullets: ["sideload-only APK", "no embedded public secrets", "native completion alerts"],
+    title: "Sideload the wrapper for native phone workflows",
+    body: "The public APK is a generic setup wrapper. Enter your private server URL, upload files with Android's picker, and let the native watcher notify when tmux is waiting.",
+    bullets: ["generic public APK", "no embedded public secrets", "native completion alerts"],
     media: "../mobile-chat.png",
     layout: "phone"
   },
   {
     eyebrow: "Desktop too",
     title: "Same server, wider control surface on PC",
-    body: "The desktop layout gives the active tmux session more width while keeping the same sessions and launchers available.",
-    bullets: ["mobile-first", "desktop-aware", "private network friendly"],
+    body: "The desktop layout uses horizontal space for the active tmux session while keeping sessions, launchers, mode switches, and notifications nearby.",
+    bullets: ["phone-first", "desktop-aware", "GUI, TTY, raw, and Focus"],
     media: "../desktop-overview.png",
     layout: "desktop"
   }
@@ -99,47 +114,37 @@ server.stdout.on("data", (chunk) => process.stdout.write(chunk));
 server.stderr.on("data", (chunk) => process.stderr.write(chunk));
 
 let browser;
-let browserCdp;
-let pageCdp;
+let page;
 
 try {
+  console.log(`Waiting for app health at ${appUrl}`);
   await waitForHttp(`${appUrl}/healthz`);
 
-  browser = spawn("chromium", [
-    "--headless=new",
-    `--remote-debugging-port=${chromiumPort}`,
-    "--window-size=390,844",
-    `--user-data-dir=/tmp/agent-tmux-web-marketing-${chromiumPort}`,
-    "--no-first-run",
-    "--no-default-browser-check",
-    "--disable-background-networking",
-    "--disable-component-update",
-    "--disable-default-apps",
-    "--disable-sync",
-    "--disable-features=Translate",
-    "--no-sandbox",
-    "about:blank"
-  ], {
-    stdio: ["ignore", "pipe", "pipe"]
+  console.log("Starting Playwright Chromium");
+  browser = await chromium.launch({
+    headless: true,
+    executablePath: process.env.CHROMIUM_BIN || undefined,
+    args: ["--no-sandbox"]
   });
-  browser.stderr.on("data", (chunk) => process.stderr.write(chunk));
-
-  const endpoint = `http://127.0.0.1:${chromiumPort}`;
-  await waitForHttp(`${endpoint}/json/version`);
-
-  const target = await fetch(`${endpoint}/json/new?${encodeURIComponent(demoUrl)}`, { method: "PUT" }).then((response) => response.json());
-  const browserInfo = await fetch(`${endpoint}/json/version`).then((response) => response.json());
-  browserCdp = await connectCdp(browserInfo.webSocketDebuggerUrl);
-  pageCdp = await connectCdp(target.webSocketDebuggerUrl);
-  await pageCdp.send("Page.enable");
-  await pageCdp.send("Runtime.enable");
-
-  await setViewport(pageCdp, 390, 844, true);
-  await pageCdp.send("Page.navigate", { url: demoUrl });
+  const context = await browser.newContext({
+    deviceScaleFactor: 2,
+    isMobile: true,
+    viewport: { width: 390, height: 844 }
+  });
+  page = await context.newPage();
+  await page.goto(demoUrl, { waitUntil: "domcontentloaded" });
   await delay(1200);
-  await capture(pageCdp, path.join(assetsDir, "mobile-chat.png"));
+  await capture(page, path.join(assetsDir, "mobile-chat.png"));
 
-  await evaluate(pageCdp, `
+  await evaluate(page, "document.querySelector('[aria-label=\"Show focus view\"]')?.click()");
+  await delay(300);
+  await evaluate(page, "document.querySelector('.tmux-focus')?.scrollTo({ top: 0 })");
+  await delay(100);
+  await capture(page, path.join(assetsDir, "mobile-focus.png"));
+  await evaluate(page, "document.querySelector('[aria-label=\"Show detailed tmux output\"]')?.click()");
+  await delay(250);
+
+  await evaluate(page, `
     (() => {
       const chat = document.querySelector('.tmux-chat');
       if (!chat) {
@@ -150,21 +155,26 @@ try {
     })()
   `);
   await delay(300);
-  await capture(pageCdp, path.join(assetsDir, "mobile-scroll.png"));
-  await evaluate(pageCdp, "document.querySelector('.tmux-jump-bottom')?.click()");
+  await capture(page, path.join(assetsDir, "mobile-scroll.png"));
+  await evaluate(page, "document.querySelector('.tmux-jump-bottom')?.click()");
   await delay(350);
 
-  await evaluate(pageCdp, "document.querySelector('[aria-label=\"Show terminal capture\"]')?.click()");
+  await evaluate(page, "document.querySelector('[aria-label=\"Show terminal capture\"]')?.click()");
   await delay(250);
-  await capture(pageCdp, path.join(assetsDir, "mobile-tty.png"));
+  await capture(page, path.join(assetsDir, "mobile-tty.png"));
+  await evaluate(page, "document.querySelector('[aria-label=\"Switch to light mode\"]')?.click()");
+  await delay(250);
+  await capture(page, path.join(assetsDir, "mobile-light.png"));
+  await evaluate(page, "document.querySelector('[aria-label=\"Switch to dark mode\"]')?.click()");
+  await delay(250);
 
-  await evaluate(pageCdp, "document.querySelector('[aria-label=\"Show GUI chat\"]')?.click()");
+  await evaluate(page, "document.querySelector('[aria-label=\"Show GUI chat\"]')?.click()");
   await delay(250);
-  await evaluate(pageCdp, "document.querySelector('.tmux-session-menu-button')?.click()");
+  await evaluate(page, "document.querySelector('.tmux-session-menu-button')?.click()");
   await delay(250);
-  await capture(pageCdp, path.join(assetsDir, "mobile-launchers.png"));
+  await capture(page, path.join(assetsDir, "mobile-launchers.png"));
 
-  await evaluate(pageCdp, `
+  await evaluate(page, `
     (() => {
       const select = document.querySelector('.tmux-tool-actions select');
       if (select) {
@@ -174,61 +184,57 @@ try {
     })()
   `);
   await delay(250);
-  await capture(pageCdp, path.join(assetsDir, "mobile-claude.png"));
+  await capture(page, path.join(assetsDir, "mobile-claude.png"));
 
-  await evaluate(pageCdp, "document.querySelector('.tmux-session-menu-button')?.click()");
+  await evaluate(page, "document.querySelector('.tmux-session-menu-button')?.click()");
   await delay(250);
-  await evaluate(pageCdp, "document.querySelector('[aria-label=\"Attach raw tmux terminal\"]')?.click()");
+  await evaluate(page, "document.querySelector('[aria-label=\"Attach raw tmux terminal\"]')?.click()");
   await delay(350);
-  await capture(pageCdp, path.join(assetsDir, "mobile-raw-terminal.png"));
+  await capture(page, path.join(assetsDir, "mobile-raw-terminal.png"));
 
-  await renderModesOverview(pageCdp);
+  await evaluate(page, "document.querySelector('[aria-label=\"Detach raw tmux terminal\"]')?.click()");
+  await delay(250);
+  await setViewport(page, 1440, 900);
+  await delay(500);
+  await capture(page, path.join(assetsDir, "desktop-overview.png"));
 
-  await setViewport(pageCdp, 1440, 900, false);
-  await pageCdp.send("Page.navigate", { url: demoUrl });
-  await delay(1000);
-  await capture(pageCdp, path.join(assetsDir, "desktop-overview.png"));
-
-  await renderShowcaseAssets(pageCdp);
+  await renderModesOverview(page);
+  await renderShowcaseAssets(page);
 
   await rm(framesDir, { recursive: true, force: true });
   console.log(`Marketing assets written to ${path.relative(root, assetsDir)}`);
 } finally {
-  pageCdp?.close();
-  if (browserCdp) {
-    await browserCdp.send("Browser.close").catch(() => {});
-    browserCdp.close();
-  }
-  if (browser && browser.exitCode === null) {
-    browser.kill("SIGTERM");
-  }
+  await browser?.close().catch(() => {});
   if (server.exitCode === null) {
     server.kill("SIGTERM");
   }
 }
 
-async function capture(cdp, file) {
-  await writeFile(file, await screenshot(cdp));
+async function capture(page, file) {
+  if (!file.includes(`${path.sep}frames${path.sep}`)) {
+    console.log(`Capturing ${path.relative(root, file)}`);
+  }
+  await page.screenshot({ path: file });
 }
 
-async function renderModesOverview(cdp) {
+async function renderModesOverview(page) {
   const modesHtmlFile = path.join(framesDir, "modes-overview.html");
   await writeFile(modesHtmlFile, buildModesOverviewHtml());
-  await setViewport(cdp, 1280, 720, false);
-  await cdp.send("Page.navigate", { url: pathToFileURL(modesHtmlFile).href });
+  await setViewport(page, 1280, 720);
+  await page.goto(pathToFileURL(modesHtmlFile).href, { waitUntil: "domcontentloaded" });
   await delay(500);
-  await capture(cdp, path.join(assetsDir, "modes-overview.png"));
+  await capture(page, path.join(assetsDir, "modes-overview.png"));
 }
 
-async function renderShowcaseAssets(cdp) {
+async function renderShowcaseAssets(page) {
   const showcaseFramesDir = path.join(framesDir, "showcase");
   await rm(showcaseFramesDir, { recursive: true, force: true });
   await mkdir(showcaseFramesDir, { recursive: true });
 
   const showcaseHtmlFile = path.join(framesDir, "showcase.html");
   await writeFile(showcaseHtmlFile, buildShowcaseHtml());
-  await setViewport(cdp, 1280, 720, false);
-  await cdp.send("Page.navigate", { url: pathToFileURL(showcaseHtmlFile).href });
+  await setViewport(page, 1280, 720);
+  await page.goto(pathToFileURL(showcaseHtmlFile).href, { waitUntil: "domcontentloaded" });
   await delay(500);
 
   const framesPerScene = 32;
@@ -236,16 +242,16 @@ async function renderShowcaseAssets(cdp) {
   for (let sceneIndex = 0; sceneIndex < showcaseScenes.length; sceneIndex += 1) {
     for (let sceneFrame = 0; sceneFrame < framesPerScene; sceneFrame += 1) {
       const progress = sceneFrame / (framesPerScene - 1);
-      await evaluate(cdp, `window.renderScene(${sceneIndex}, ${progress})`);
+      await evaluate(page, `window.renderScene(${sceneIndex}, ${progress})`);
       await delay(20);
-      await capture(cdp, path.join(showcaseFramesDir, `frame-${String(frameIndex).padStart(3, "0")}.png`));
+      await capture(page, path.join(showcaseFramesDir, `frame-${String(frameIndex).padStart(3, "0")}.png`));
       frameIndex += 1;
     }
   }
 
-  await evaluate(cdp, "window.renderScene(0, 0.45)");
+  await evaluate(page, "window.renderScene(0, 0.45)");
   await delay(60);
-  await capture(cdp, path.join(assetsDir, "agent-tmux-web-showcase-poster.png"));
+  await capture(page, path.join(assetsDir, "agent-tmux-web-showcase-poster.png"));
 
   await run("ffmpeg", [
     "-y",
@@ -280,6 +286,11 @@ async function renderShowcaseAssets(cdp) {
 
 function buildModesOverviewHtml() {
   const modes = [
+    {
+      label: "Focus",
+      title: "Attention overview",
+      image: "../mobile-focus.png"
+    },
     {
       label: "GUI",
       title: "Readable agent transcript",
@@ -361,8 +372,8 @@ function buildModesOverviewHtml() {
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 24px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 18px;
       min-height: 0;
     }
 
@@ -381,7 +392,7 @@ function buildModesOverviewHtml() {
       min-height: 38px;
       padding: 0 2px;
       color: #dce5e2;
-      font-size: 17px;
+      font-size: 15px;
       font-weight: 800;
     }
 
@@ -395,7 +406,7 @@ function buildModesOverviewHtml() {
       min-height: 0;
       padding: 10px;
       border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 34px;
+      border-radius: 28px;
       background: #20262a;
       filter: drop-shadow(0 26px 42px rgba(0,0,0,0.38));
     }
@@ -405,7 +416,7 @@ function buildModesOverviewHtml() {
       width: 100%;
       height: 100%;
       border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 25px;
+      border-radius: 21px;
       object-fit: cover;
       object-position: top;
       background: #0f1214;
@@ -684,61 +695,12 @@ function buildShowcaseHtml() {
 </html>`;
 }
 
-async function screenshot(cdp) {
-  const result = await cdp.send("Page.captureScreenshot", { format: "png", fromSurface: true });
-  return Buffer.from(result.data, "base64");
+async function setViewport(page, width, height) {
+  await page.setViewportSize({ width, height });
 }
 
-async function setViewport(cdp, width, height, mobile) {
-  await cdp.send("Emulation.setDeviceMetricsOverride", {
-    width,
-    height,
-    deviceScaleFactor: mobile ? 2 : 1,
-    mobile
-  });
-}
-
-async function evaluate(cdp, expression) {
-  await cdp.send("Runtime.evaluate", { expression, awaitPromise: true });
-}
-
-async function connectCdp(wsUrl) {
-  const socket = new WebSocket(wsUrl);
-  let nextId = 1;
-  const pending = new Map();
-
-  socket.on("message", (data) => {
-    const message = JSON.parse(String(data));
-    if (!message.id || !pending.has(message.id)) {
-      return;
-    }
-    const { resolve, reject } = pending.get(message.id);
-    pending.delete(message.id);
-    if (message.error) {
-      reject(new Error(message.error.message));
-    } else {
-      resolve(message.result);
-    }
-  });
-
-  await new Promise((resolve, reject) => {
-    socket.once("open", resolve);
-    socket.once("error", reject);
-  });
-
-  return {
-    send(method, params = {}) {
-      const id = nextId;
-      nextId += 1;
-      socket.send(JSON.stringify({ id, method, params }));
-      return new Promise((resolve, reject) => {
-        pending.set(id, { resolve, reject });
-      });
-    },
-    close() {
-      socket.close();
-    }
-  };
+async function evaluate(page, expression) {
+  await page.evaluate(expression);
 }
 
 async function waitForHttp(url) {
