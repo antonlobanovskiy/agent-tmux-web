@@ -46,7 +46,7 @@ import {
 } from "./slashCommands.js";
 import { COLOR_THEME_STORAGE_KEY, nextColorTheme, resolveInitialColorTheme, type ColorTheme } from "./theme.js";
 import { buildCompactTmuxMessages, summarizeTmuxAgent, type CompactTmuxMessage, type TmuxAgentSummary } from "./agentStatus.js";
-import { applyTextareaPaste, shouldSubmitTextareaEnter } from "./inputBehavior.js";
+import { applyTextareaPaste, buildPastedPromptText, extractPastedImageFiles, shouldSubmitTextareaEnter } from "./inputBehavior.js";
 import { LinkifiedText } from "./LinkifiedText.js";
 import { shouldShowTmuxSendForm } from "./rawTerminalMode.js";
 import { parseTmuxChatOutput, splitTmuxChatMessage, type TmuxChatMessage } from "./tmuxGui.js";
@@ -241,6 +241,7 @@ export function App() {
   const [colorTheme, setColorTheme] = useState(readInitialColorTheme);
   const [requestedTmuxSession, setRequestedTmuxSession] = useState(readInitialRequestedTmuxSession);
   const [tmuxAtBottom, setTmuxAtBottom] = useState(true);
+  const [uploadingComposerFiles, setUploadingComposerFiles] = useState(false);
   const [uploadingTmuxFiles, setUploadingTmuxFiles] = useState(false);
   const [terminalStatus, setTerminalStatus] = useState(demoMode ? "gui view for agent-demo" : "");
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -682,6 +683,9 @@ export function App() {
 
   async function sendMessage(event: FormEvent) {
     event.preventDefault();
+    if (uploadingComposerFiles) {
+      return;
+    }
     const text = message.trim();
     if (!text) {
       return;
@@ -807,7 +811,24 @@ export function App() {
     scheduleTmuxFollow(selectedTmux);
   }
 
-  async function attachTmuxFiles(files: FileList | null) {
+  async function uploadFilesForPrompt(selectedFiles: File[]): Promise<UploadedFileDto[]> {
+    if (demoMode) {
+      return selectedFiles.map((file) => ({
+        name: file.name || "upload",
+        path: `/tmp/agent-tmux-web/uploads/demo/${file.name || "upload"}`,
+        size: file.size,
+        mimeType: file.type || null
+      }));
+    }
+
+    const uploads: UploadedFileDto[] = [];
+    for (const file of selectedFiles) {
+      uploads.push(await uploadFileToServer(file));
+    }
+    return uploads;
+  }
+
+  async function attachTmuxFiles(files: FileList | File[] | null) {
     const selectedFiles = Array.from(files ?? []);
     if (selectedFiles.length === 0) {
       return;
@@ -816,26 +837,72 @@ export function App() {
     setError("");
     setUploadingTmuxFiles(true);
     try {
-      if (demoMode) {
-        const uploads = selectedFiles.map((file) => ({
-          name: file.name,
-          path: `/tmp/agent-tmux-web/uploads/demo/${file.name || "upload"}`,
-          size: file.size,
-          mimeType: file.type || null
-        }));
-        appendTmuxPromptText(formatUploadedFilesForPrompt(uploads));
-        setTerminalStatus(`uploaded ${uploads.length} file${uploads.length === 1 ? "" : "s"} to server`);
-        return;
-      }
-      const uploads: UploadedFileDto[] = [];
-      for (const file of selectedFiles) {
-        uploads.push(await uploadFileToServer(file));
-      }
+      const uploads = await uploadFilesForPrompt(selectedFiles);
       appendTmuxPromptText(formatUploadedFilesForPrompt(uploads));
       setTerminalStatus(`uploaded ${uploads.length} file${uploads.length === 1 ? "" : "s"} to server`);
     } finally {
       setUploadingTmuxFiles(false);
     }
+  }
+
+  async function pasteImagesIntoComposer(files: File[], pastedText: string, sourceInput: HTMLTextAreaElement) {
+    setError("");
+    setUploadingComposerFiles(true);
+    try {
+      const uploads = await uploadFilesForPrompt(files);
+      insertComposerPromptText(buildPastedPromptText(pastedText, formatUploadedFilesForPrompt(uploads)), sourceInput);
+    } finally {
+      setUploadingComposerFiles(false);
+    }
+  }
+
+  async function pasteImagesIntoTmuxPrompt(files: File[], pastedText: string, sourceInput: HTMLTextAreaElement) {
+    setError("");
+    setUploadingTmuxFiles(true);
+    try {
+      const uploads = await uploadFilesForPrompt(files);
+      insertTmuxPromptText(buildPastedPromptText(pastedText, formatUploadedFilesForPrompt(uploads)), sourceInput);
+      setTerminalStatus(`uploaded ${uploads.length} pasted image${uploads.length === 1 ? "" : "s"} to server`);
+    } finally {
+      setUploadingTmuxFiles(false);
+    }
+  }
+
+  function insertComposerPromptText(text: string, sourceInput?: HTMLTextAreaElement | null) {
+    const input = composerRef.current ?? sourceInput ?? null;
+    const value = input?.value ?? message;
+    const selectionStart = input?.selectionStart ?? value.length;
+    const selectionEnd = input?.selectionEnd ?? selectionStart;
+    const next = applyTextareaPaste(value, selectionStart, selectionEnd, text);
+
+    if (input) {
+      input.value = next.value;
+    }
+    setMessage(next.value);
+    setComposerCaret(next.selectionStart);
+    window.requestAnimationFrame(() => {
+      input?.focus();
+      input?.setSelectionRange(next.selectionStart, next.selectionEnd);
+    });
+  }
+
+  function insertTmuxPromptText(text: string, sourceInput?: HTMLTextAreaElement | null) {
+    const input = tmuxInputRef.current ?? sourceInput ?? null;
+    const value = input?.value ?? tmuxInput;
+    const selectionStart = input?.selectionStart ?? value.length;
+    const selectionEnd = input?.selectionEnd ?? selectionStart;
+    const next = applyTextareaPaste(value, selectionStart, selectionEnd, text);
+
+    if (input) {
+      input.value = next.value;
+    }
+    setTmuxInput(next.value);
+    resizeTmuxInput(input);
+    window.requestAnimationFrame(() => {
+      input?.focus();
+      input?.setSelectionRange(next.selectionStart, next.selectionEnd);
+      resizeTmuxInput(input);
+    });
   }
 
   function appendTmuxPromptText(text: string) {
@@ -1278,6 +1345,14 @@ export function App() {
   }
 
   function handleComposerPaste(event: ClipboardEvent<HTMLTextAreaElement>) {
+    const pastedImageFiles = extractPastedImageFiles(event.clipboardData);
+    if (pastedImageFiles.length > 0) {
+      event.preventDefault();
+      const pastedText = event.clipboardData.getData("text/plain");
+      void pasteImagesIntoComposer(pastedImageFiles, pastedText, event.currentTarget).catch(reportError(setError));
+      return;
+    }
+
     const pastedText = event.clipboardData.getData("text/plain");
     if (!pastedText) {
       return;
@@ -1296,6 +1371,14 @@ export function App() {
   }
 
   function handleTmuxInputPaste(event: ClipboardEvent<HTMLTextAreaElement>) {
+    const pastedImageFiles = extractPastedImageFiles(event.clipboardData);
+    if (pastedImageFiles.length > 0) {
+      event.preventDefault();
+      const pastedText = event.clipboardData.getData("text/plain");
+      void pasteImagesIntoTmuxPrompt(pastedImageFiles, pastedText, event.currentTarget).catch(reportError(setError));
+      return;
+    }
+
     const pastedText = event.clipboardData.getData("text/plain");
     if (!pastedText) {
       return;
@@ -1530,7 +1613,14 @@ export function App() {
               ))}
             </div>
           )}
-          <button type="submit"><Send size={18} /></button>
+          <button
+            aria-label={uploadingComposerFiles ? "Uploading pasted image" : "Send message"}
+            disabled={uploadingComposerFiles}
+            title={uploadingComposerFiles ? "Uploading pasted image" : "Send message"}
+            type="submit"
+          >
+            <Send size={18} />
+          </button>
         </form>
       </main>
 

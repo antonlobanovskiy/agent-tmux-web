@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyTextareaPaste,
+  buildPastedPromptText,
+  extractPastedImageFiles,
   isMobileInputDevice,
   shouldSubmitTextareaEnter
 } from "../inputBehavior.js";
@@ -14,6 +16,44 @@ describe("input behavior", () => {
     expect(result.value).toBe(`hello ${pastedText}`);
     expect(result.selectionStart).toBe(6 + pastedText.length);
     expect(result.selectionEnd).toBe(result.selectionStart);
+  });
+
+  it("extracts image files from clipboard items and ignores non-image entries", () => {
+    const image = new File(["image-data"], "", { type: "image/png", lastModified: 123 });
+    const textFile = new File(["notes"], "notes.txt", { type: "text/plain" });
+
+    const files = extractPastedImageFiles({
+      files: [textFile],
+      items: [
+        { kind: "string", type: "text/plain", getAsFile: () => null },
+        { kind: "file", type: "text/plain", getAsFile: () => textFile },
+        { kind: "file", type: "image/png", getAsFile: () => image }
+      ]
+    });
+
+    expect(files).toHaveLength(1);
+    expect(files[0].name).toBe("pasted-image-1.png");
+    expect(files[0].type).toBe("image/png");
+    expect(files[0].lastModified).toBe(123);
+  });
+
+  it("falls back to clipboard files when item data has no images", () => {
+    const image = new File(["jpeg-data"], "camera.jpg", { type: "image/jpeg" });
+    const textFile = new File(["notes"], "notes.txt", { type: "text/plain" });
+
+    const files = extractPastedImageFiles({
+      files: [image, textFile],
+      items: [{ kind: "string", type: "text/plain", getAsFile: () => null }]
+    });
+
+    expect(files).toEqual([image]);
+  });
+
+  it("preserves clipboard text before inserted uploaded file paths", () => {
+    expect(buildPastedPromptText("please review this", "Attached file on server: /tmp/paste.png"))
+      .toBe("please review this\n\nAttached file on server: /tmp/paste.png");
+    expect(buildPastedPromptText("", "Attached file on server: /tmp/paste.png"))
+      .toBe("Attached file on server: /tmp/paste.png");
   });
 
   it("submits Enter on desktop textareas but keeps Shift+Enter for newlines", () => {
