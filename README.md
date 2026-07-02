@@ -51,7 +51,8 @@ and desktop layout.
   view.
 - Green/yellow/red status dots for running, waiting/idle, and error sessions.
 - Stable scrollback while new tmux output continues arriving.
-- File uploads from Android, iOS, or desktop browsers to temporary server paths.
+- File uploads and pasted clipboard images from Android, iOS, or desktop
+  browsers to temporary server paths.
 - Browser and Android notifications when watched tasks return to a prompt.
 - Light and dark themes.
 - Generic public Android APK plus optional private APK builds for your own
@@ -155,8 +156,9 @@ mode, and notifications.
 4. Use `GUI` for readable agent output, `TTY` for plain pane text, and `Raw`
    when you need exact terminal input.
 5. Turn on `Notify` when you want task-done alerts.
-6. Use the paperclip button to upload files and paste their temporary server
-   paths into prompts.
+6. Use the paperclip button to upload files, or paste clipboard images directly
+   into the chat input. Uploaded files are inserted as temporary server paths in
+   prompts.
 
 Status dots:
 
