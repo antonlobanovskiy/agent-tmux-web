@@ -8,10 +8,16 @@ uploads, machine-specific service edits, or private signing material.
 
 ## Unreleased
 
+## 0.1.16 - 2026-07-03
+
 - Cleaned up the public README flow and refreshed the generated demo/screenshot
   story for the current UI.
 - Prevented the top tmux overview and Focus attention lists from showing the
   selected session or repeating the same session multiple times.
+- Added clipboard image paste support for the chat composer and tmux prompt.
+- Pasted images now upload through the existing temporary server upload path and
+  insert an `Attached file on server: ...` prompt reference.
+- Bumped the public Android version defaults to `0.1.16` / version code `17`.
 
 ## 0.1.15 - 2026-06-29
 
