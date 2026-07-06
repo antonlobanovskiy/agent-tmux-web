@@ -13,6 +13,7 @@ import {
   ChevronRight,
   CircleStop,
   CornerDownLeft,
+  Copy,
   Cpu,
   Download,
   Folder,
@@ -50,6 +51,7 @@ import { applyTextareaPaste, buildPastedPromptText, extractPastedImageFiles, sho
 import { LinkifiedText } from "./LinkifiedText.js";
 import { shouldShowTmuxSendForm } from "./rawTerminalMode.js";
 import { parseTmuxChatOutput, splitTmuxChatMessage, type TmuxChatMessage } from "./tmuxGui.js";
+import { cleanTmuxAssistantCopyText } from "./tmuxCopy.js";
 import { shouldAutoCaptureTmux, TMUX_CAPTURE_POLL_INTERVAL_MS, TMUX_SEND_FOLLOW_DELAYS_MS } from "./tmuxFollow.js";
 import { TmuxOutputLines } from "./tmuxOutputLines.js";
 import { buildTmuxDoneNotification } from "./tmuxNotifications.js";
@@ -244,6 +246,7 @@ export function App() {
   const [uploadingComposerFiles, setUploadingComposerFiles] = useState(false);
   const [uploadingTmuxFiles, setUploadingTmuxFiles] = useState(false);
   const [terminalStatus, setTerminalStatus] = useState(demoMode ? "gui view for agent-demo" : "");
+  const [tmuxCopyNotice, setTmuxCopyNotice] = useState("");
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const terminalHostRef = useRef<HTMLDivElement | null>(null);
@@ -259,6 +262,7 @@ export function App() {
   const tmuxStickToBottomRef = useRef(true);
   const forceTmuxScrollBottomRef = useRef(false);
   const tmuxScrollSnapshotRef = useRef<TmuxScrollSnapshot | null>(null);
+  const tmuxCopyNoticeTimerRef = useRef<number | null>(null);
   const selectedTmuxRef = useRef(selectedTmux);
   const tmuxCaptureRequestIdRef = useRef(0);
 
@@ -277,6 +281,10 @@ export function App() {
   const slashQuery = useMemo(() => slashQueryForMessage(message, composerCaret), [composerCaret, message]);
   const slashMatches = useMemo(() => slashQuery ? filterSlashCommands(slashQuery.query) : [], [slashQuery]);
   const tmuxChatMessages = useMemo(() => parseTmuxChatOutput(tmuxOutput), [tmuxOutput]);
+  const latestTmuxAssistantMessage = useMemo(
+    () => [...tmuxChatMessages].reverse().find((entry) => entry.role === "assistant") ?? null,
+    [tmuxChatMessages]
+  );
   const selectedTmuxSession = useMemo(
     () => tmuxSessions.find((session) => session.name === selectedTmux) ?? null,
     [selectedTmux, tmuxSessions]
@@ -538,6 +546,12 @@ export function App() {
 
   useEffect(() => {
     return () => clearTmuxFollowTimers(tmuxFollowTimersRef);
+  }, []);
+
+  useEffect(() => () => {
+    if (tmuxCopyNoticeTimerRef.current !== null) {
+      window.clearTimeout(tmuxCopyNoticeTimerRef.current);
+    }
   }, []);
 
   useEffect(() => {
@@ -965,6 +979,35 @@ export function App() {
     void captureTmux(selectedTmux)
       .then(() => setTerminalStatus(`synced ${selectedTmux}`))
       .catch(reportError(setError));
+  }
+
+  function showTmuxCopyNotice(message: string) {
+    setTmuxCopyNotice(message);
+    if (tmuxCopyNoticeTimerRef.current !== null) {
+      window.clearTimeout(tmuxCopyNoticeTimerRef.current);
+    }
+    tmuxCopyNoticeTimerRef.current = window.setTimeout(() => {
+      setTmuxCopyNotice("");
+      tmuxCopyNoticeTimerRef.current = null;
+    }, 1800);
+  }
+
+  async function copyTmuxAssistantText(text: string) {
+    const cleaned = cleanTmuxAssistantCopyText(text);
+    if (!cleaned) {
+      showTmuxCopyNotice("No clean reply visible");
+      return;
+    }
+    await writeClipboardText(cleaned);
+    showTmuxCopyNotice(cleaned === text.trim() ? "Copied message" : "Copied clean draft");
+  }
+
+  async function copyLatestTmuxAssistantText() {
+    if (!latestTmuxAssistantMessage) {
+      showTmuxCopyNotice("No agent reply visible");
+      return;
+    }
+    await copyTmuxAssistantText(latestTmuxAssistantMessage.text);
   }
 
   function toggleTmuxGui() {
@@ -1718,6 +1761,16 @@ export function App() {
               <Download size={15} /> <span>Force Sync</span>
             </button>
             <button
+              aria-label="Copy latest clean agent reply"
+              disabled={!latestTmuxAssistantMessage}
+              title="Copy latest clean agent reply"
+              type="button"
+              onClick={() => copyLatestTmuxAssistantText().catch(reportError(setError))}
+            >
+              <Copy size={15} />
+              <span>Copy</span>
+            </button>
+            <button
               aria-label={tmuxGuiActive ? "Show terminal capture" : "Show GUI chat"}
               className={tmuxGuiActive ? "active" : ""}
               title={tmuxGuiActive ? "Show terminal capture" : "Show GUI chat"}
@@ -1755,7 +1808,7 @@ export function App() {
               <Bell size={15} />
               <span>Notify</span>
             </button>
-            <span>{terminalStatus || selectedTmux || "no session selected"}</span>
+            <span>{tmuxCopyNotice || terminalStatus || selectedTmux || "no session selected"}</span>
           </div>
           {!terminalActive && !tmuxFocusActive && (
             <TmuxAgentSummaryStrip
@@ -1789,7 +1842,12 @@ export function App() {
                 onSelectSession={selectTmuxSession}
               />
             ) : tmuxGuiActive ? (
-              <TmuxChatView ref={tmuxChatRef} messages={tmuxChatMessages} onScroll={handleTmuxOutputScroll} />
+              <TmuxChatView
+                ref={tmuxChatRef}
+                messages={tmuxChatMessages}
+                onCopyMessage={(message) => copyTmuxAssistantText(message.text).catch(reportError(setError))}
+                onScroll={handleTmuxOutputScroll}
+              />
             ) : (
               <pre ref={tmuxOutputRef} className="tmux-output" onScroll={handleTmuxOutputScroll}>
                 <TmuxOutputLines output={tmuxOutput || "No tmux output captured."} />
@@ -1987,8 +2045,9 @@ TmuxFocusView.displayName = "TmuxFocusView";
 
 const TmuxChatView = forwardRef<HTMLDivElement, {
   messages: TmuxChatMessage[];
+  onCopyMessage: (message: TmuxChatMessage) => void;
   onScroll: (event: UIEvent<HTMLDivElement>) => void;
-}>(({ messages, onScroll }, ref) => (
+}>(({ messages, onCopyMessage, onScroll }, ref) => (
   <div ref={ref} className="tmux-chat" onScroll={onScroll}>
     {messages.length === 0 ? (
       <article className="tmux-chat-message terminal">
@@ -2000,7 +2059,20 @@ const TmuxChatView = forwardRef<HTMLDivElement, {
           className={`tmux-chat-message ${message.role}`}
           key={message.id}
         >
-          <span className="tmux-chat-label">{message.role === "user" ? "You" : message.role === "assistant" ? "Agent" : "Terminal"}</span>
+          <div className="tmux-chat-meta">
+            <span className="tmux-chat-label">{message.role === "user" ? "You" : message.role === "assistant" ? "Agent" : "Terminal"}</span>
+            {message.role === "assistant" && (
+              <button
+                aria-label="Copy clean agent reply"
+                className="tmux-chat-copy"
+                title="Copy clean agent reply"
+                type="button"
+                onClick={() => onCopyMessage(message)}
+              >
+                <Copy size={14} />
+              </button>
+            )}
+          </div>
           <TmuxChatBubble message={message} messageIndex={index} />
         </article>
       ))
@@ -2056,6 +2128,31 @@ function TmuxChatAnchorLines({ anchorBase, className, linkify = false, text }: {
 
 function tmuxChatAnchorBase(messageIndex: number, partIndex: number): number {
   return (messageIndex * 100_000) + (partIndex * 1_000);
+}
+
+async function writeClipboardText(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+      // Some Android WebViews deny the async Clipboard API on HTTP origins.
+    }
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  textarea.style.top = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  document.body.removeChild(textarea);
+  if (!copied) {
+    throw new Error("Clipboard copy failed");
+  }
 }
 
 async function api<T = unknown>(url: string, init?: RequestInit): Promise<T> {

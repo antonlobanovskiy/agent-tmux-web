@@ -8,6 +8,10 @@ uploads, machine-specific service edits, or private signing material.
 
 ## Unreleased
 
+- Added clean-copy controls for tmux GUI assistant replies, including a latest
+  reply toolbar action and per-message copy buttons that remove terminal quote
+  wrapping from draft replies.
+
 ## 0.1.17 - 2026-07-06
 
 - Fixed raw tmux mode so browser attach resizes the tmux window immediately,
