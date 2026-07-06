@@ -40,6 +40,7 @@ describe("browser tmux terminal helpers", () => {
     const policy = buildBrowserRawTerminalPolicy({ hasAttachedClients: true });
 
     expect(policy.attachOptions).toEqual({});
+    expect(policy.resizeTmuxWindowOnAttach).toBe(true);
     expect(policy.resizeTmuxWindow).toBe(true);
     expect(buildScriptArgsForTmuxAttach("codex-ui", policy.attachOptions)).toEqual([
       "-qfec",
