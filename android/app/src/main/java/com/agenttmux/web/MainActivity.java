@@ -10,6 +10,7 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Message;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
@@ -132,6 +133,7 @@ public final class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setLoadWithOverviewMode(false);
         settings.setUseWideViewPort(false);
+        settings.setSupportMultipleWindows(true);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         }
@@ -149,6 +151,32 @@ public final class MainActivity extends Activity {
         });
 
         webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onCreateWindow(
+                WebView view,
+                boolean isDialog,
+                boolean isUserGesture,
+                Message resultMsg
+            ) {
+                WebView externalLinkView = new WebView(MainActivity.this);
+                externalLinkView.setWebViewClient(new WebViewClient() {
+                    @Override
+                    public boolean shouldOverrideUrlLoading(WebView popupView, WebResourceRequest request) {
+                        Uri uri = request.getUrl();
+                        if (ExternalLinkPolicy.shouldOpenInExternalBrowser(uri.toString(), serverUrl())) {
+                            openExternalUri(uri);
+                        } else if (isHttpUri(uri)) {
+                            webView.loadUrl(uri.toString());
+                        }
+                        return true;
+                    }
+                });
+                WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
+                transport.setWebView(externalLinkView);
+                resultMsg.sendToTarget();
+                return true;
+            }
+
             @Override
             public boolean onShowFileChooser(
                 WebView view,
@@ -171,18 +199,28 @@ public final class MainActivity extends Activity {
         });
     }
 
-    private boolean shouldOpenExternally(Uri uri) {
+    private static boolean isHttpUri(Uri uri) {
         String scheme = uri.getScheme();
-        if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
+        return "http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme);
+    }
+
+    private boolean shouldOpenExternally(Uri uri) {
+        if (!ExternalLinkPolicy.shouldOpenInExternalBrowser(uri.toString(), serverUrl())) {
             return false;
         }
 
+        openExternalUri(uri);
+        return true;
+    }
+
+    private void openExternalUri(Uri uri) {
         try {
-            startActivity(new Intent(Intent.ACTION_VIEW, uri));
+            Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+            intent.addCategory(Intent.CATEGORY_BROWSABLE);
+            startActivity(intent);
         } catch (ActivityNotFoundException error) {
             Toast.makeText(this, "No app can open this link", Toast.LENGTH_SHORT).show();
         }
-        return true;
     }
 
     private void addSettingsButton() {
