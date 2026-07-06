@@ -8,9 +8,14 @@ uploads, machine-specific service edits, or private signing material.
 
 ## Unreleased
 
+## 0.1.17 - 2026-07-06
+
 - Fixed raw tmux mode so browser attach resizes the tmux window immediately,
   preventing interactive redraws such as `/model` from leaving stale content
   outside an older pane size.
+- Fixed Android link taps so external links opened from the app are handed to
+  the phone's browser instead of loading inside the WebView.
+- Bumped the public Android version defaults to `0.1.17` / version code `18`.
 
 ## 0.1.16 - 2026-07-03
 
