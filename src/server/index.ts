@@ -448,6 +448,12 @@ tmuxWss.on("connection", async (socket, req) => {
     });
   };
 
+  if (rawTerminalPolicy.resizeTmuxWindowOnAttach) {
+    await resizeTmuxWindowIfNeeded(session, size).catch(() => {
+      // Best-effort initial resize; the browser PTY is still sized before attach.
+    });
+  }
+
   const child = spawn("script", buildScriptArgsForTmuxAttach(session, rawTerminalPolicy.attachOptions, size), {
     cwd: process.env.HOME ?? process.cwd(),
     env: {

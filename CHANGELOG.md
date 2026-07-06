@@ -8,6 +8,10 @@ uploads, machine-specific service edits, or private signing material.
 
 ## Unreleased
 
+- Fixed raw tmux mode so browser attach resizes the tmux window immediately,
+  preventing interactive redraws such as `/model` from leaving stale content
+  outside an older pane size.
+
 ## 0.1.16 - 2026-07-03
 
 - Cleaned up the public README flow and refreshed the generated demo/screenshot

@@ -14,12 +14,14 @@ export type TmuxAttachOptions = {
 
 export type BrowserRawTerminalPolicy = {
   attachOptions: TmuxAttachOptions;
+  resizeTmuxWindowOnAttach: boolean;
   resizeTmuxWindow: boolean;
 };
 
 export function buildBrowserRawTerminalPolicy(_context: { hasAttachedClients: boolean }): BrowserRawTerminalPolicy {
   return {
     attachOptions: {},
+    resizeTmuxWindowOnAttach: true,
     resizeTmuxWindow: true
   };
 }
