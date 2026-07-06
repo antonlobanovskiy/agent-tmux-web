@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildBrowserRawTerminalPolicy,
   buildScriptArgsForTmuxAttach,
   buildTmuxAttachShellCommand,
   buildTmuxCaptureSizeFromClientWidth,
@@ -23,6 +24,26 @@ describe("browser tmux terminal helpers", () => {
     expect(buildScriptArgsForTmuxAttach("codex-ui", { ignoreSize: true })).toEqual([
       "-qfec",
       "tmux attach-session -f ignore-size -t codex-ui",
+      "/dev/null"
+    ]);
+  });
+
+  it("sets the script pty size before attaching a browser raw terminal", () => {
+    expect(buildScriptArgsForTmuxAttach("codex-ui", {}, { cols: 132, rows: 36 })).toEqual([
+      "-qfec",
+      "stty cols 132 rows 36; tmux attach-session -t codex-ui",
+      "/dev/null"
+    ]);
+  });
+
+  it("lets browser raw terminals drive tmux size even when another client is attached", () => {
+    const policy = buildBrowserRawTerminalPolicy({ hasAttachedClients: true });
+
+    expect(policy.attachOptions).toEqual({});
+    expect(policy.resizeTmuxWindow).toBe(true);
+    expect(buildScriptArgsForTmuxAttach("codex-ui", policy.attachOptions)).toEqual([
+      "-qfec",
+      "tmux attach-session -t codex-ui",
       "/dev/null"
     ]);
   });
