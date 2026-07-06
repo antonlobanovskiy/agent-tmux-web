@@ -12,6 +12,7 @@ import { describeCodexNotification } from "../shared/codexEvents.js";
 import { classifyTmuxStatus } from "../shared/tmuxStatus.js";
 import { CodexBridge } from "./codexBridge.js";
 import {
+  buildBrowserRawTerminalPolicy,
   buildTmuxCaptureSizeFromClientWidth,
   buildScriptArgsForTmuxAttach,
   buildTmuxDisplayWindowSizeArgs,
@@ -434,7 +435,8 @@ tmuxWss.on("connection", async (socket, req) => {
 
   const size = normalizeTerminalSize(url.searchParams.get("cols"), url.searchParams.get("rows"));
   const initialWindowState = await readTmuxWindowState(session).catch(() => null);
-  const preserveExistingClientSize = await hasAttachedTmuxClients(session).catch(() => false);
+  const hasAttachedClients = await hasAttachedTmuxClients(session).catch(() => false);
+  const rawTerminalPolicy = buildBrowserRawTerminalPolicy({ hasAttachedClients });
   let restoredWindowState = false;
   const restoreWindowState = () => {
     if (restoredWindowState) {
@@ -446,7 +448,7 @@ tmuxWss.on("connection", async (socket, req) => {
     });
   };
 
-  const child = spawn("script", buildScriptArgsForTmuxAttach(session, { ignoreSize: preserveExistingClientSize }), {
+  const child = spawn("script", buildScriptArgsForTmuxAttach(session, rawTerminalPolicy.attachOptions, size), {
     cwd: process.env.HOME ?? process.cwd(),
     env: {
       ...process.env,
@@ -488,7 +490,7 @@ tmuxWss.on("connection", async (socket, req) => {
       return;
     }
 
-    if (message.type === "resize" && !preserveExistingClientSize) {
+    if (message.type === "resize" && rawTerminalPolicy.resizeTmuxWindow) {
       const nextSize = normalizeTerminalSize(message.cols, message.rows);
       resizeTmuxWindowIfNeeded(session, nextSize).catch(() => {
         // Best-effort resize; the tmux attachment remains usable if this fails.

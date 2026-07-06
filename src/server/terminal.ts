@@ -12,12 +12,28 @@ export type TmuxAttachOptions = {
   ignoreSize?: boolean;
 };
 
-export function buildScriptArgsForTmuxAttach(session: string, options: TmuxAttachOptions = {}): string[] {
-  return ["-qfec", buildTmuxAttachShellCommand(session, options), "/dev/null"];
+export type BrowserRawTerminalPolicy = {
+  attachOptions: TmuxAttachOptions;
+  resizeTmuxWindow: boolean;
+};
+
+export function buildBrowserRawTerminalPolicy(_context: { hasAttachedClients: boolean }): BrowserRawTerminalPolicy {
+  return {
+    attachOptions: {},
+    resizeTmuxWindow: true
+  };
 }
 
-export function buildTmuxAttachShellCommand(session: string, options: TmuxAttachOptions = {}): string {
-  return `tmux attach-session${options.ignoreSize ? " -f ignore-size" : ""} -t ${shellQuote(session)}`;
+export function buildScriptArgsForTmuxAttach(session: string, options: TmuxAttachOptions = {}, size?: TerminalSize): string[] {
+  return ["-qfec", buildTmuxAttachShellCommand(session, options, size), "/dev/null"];
+}
+
+export function buildTmuxAttachShellCommand(session: string, options: TmuxAttachOptions = {}, size?: TerminalSize): string {
+  const attachCommand = `tmux attach-session${options.ignoreSize ? " -f ignore-size" : ""} -t ${shellQuote(session)}`;
+  if (!size) {
+    return attachCommand;
+  }
+  return `stty cols ${size.cols} rows ${size.rows}; ${attachCommand}`;
 }
 
 export function buildTmuxResizeWindowArgs(session: string, size: TerminalSize): string[] {
