@@ -47,6 +47,7 @@ import {
 } from "./slashCommands.js";
 import { COLOR_THEME_STORAGE_KEY, nextColorTheme, resolveInitialColorTheme, type ColorTheme } from "./theme.js";
 import { buildCompactTmuxMessages, summarizeTmuxAgent, type CompactTmuxMessage, type TmuxAgentSummary } from "./agentStatus.js";
+import { writeClipboardText } from "./clipboard.js";
 import { applyTextareaPaste, buildPastedPromptText, extractPastedImageFiles, shouldSubmitTextareaEnter } from "./inputBehavior.js";
 import { LinkifiedText } from "./LinkifiedText.js";
 import { shouldShowTmuxSendForm } from "./rawTerminalMode.js";
@@ -1340,7 +1341,7 @@ export function App() {
         addLocalEntry(setTimeline, "/copy", "No completed agent output is visible yet.");
         return true;
       }
-      await navigator.clipboard.writeText(latest.body);
+      await writeClipboardText(latest.body);
       addLocalEntry(setTimeline, "/copy", "Latest visible agent output copied.");
       return true;
     }
@@ -2128,31 +2129,6 @@ function TmuxChatAnchorLines({ anchorBase, className, linkify = false, text }: {
 
 function tmuxChatAnchorBase(messageIndex: number, partIndex: number): number {
   return (messageIndex * 100_000) + (partIndex * 1_000);
-}
-
-async function writeClipboardText(text: string): Promise<void> {
-  if (navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return;
-    } catch {
-      // Some Android WebViews deny the async Clipboard API on HTTP origins.
-    }
-  }
-
-  const textarea = document.createElement("textarea");
-  textarea.value = text;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.left = "-9999px";
-  textarea.style.top = "0";
-  document.body.appendChild(textarea);
-  textarea.select();
-  const copied = document.execCommand("copy");
-  document.body.removeChild(textarea);
-  if (!copied) {
-    throw new Error("Clipboard copy failed");
-  }
 }
 
 async function api<T = unknown>(url: string, init?: RequestInit): Promise<T> {

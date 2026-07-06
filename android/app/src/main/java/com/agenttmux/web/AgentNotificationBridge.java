@@ -1,6 +1,9 @@
 package com.agenttmux.web;
 
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.webkit.JavascriptInterface;
 
 public final class AgentNotificationBridge {
@@ -43,6 +46,22 @@ public final class AgentNotificationBridge {
                 WatchPollingService.setEnabled(activity, false);
             }
         });
+    }
+
+    @JavascriptInterface
+    public boolean writeClipboard(String text) {
+        String safeText = text == null ? "" : text;
+        try {
+            activity.runOnUiThread(() -> {
+                ClipboardManager clipboard = (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
+                if (clipboard != null) {
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Agent Tmux", safeText));
+                }
+            });
+            return true;
+        } catch (RuntimeException error) {
+            return false;
+        }
     }
 
     private void postNotification(String title, String body, String tag, String tmuxSession) {

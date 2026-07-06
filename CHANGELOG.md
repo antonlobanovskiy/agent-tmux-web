@@ -8,9 +8,15 @@ uploads, machine-specific service edits, or private signing material.
 
 ## Unreleased
 
+## 0.1.18 - 2026-07-06
+
 - Added clean-copy controls for tmux GUI assistant replies, including a latest
   reply toolbar action and per-message copy buttons that remove terminal quote
   wrapping from draft replies.
+- Added a native Android clipboard bridge so copy actions in the APK write
+  directly to the phone clipboard before falling back to browser clipboard APIs.
+- Updated `/copy` to use the same mobile-safe clipboard path.
+- Bumped the public Android version defaults to `0.1.18` / version code `19`.
 
 ## 0.1.17 - 2026-07-06
 

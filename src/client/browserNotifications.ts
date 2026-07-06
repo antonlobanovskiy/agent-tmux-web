@@ -1,3 +1,5 @@
+import "./androidBridge.js";
+
 export type BrowserNotificationSnapshot = {
   supported: boolean;
   secureContext: boolean;
@@ -10,22 +12,9 @@ export type BrowserNotificationAvailability =
   | { available: true }
   | { available: false; message: string };
 
-type AndroidNotificationBridge = {
-  notificationsEnabled?: () => boolean;
-  notify?: (title: string, body: string, tag: string) => void;
-  notifyForSession?: (title: string, body: string, tag: string, tmuxSession: string) => void;
-  setWatchPollingEnabled?: (enabled: boolean) => void;
-};
-
 export type AgentNotificationOptions = {
   tmuxSession?: string;
 };
-
-declare global {
-  interface Window {
-    AgentTmuxAndroid?: AndroidNotificationBridge;
-  }
-}
 
 export function getBrowserNotificationSnapshot(): BrowserNotificationSnapshot {
   const supported = typeof window !== "undefined" && "Notification" in window;
