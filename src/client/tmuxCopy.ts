@@ -6,7 +6,7 @@ export function cleanTmuxAssistantCopyText(text: string): string {
   const normalized = text.replace(/\r\n?/g, "\n");
   const draftLines = extractDraftReplyLines(normalized);
   if (!draftLines) {
-    return trimBlankEdges(normalized.split("\n")).join("\n").trim();
+    return reflowProseLines(trimBlankEdges(normalized.split("\n"))).trim();
   }
 
   const unquoted = draftLines.map((line) => line.replace(QUOTE_MARKER_PATTERN, ""));
@@ -20,43 +20,83 @@ function extractDraftReplyLines(text: string): string[] | null {
 }
 
 function reflowProseLines(lines: string[]): string {
-  const paragraphs: string[] = [];
+  const blocks: string[] = [];
   let current: string[] = [];
-  let inFence = false;
+  let fence: string[] | null = null;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (fence) {
+      fence.push(line.trimEnd());
+      if (trimmed.startsWith("```")) {
+        blocks.push(trimBlankEdges(fence).join("\n").trimEnd());
+        fence = null;
+      }
+      continue;
+    }
+
+    if (trimmed.startsWith("```")) {
+      pushProseBlock(blocks, current);
+      current = [];
+      fence = [trimmed];
+      continue;
+    }
+
+    if (!trimmed) {
+      pushProseBlock(blocks, current);
+      current = [];
+      continue;
+    }
+
+    current.push(line);
+  }
+
+  if (fence) {
+    blocks.push(trimBlankEdges(fence).join("\n").trimEnd());
+  }
+
+  pushProseBlock(blocks, current);
+  return blocks.join("\n\n");
+}
+
+function pushProseBlock(blocks: string[], lines: string[]) {
+  const blockLines = trimBlankEdges(lines);
+  if (blockLines.length === 0) {
+    return;
+  }
+
+  if (blockLines.some((line) => LIST_ITEM_PATTERN.test(line.trim()))) {
+    blocks.push(reflowListBlock(blockLines));
+    return;
+  }
+
+  blocks.push(blockLines.map((line) => line.trim()).join(" ").replace(/\s+/g, " ").trim());
+}
+
+function reflowListBlock(lines: string[]): string {
+  const items: string[] = [];
+  let current: string[] = [];
 
   const pushCurrent = () => {
     if (current.length === 0) {
       return;
     }
-    paragraphs.push(current.join(" ").replace(/\s+/g, " ").trim());
+    items.push(current.join(" ").replace(/\s+/g, " ").trim());
     current = [];
   };
 
   for (const line of lines) {
     const trimmed = line.trim();
-    if (!trimmed) {
+    if (LIST_ITEM_PATTERN.test(trimmed)) {
       pushCurrent();
+      current = [trimmed];
       continue;
     }
-
-    if (trimmed.startsWith("```")) {
-      pushCurrent();
-      paragraphs.push(trimmed);
-      inFence = !inFence;
-      continue;
-    }
-
-    if (inFence || LIST_ITEM_PATTERN.test(trimmed)) {
-      pushCurrent();
-      paragraphs.push(line.trimEnd());
-      continue;
-    }
-
     current.push(trimmed);
   }
 
   pushCurrent();
-  return paragraphs.join("\n\n");
+  return items.join("\n");
 }
 
 function trimBlankEdges(lines: string[]): string[] {
