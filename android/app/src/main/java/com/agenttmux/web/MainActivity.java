@@ -2,11 +2,14 @@ package com.agenttmux.web;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
@@ -159,42 +162,10 @@ public final class MainActivity extends Activity {
                 boolean isUserGesture,
                 Message resultMsg
             ) {
-                if (openPopupUrlExternally(hitTestUrl(view))) {
-                    return false;
+                if (isUserGesture) {
+                    openPopupUrlExternally(hitTestUrl(view));
                 }
-
-                WebView externalLinkView = new WebView(MainActivity.this);
-                externalLinkView.setWebViewClient(new WebViewClient() {
-                    private boolean handled;
-
-                    @Override
-                    public boolean shouldOverrideUrlLoading(WebView popupView, WebResourceRequest request) {
-                        return openPopupUriExternally(popupView, request.getUrl());
-                    }
-
-                    @Override
-                    public void onPageStarted(WebView popupView, String url, Bitmap favicon) {
-                        Uri uri = url == null ? null : Uri.parse(url);
-                        if (openPopupUriExternally(popupView, uri)) {
-                            popupView.stopLoading();
-                        }
-                    }
-
-                    private boolean openPopupUriExternally(WebView popupView, Uri uri) {
-                        if (handled || uri == null || !ExternalLinkPolicy.shouldOpenPopupInExternalBrowser(uri.toString())) {
-                            return handled;
-                        }
-
-                        handled = true;
-                        openExternalUri(uri);
-                        popupView.destroy();
-                        return true;
-                    }
-                });
-                WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
-                transport.setWebView(externalLinkView);
-                resultMsg.sendToTarget();
-                return true;
+                return false;
             }
 
             @Override
@@ -217,6 +188,8 @@ public final class MainActivity extends Activity {
                 return true;
             }
         });
+
+        webView.setOnLongClickListener(view -> showLinkActions(hitTestUrl(webView)));
     }
 
     private boolean shouldOpenExternally(Uri uri) {
@@ -229,10 +202,14 @@ public final class MainActivity extends Activity {
     }
 
     private void openExternalUri(Uri uri) {
+        openExternalUri(uri, false);
+    }
+
+    private void openExternalUri(Uri uri, boolean showChooser) {
         try {
             Intent intent = new Intent(Intent.ACTION_VIEW, uri);
             intent.addCategory(Intent.CATEGORY_BROWSABLE);
-            startActivity(intent);
+            startActivity(showChooser ? Intent.createChooser(intent, "Open link with") : intent);
         } catch (ActivityNotFoundException error) {
             Toast.makeText(this, "No app can open this link", Toast.LENGTH_SHORT).show();
         }
@@ -245,6 +222,56 @@ public final class MainActivity extends Activity {
 
         openExternalUri(Uri.parse(url));
         return true;
+    }
+
+    private boolean showLinkActions(String url) {
+        if (!ExternalLinkPolicy.shouldShowUserLinkActions(url)) {
+            return false;
+        }
+
+        boolean canOpenHere = ExternalLinkPolicy.canOpenInAppWebView(url, serverUrl());
+        String[] actions = canOpenHere
+            ? new String[] { "Open here", "Open in browser", "Choose app", "Copy link" }
+            : new String[] { "Open in browser", "Choose app", "Copy link" };
+
+        new AlertDialog.Builder(this)
+            .setTitle("Link")
+            .setMessage(url)
+            .setItems(actions, (dialog, which) -> handleLinkAction(url, canOpenHere, which))
+            .show();
+        return true;
+    }
+
+    private void handleLinkAction(String url, boolean canOpenHere, int actionIndex) {
+        int index = actionIndex;
+        if (canOpenHere && index == 0) {
+            webView.loadUrl(url);
+            return;
+        }
+        if (canOpenHere) {
+            index -= 1;
+        }
+
+        if (index == 0) {
+            openExternalUri(Uri.parse(url));
+            return;
+        }
+        if (index == 1) {
+            openExternalUri(Uri.parse(url), true);
+            return;
+        }
+        copyLinkToClipboard(url);
+    }
+
+    private void copyLinkToClipboard(String url) {
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard == null) {
+            Toast.makeText(this, "Clipboard unavailable", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        clipboard.setPrimaryClip(ClipData.newPlainText("Link", url));
+        Toast.makeText(this, "Link copied", Toast.LENGTH_SHORT).show();
     }
 
     private static String hitTestUrl(WebView view) {

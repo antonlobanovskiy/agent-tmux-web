@@ -44,6 +44,32 @@ final class ExternalLinkPolicy {
         return requestedScheme != null && !requestedScheme.trim().isEmpty();
     }
 
+    static boolean shouldShowUserLinkActions(String requestedUrl) {
+        URI requested = parse(requestedUrl);
+        if (requested == null) {
+            return false;
+        }
+
+        String requestedScheme = requested.getScheme();
+        if (isWebViewInternalScheme(requestedScheme)) {
+            return false;
+        }
+
+        return requestedScheme != null && !requestedScheme.trim().isEmpty();
+    }
+
+    static boolean canOpenInAppWebView(String requestedUrl, String configuredServerUrl) {
+        URI requested = parse(requestedUrl);
+        if (requested == null || !isHttpScheme(requested.getScheme())) {
+            return false;
+        }
+
+        URI configuredServer = parse(configuredServerUrl);
+        return configuredServer != null
+            && isHttpScheme(configuredServer.getScheme())
+            && sameOrigin(requested, configuredServer);
+    }
+
     private static URI parse(String value) {
         if (value == null || value.trim().isEmpty()) {
             return null;
