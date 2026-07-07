@@ -8,9 +8,14 @@ uploads, machine-specific service edits, or private signing material.
 
 ## Unreleased
 
+## 0.1.19 - 2026-07-07
+
 - Fixed tmux clean-copy so normal assistant replies copied from a phone-width
   tmux capture reflow hard-wrapped prose instead of preserving viewport line
   breaks.
+- Fixed Android popup link handling so clicked chat/output links launch through
+  the device browser instead of being routed back into the app WebView.
+- Bumped the public Android version defaults to `0.1.19` / version code `20`.
 
 ## 0.1.18 - 2026-07-06
 

@@ -43,6 +43,16 @@ public final class ExternalLinkPolicyTest {
     }
 
     @Test
+    public void opensPopupLinksInExternalBrowserEvenWhenSameOrigin() {
+        assertTrue(ExternalLinkPolicy.shouldOpenPopupInExternalBrowser(
+            "http://100.67.212.112:6174/assets/agent-tmux-web-v0.1.19-private-release.apk"
+        ));
+        assertTrue(ExternalLinkPolicy.shouldOpenPopupInExternalBrowser(
+            "https://example.com/docs"
+        ));
+    }
+
+    @Test
     public void keepsWebViewInternalSchemesInWebView() {
         assertFalse(ExternalLinkPolicy.shouldOpenInExternalBrowser(
             "about:blank",
@@ -52,5 +62,6 @@ public final class ExternalLinkPolicyTest {
             "data:text/plain,loading",
             "http://100.67.212.112:6174"
         ));
+        assertFalse(ExternalLinkPolicy.shouldOpenPopupInExternalBrowser("about:blank"));
     }
 }

@@ -30,6 +30,20 @@ final class ExternalLinkPolicy {
         return !sameOrigin(requested, configuredServer);
     }
 
+    static boolean shouldOpenPopupInExternalBrowser(String requestedUrl) {
+        URI requested = parse(requestedUrl);
+        if (requested == null) {
+            return false;
+        }
+
+        String requestedScheme = requested.getScheme();
+        if (isWebViewInternalScheme(requestedScheme)) {
+            return false;
+        }
+
+        return requestedScheme != null && !requestedScheme.trim().isEmpty();
+    }
+
     private static URI parse(String value) {
         if (value == null || value.trim().isEmpty()) {
             return null;

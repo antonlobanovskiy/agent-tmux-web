@@ -6,6 +6,7 @@ import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
@@ -158,16 +159,35 @@ public final class MainActivity extends Activity {
                 boolean isUserGesture,
                 Message resultMsg
             ) {
+                if (openPopupUrlExternally(hitTestUrl(view))) {
+                    return false;
+                }
+
                 WebView externalLinkView = new WebView(MainActivity.this);
                 externalLinkView.setWebViewClient(new WebViewClient() {
+                    private boolean handled;
+
                     @Override
                     public boolean shouldOverrideUrlLoading(WebView popupView, WebResourceRequest request) {
-                        Uri uri = request.getUrl();
-                        if (ExternalLinkPolicy.shouldOpenInExternalBrowser(uri.toString(), serverUrl())) {
-                            openExternalUri(uri);
-                        } else if (isHttpUri(uri)) {
-                            webView.loadUrl(uri.toString());
+                        return openPopupUriExternally(popupView, request.getUrl());
+                    }
+
+                    @Override
+                    public void onPageStarted(WebView popupView, String url, Bitmap favicon) {
+                        Uri uri = url == null ? null : Uri.parse(url);
+                        if (openPopupUriExternally(popupView, uri)) {
+                            popupView.stopLoading();
                         }
+                    }
+
+                    private boolean openPopupUriExternally(WebView popupView, Uri uri) {
+                        if (handled || uri == null || !ExternalLinkPolicy.shouldOpenPopupInExternalBrowser(uri.toString())) {
+                            return handled;
+                        }
+
+                        handled = true;
+                        openExternalUri(uri);
+                        popupView.destroy();
                         return true;
                     }
                 });
@@ -199,11 +219,6 @@ public final class MainActivity extends Activity {
         });
     }
 
-    private static boolean isHttpUri(Uri uri) {
-        String scheme = uri.getScheme();
-        return "http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme);
-    }
-
     private boolean shouldOpenExternally(Uri uri) {
         if (!ExternalLinkPolicy.shouldOpenInExternalBrowser(uri.toString(), serverUrl())) {
             return false;
@@ -221,6 +236,21 @@ public final class MainActivity extends Activity {
         } catch (ActivityNotFoundException error) {
             Toast.makeText(this, "No app can open this link", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private boolean openPopupUrlExternally(String url) {
+        if (!ExternalLinkPolicy.shouldOpenPopupInExternalBrowser(url)) {
+            return false;
+        }
+
+        openExternalUri(Uri.parse(url));
+        return true;
+    }
+
+    private static String hitTestUrl(WebView view) {
+        WebView.HitTestResult hitTestResult = view == null ? null : view.getHitTestResult();
+        String url = hitTestResult == null ? "" : hitTestResult.getExtra();
+        return url == null ? "" : url.trim();
     }
 
     private void addSettingsButton() {
