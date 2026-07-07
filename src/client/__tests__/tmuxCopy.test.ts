@@ -25,13 +25,38 @@ describe("cleanTmuxAssistantCopyText", () => {
     ].join("\n"));
   });
 
-  it("leaves non-draft assistant output unchanged apart from edge whitespace", () => {
-    expect(cleanTmuxAssistantCopyText("\n• Tests passed.\n\n```sh\npnpm test\n```\n")).toBe("• Tests passed.\n\n```sh\npnpm test\n```");
+  it("preserves code blocks while removing the leading Codex bullet", () => {
+    expect(cleanTmuxAssistantCopyText("\n• Tests passed.\n\n```sh\npnpm test\n```\n")).toBe("Tests passed.\n\n```sh\npnpm test\n```");
   });
 
   it("reflows plain assistant replies that were hard-wrapped by tmux width", () => {
     expect(cleanTmuxAssistantCopyText([
       "Thanks. Sessions live in server-side tmux, so",
+      "phone disconnects, browser",
+      "  refreshes, app restarts, and even restarting the",
+      "web service will not kill",
+      "  running agents.",
+      "",
+      "Host reboots are different: stock tmux does not",
+      "survive reboot unless you add",
+      "  restore tooling like tmux-resurrect/continuum or a",
+      "small systemd bootstrap.",
+      "",
+      "For 20+ agents, first-class session templates and",
+      "reboot restore are probably",
+      "  worth building."
+    ].join("\n"))).toBe([
+      "Thanks. Sessions live in server-side tmux, so phone disconnects, browser refreshes, app restarts, and even restarting the web service will not kill running agents.",
+      "",
+      "Host reboots are different: stock tmux does not survive reboot unless you add restore tooling like tmux-resurrect/continuum or a small systemd bootstrap.",
+      "",
+      "For 20+ agents, first-class session templates and reboot restore are probably worth building."
+    ].join("\n"));
+  });
+
+  it("removes a Codex leading bullet from single-reply prose", () => {
+    expect(cleanTmuxAssistantCopyText([
+      "• Thanks. Sessions live in server-side tmux, so",
       "phone disconnects, browser",
       "  refreshes, app restarts, and even restarting the",
       "web service will not kill",

@@ -1,4 +1,5 @@
 const DRAFT_REPLY_PATTERN = /^(?:[•*-]\s*)?Draft reply:\s*$/i;
+const LEADING_CODEX_BULLET_PATTERN = /^\s*•\s+/;
 const QUOTE_MARKER_PATTERN = /^\s*>\s?/;
 const LIST_ITEM_PATTERN = /^\s*(?:[-*•]\s+|\d+[.)]\s+)/;
 
@@ -6,7 +7,7 @@ export function cleanTmuxAssistantCopyText(text: string): string {
   const normalized = text.replace(/\r\n?/g, "\n");
   const draftLines = extractDraftReplyLines(normalized);
   if (!draftLines) {
-    return reflowProseLines(trimBlankEdges(normalized.split("\n"))).trim();
+    return reflowProseLines(stripLeadingCodexBullet(trimBlankEdges(normalized.split("\n")))).trim();
   }
 
   const unquoted = draftLines.map((line) => line.replace(QUOTE_MARKER_PATTERN, ""));
@@ -17,6 +18,17 @@ function extractDraftReplyLines(text: string): string[] | null {
   const lines = text.split("\n");
   const draftIndex = lines.findIndex((line) => DRAFT_REPLY_PATTERN.test(line.trim()));
   return draftIndex === -1 ? null : lines.slice(draftIndex + 1);
+}
+
+function stripLeadingCodexBullet(lines: string[]): string[] {
+  const firstContentIndex = lines.findIndex((line) => line.trim());
+  if (firstContentIndex === -1) {
+    return lines;
+  }
+
+  const result = [...lines];
+  result[firstContentIndex] = result[firstContentIndex].replace(LEADING_CODEX_BULLET_PATTERN, "");
+  return result;
 }
 
 function reflowProseLines(lines: string[]): string {
