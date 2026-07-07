@@ -8,6 +8,10 @@ uploads, machine-specific service edits, or private signing material.
 
 ## Unreleased
 
+- Fixed tmux clean-copy so normal assistant replies copied from a phone-width
+  tmux capture reflow hard-wrapped prose instead of preserving viewport line
+  breaks.
+
 ## 0.1.18 - 2026-07-06
 
 - Added clean-copy controls for tmux GUI assistant replies, including a latest
