@@ -53,6 +53,30 @@ public final class ExternalLinkPolicyTest {
     }
 
     @Test
+    public void showsUserActionsForLongPressedLinks() {
+        assertTrue(ExternalLinkPolicy.shouldShowUserLinkActions("https://example.com/docs"));
+        assertTrue(ExternalLinkPolicy.shouldShowUserLinkActions("mailto:hello@example.com"));
+        assertFalse(ExternalLinkPolicy.shouldShowUserLinkActions("about:blank"));
+        assertFalse(ExternalLinkPolicy.shouldShowUserLinkActions("data:text/plain,loading"));
+    }
+
+    @Test
+    public void onlyAllowsConfiguredServerLinksToOpenInAppWebView() {
+        assertTrue(ExternalLinkPolicy.canOpenInAppWebView(
+            "http://100.67.212.112:6174/assets/app.js",
+            "http://100.67.212.112:6174"
+        ));
+        assertFalse(ExternalLinkPolicy.canOpenInAppWebView(
+            "https://example.com/docs",
+            "http://100.67.212.112:6174"
+        ));
+        assertFalse(ExternalLinkPolicy.canOpenInAppWebView(
+            "mailto:hello@example.com",
+            "http://100.67.212.112:6174"
+        ));
+    }
+
+    @Test
     public void keepsWebViewInternalSchemesInWebView() {
         assertFalse(ExternalLinkPolicy.shouldOpenInExternalBrowser(
             "about:blank",

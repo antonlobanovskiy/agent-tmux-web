@@ -8,6 +8,14 @@ uploads, machine-specific service edits, or private signing material.
 
 ## Unreleased
 
+## 0.1.20 - 2026-07-07
+
+- Removed the Android popup-link fallback that created a hidden WebView before
+  launching browser links, improving link tap responsiveness.
+- Added a native Android long-press link menu with browser/app chooser and copy
+  actions.
+- Bumped the public Android version defaults to `0.1.20` / version code `21`.
+
 ## 0.1.19 - 2026-07-07
 
 - Fixed tmux clean-copy so normal assistant replies copied from a phone-width
