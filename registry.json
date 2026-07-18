@@ -30,6 +30,11 @@
           "target": "~/CHANGELOG.md"
         },
         {
+          "path": "PRIVACY.md",
+          "type": "registry:file",
+          "target": "~/PRIVACY.md"
+        },
+        {
           "path": "docs/registry.md",
           "type": "registry:file",
           "target": "~/docs/registry.md"
@@ -40,6 +45,11 @@
           "target": "~/docs/play-store.md"
         },
         {
+          "path": "docs/play-store-listing.md",
+          "type": "registry:file",
+          "target": "~/docs/play-store-listing.md"
+        },
+        {
           "path": "docs/marketing.md",
           "type": "registry:file",
           "target": "~/docs/marketing.md"
@@ -48,6 +58,11 @@
           "path": "scripts/capture-marketing.mjs",
           "type": "registry:file",
           "target": "~/scripts/capture-marketing.mjs"
+        },
+        {
+          "path": "scripts/capture-play-store.mjs",
+          "type": "registry:file",
+          "target": "~/scripts/capture-play-store.mjs"
         }
       ],
       "docs": "Install into an empty project directory or inspect first with --dry-run, --diff, or view. Binary media assets, launcher images, and the Gradle wrapper jar are intentionally omitted from registry items; clone the repository for the complete asset set. Keep runtime .env files, auth tokens, uploads, APKs, and machine-specific service files out of git.",
@@ -433,8 +448,13 @@
       "name": "android-wrapper",
       "type": "registry:item",
       "title": "Android Wrapper",
-      "description": "Sideload-only Android WebView wrapper, native upload bridge, and notification watcher source.",
+      "description": "Android WebView wrapper, native upload bridge, notification watcher, and Google Play build source.",
       "files": [
+        {
+          "path": "PRIVACY.md",
+          "type": "registry:file",
+          "target": "~/PRIVACY.md"
+        },
         {
           "path": "android/README.md",
           "type": "registry:file",
@@ -444,6 +464,11 @@
           "path": "docs/play-store.md",
           "type": "registry:file",
           "target": "~/docs/play-store.md"
+        },
+        {
+          "path": "docs/play-store-listing.md",
+          "type": "registry:file",
+          "target": "~/docs/play-store-listing.md"
         },
         {
           "path": "android/build.gradle",
@@ -496,6 +521,11 @@
           "target": "~/android/app/src/main/java/com/agenttmux/web/AgentNotifications.java"
         },
         {
+          "path": "android/app/src/main/java/com/agenttmux/web/ExternalLinkPolicy.java",
+          "type": "registry:file",
+          "target": "~/android/app/src/main/java/com/agenttmux/web/ExternalLinkPolicy.java"
+        },
+        {
           "path": "android/app/src/main/java/com/agenttmux/web/MainActivity.java",
           "type": "registry:file",
           "target": "~/android/app/src/main/java/com/agenttmux/web/MainActivity.java"
@@ -546,9 +576,29 @@
           "target": "~/android/app/src/main/res/values/styles.xml"
         },
         {
+          "path": "android/app/src/main/res/xml/backup_rules.xml",
+          "type": "registry:file",
+          "target": "~/android/app/src/main/res/xml/backup_rules.xml"
+        },
+        {
+          "path": "android/app/src/main/res/xml/data_extraction_rules.xml",
+          "type": "registry:file",
+          "target": "~/android/app/src/main/res/xml/data_extraction_rules.xml"
+        },
+        {
           "path": "android/app/src/main/res/xml/network_security_config.xml",
           "type": "registry:file",
           "target": "~/android/app/src/main/res/xml/network_security_config.xml"
+        },
+        {
+          "path": "android/app/src/test/java/com/agenttmux/web/AgentNotificationBridgeTest.java",
+          "type": "registry:file",
+          "target": "~/android/app/src/test/java/com/agenttmux/web/AgentNotificationBridgeTest.java"
+        },
+        {
+          "path": "android/app/src/test/java/com/agenttmux/web/ExternalLinkPolicyTest.java",
+          "type": "registry:file",
+          "target": "~/android/app/src/test/java/com/agenttmux/web/ExternalLinkPolicyTest.java"
         },
         {
           "path": "android/app/src/test/java/com/agenttmux/web/NotificationTargetTest.java",
@@ -564,6 +614,11 @@
           "path": "scripts/verify-public-apk.mjs",
           "type": "registry:file",
           "target": "~/scripts/verify-public-apk.mjs"
+        },
+        {
+          "path": "scripts/verify-play-bundle.mjs",
+          "type": "registry:file",
+          "target": "~/scripts/verify-play-bundle.mjs"
         }
       ],
       "docs": "Public APKs and Play bundles must not include a default server URL or auth token. Private APKs should use a separate package id and should be delivered over LAN, VPN, or Tailscale instead of email. Clone the repository for binary launcher images and the Gradle wrapper jar.",

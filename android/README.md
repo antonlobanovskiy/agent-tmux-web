@@ -14,7 +14,7 @@ builds may prefill a server URL/token for your own device.
 Prerequisites:
 
 - JDK 17+
-- Android SDK platform 35
+- Android SDK platform 36
 - Android SDK build-tools 35
 - Android platform-tools if you want to install with `adb`
 
@@ -35,11 +35,20 @@ Build a shareable public sideload APK with no embedded server URL or token:
 pnpm android:build:public
 ```
 
-Build a public Google Play upload bundle with no embedded server URL or token:
+Validate a generic Google Play bundle without production signing credentials:
+
+```bash
+pnpm android:build:play:check
+```
+
+Build a signed Google Play upload bundle with no embedded server URL or token:
 
 ```bash
 pnpm android:build:play
 ```
+
+The upload command requires the dedicated `agentTmuxPlay*` signing properties
+described below. It fails instead of falling back to Android's debug key.
 
 The APKs are written to:
 
@@ -90,7 +99,7 @@ Override those defaults when needed:
 AGENT_TMUX_ANDROID_ID_SUFFIX=.work \
 AGENT_TMUX_ANDROID_APP_LABEL="Agent Tmux Work" \
 AGENT_TMUX_ANDROID_VERSION_CODE=20042 \
-AGENT_TMUX_ANDROID_VERSION_NAME=0.1.23-work \
+AGENT_TMUX_ANDROID_VERSION_NAME=0.1.24-work \
 pnpm android:build:private
 ```
 
@@ -122,6 +131,23 @@ agentTmuxReleaseKeyPassword=your-key-password
 
 Without those signing properties, release APKs use the local Android debug key.
 That is fine for personal testing, but it is not stable across machines.
+
+## Google Play Signing
+
+Use Play App Signing and keep a dedicated upload key separate from the local or
+private APK signing key above. Configure the ignored `android/local.properties`:
+
+```properties
+agentTmuxPlayStoreFile=/absolute/path/to/agent-tmux-play-upload.jks
+agentTmuxPlayStorePassword=your-store-password
+agentTmuxPlayKeyAlias=agent-tmux-upload
+agentTmuxPlayKeyPassword=your-key-password
+```
+
+`pnpm android:build:play` requires all four values and verifies that the bundle
+is not signed with Android's debug certificate. Never commit the keystore or
+credentials. See [docs/play-store.md](../docs/play-store.md) for the complete
+Console workflow.
 
 ## APK Delivery
 
@@ -190,10 +216,15 @@ cd android
   access to the server user.
 - Public APKs are sideload-only setup wrappers. Users must enter their own
   private server URL and optional auth token.
+- The saved URL, token, WebView preferences, pins, and custom launchers survive
+  normal same-package updates. Android cloud backup is disabled so the token is
+  not copied into device backups.
+- Moving from the existing debug-signed public APK or the separate private app
+  to Play requires one setup after install. Later Play updates preserve it.
 - File inputs in the web UI open the Android file picker.
 - Notifications use a native Android bridge. When enabled, the app runs a
   low-importance foreground watcher that polls the server for completed tmux
   tasks.
-- Release APKs use the standard Android debug key unless local release signing
+- Sideload release APKs use the standard Android debug key unless local release signing
   properties are configured. Use your own signing key before publishing through
   an app store or distributing updates from multiple machines.

@@ -31,8 +31,9 @@ attach, and temporary file uploads over a private network path.
 - Upload files from Android or desktop browsers to temporary server paths.
 - Use the clearly labeled view dropdown for TTY, GUI, Focus, Raw, Light, and
   Dark controls without crowding the tmux toolbar.
-- Android sideload APK wraps the private server UI with native file picking and
-  task-complete notifications.
+- Android app wraps the private server UI with native file picking and
+  task-complete notifications. Public sideloading remains available while the
+  Google Play release moves through testing.
 - Browser/native notifications can alert when a watched tmux task returns to
   input.
 - Shared minimal icon for the browser tab, app header, and Android launcher.
@@ -61,19 +62,22 @@ attach, and temporary file uploads over a private network path.
 - Mobile Claude launcher: `docs/assets/mobile-claude.png`
 - Raw tmux mode screenshot: `docs/assets/mobile-raw-terminal.png`
 - Desktop overview: `docs/assets/desktop-overview.png`
+- Play Store icon, feature graphic, and phone screenshots:
+  `docs/play-store/assets/`
 
 ## Android Demo Note
 
-The Android APK is sideload-only and generic in public builds. It should show a
-setup screen where users enter their own server URL/token, then it loads the
-same GUI/TTY/raw tmux modes shown in the browser demo. Turn on `Notify` in the
-tmux toolbar to start the native foreground watcher for task-complete alerts.
+The Android app is generic in public builds. It shows a setup screen where users
+enter their own server URL/token, then loads the same GUI/TTY/raw tmux modes
+shown in the browser demo. Turn on `Notify` in the tmux toolbar to start the
+native foreground watcher for task-complete alerts.
 
 Regenerate assets with:
 
 ```bash
 pnpm build
 pnpm capture:marketing
+pnpm capture:play-store
 ```
 
 The capture script uses Playwright Chromium and `ffmpeg`. On a fresh machine,

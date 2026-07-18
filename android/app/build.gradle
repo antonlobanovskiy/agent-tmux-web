@@ -36,9 +36,17 @@ if (hasReleaseSigning && !(releaseStoreFile && releaseStorePassword && releaseKe
     throw new GradleException("Set agentTmuxReleaseStoreFile, agentTmuxReleaseStorePassword, agentTmuxReleaseKeyAlias, and agentTmuxReleaseKeyPassword together.")
 }
 
+def playSigningRequested = configValue("agentTmuxPlaySigning").trim().equalsIgnoreCase("true")
+def playStoreFile = configValue("agentTmuxPlayStoreFile").trim()
+def playStorePassword = configValue("agentTmuxPlayStorePassword").trim()
+def playKeyAlias = configValue("agentTmuxPlayKeyAlias").trim()
+def playKeyPassword = configValue("agentTmuxPlayKeyPassword").trim()
+def hasAnyPlaySigning = playStoreFile || playStorePassword || playKeyAlias || playKeyPassword
+def hasPlaySigning = playStoreFile && playStorePassword && playKeyAlias && playKeyPassword
+
 android {
     namespace "com.agenttmux.web"
-    compileSdk 35
+    compileSdk 36
 
     signingConfigs {
         localRelease {
@@ -50,18 +58,28 @@ android {
                 keyPassword releaseKeyPassword
             }
         }
+        playUpload {
+            if (hasPlaySigning) {
+                def storePath = new File(playStoreFile)
+                storeFile storePath.isAbsolute() ? storePath : rootProject.file(playStoreFile)
+                storePassword playStorePassword
+                keyAlias playKeyAlias
+                keyPassword playKeyPassword
+            }
+        }
     }
 
     defaultConfig {
         applicationId "com.agenttmux.web${normalizedApplicationIdSuffix}"
         minSdk 26
-        targetSdk 35
-        versionCode configuredVersionCode ? configuredVersionCode.toInteger() : 24
-        versionName configuredVersionName ?: "0.1.23"
+        targetSdk 36
+        versionCode configuredVersionCode ? configuredVersionCode.toInteger() : 25
+        versionName configuredVersionName ?: "0.1.24"
         manifestPlaceholders = [agentTmuxAppLabel: appLabel]
 
         buildConfigField "String", "DEFAULT_SERVER_URL", quotedBuildConfig(configValue("agentTmuxDefaultUrl"))
         buildConfigField "String", "DEFAULT_AUTH_TOKEN", quotedBuildConfig(configValue("agentTmuxDefaultToken"))
+        buildConfigField "String", "PRIVACY_POLICY_URL", quotedBuildConfig("https://github.com/antonlobanovskiy/agent-tmux-web/blob/main/PRIVACY.md")
     }
 
     buildFeatures {
@@ -70,7 +88,9 @@ android {
 
     buildTypes {
         release {
-            signingConfig hasReleaseSigning ? signingConfigs.localRelease : signingConfigs.debug
+            signingConfig playSigningRequested
+                ? signingConfigs.playUpload
+                : (hasReleaseSigning ? signingConfigs.localRelease : signingConfigs.debug)
             minifyEnabled false
             debuggable false
         }
@@ -81,6 +101,16 @@ android {
             outputFileName = "agent-tmux-web-v${variant.versionName}-${variant.buildType.name}.apk"
         }
     }
+}
+
+if (hasAnyPlaySigning && !hasPlaySigning) {
+    throw new GradleException("Set agentTmuxPlayStoreFile, agentTmuxPlayStorePassword, agentTmuxPlayKeyAlias, and agentTmuxPlayKeyPassword together.")
+}
+if (playSigningRequested && !hasPlaySigning) {
+    throw new GradleException("Google Play builds require a dedicated upload key. Configure the agentTmuxPlay* signing properties described in android/README.md.")
+}
+if (playSigningRequested && new File(playStoreFile).name.equalsIgnoreCase("debug.keystore")) {
+    throw new GradleException("Google Play builds cannot use Android's debug.keystore.")
 }
 
 dependencies {

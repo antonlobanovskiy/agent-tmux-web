@@ -8,6 +8,19 @@ uploads, machine-specific service edits, or private signing material.
 
 ## Unreleased
 
+## 0.1.24 - 2026-07-18
+
+- Raised the Android compile and target SDK to API 36 and updated the Android
+  Gradle Plugin and Gradle wrapper for current Google Play submissions.
+- Split Google Play upload signing from private APK signing and made production
+  bundle builds fail when a dedicated upload key is missing or a debug
+  certificate is used.
+- Added an in-app privacy-policy link, disabled Android cloud backup for the
+  saved auth token, and documented what remains configured across Play updates.
+- Added Play Console listing copy, Data safety facts, reviewer-access guidance,
+  and compliant store graphics generated from the real demo UI.
+- Bumped the public Android version defaults to `0.1.24` / version code `25`.
+
 ## 0.1.23 - 2026-07-18
 
 - Removed the redundant agent state viewer above TTY and GUI output, returning
