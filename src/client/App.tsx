@@ -10,6 +10,8 @@ import {
   ArrowRight,
   ArrowUp,
   Bell,
+  Check,
+  ChevronDown,
   ChevronRight,
   CircleStop,
   CornerDownLeft,
@@ -23,6 +25,8 @@ import {
   MessageSquare,
   Moon,
   Paperclip,
+  Pin,
+  PinOff,
   Play,
   Plus,
   RefreshCw,
@@ -31,7 +35,8 @@ import {
   Sun,
   Terminal as TerminalIcon,
   Trash2,
-  Wrench
+  Wrench,
+  X
 } from "lucide-react";
 import { ClipboardEvent, FormEvent, KeyboardEvent, UIEvent, forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
@@ -55,6 +60,15 @@ import { parseTmuxChatOutput, splitTmuxChatMessage, type TmuxChatMessage } from 
 import { cleanTmuxAssistantCopyText } from "./tmuxCopy.js";
 import { shouldAutoCaptureTmux, TMUX_CAPTURE_POLL_INTERVAL_MS, TMUX_SEND_FOLLOW_DELAYS_MS } from "./tmuxFollow.js";
 import { TmuxOutputLines } from "./tmuxOutputLines.js";
+import {
+  createCustomTmuxTool,
+  CUSTOM_TMUX_TOOLS_STORAGE_KEY,
+  groupTmuxTools,
+  parseCustomTmuxTools,
+  parsePinnedTmuxToolIds,
+  PINNED_TMUX_TOOLS_STORAGE_KEY,
+  togglePinnedTmuxToolId
+} from "./tmuxToolPreferences.js";
 import { buildTmuxDoneNotification } from "./tmuxNotifications.js";
 import { normalizeRequestedTmuxSession, readRequestedTmuxSession, removeRequestedTmuxSession } from "./tmuxSessionTarget.js";
 import { buildTmuxAttentionEvents } from "./tmuxAttention.js";
@@ -80,7 +94,7 @@ type ThreadSummary = {
 type TmuxViewMode = "regular" | "gui" | "focus" | "raw";
 
 const TMUX_VIEW_MODE_LABELS: Record<TmuxViewMode, string> = {
-  regular: "Regular",
+  regular: "TTY",
   gui: "GUI",
   focus: "Focus",
   raw: "Raw"
@@ -238,7 +252,11 @@ export function App() {
   const [newTmuxName, setNewTmuxName] = useState("agent");
   const [selectedTmuxTool, setSelectedTmuxTool] = useState("opencode");
   const [selectedTmuxToolModes, setSelectedTmuxToolModes] = useState<Record<string, string[]>>({});
-  const [customTmuxCommand, setCustomTmuxCommand] = useState("");
+  const [customTmuxTools, setCustomTmuxTools] = useState<TmuxToolDto[]>(readInitialCustomTmuxTools);
+  const [pinnedTmuxToolIds, setPinnedTmuxToolIds] = useState<string[]>(readInitialPinnedTmuxToolIds);
+  const [customTmuxToolFormOpen, setCustomTmuxToolFormOpen] = useState(false);
+  const [newCustomTmuxToolLabel, setNewCustomTmuxToolLabel] = useState("");
+  const [newCustomTmuxToolCommand, setNewCustomTmuxToolCommand] = useState("");
   const [slashIndex, setSlashIndex] = useState(0);
   const [terminalActive, setTerminalActive] = useState(false);
   const [tmuxFocusActive, setTmuxFocusActive] = useState(false);
@@ -304,7 +322,21 @@ export function App() {
   const showTmuxSendForm = shouldShowTmuxSendForm({ terminalActive });
   const tmuxViewMode: TmuxViewMode = terminalActive ? "raw" : tmuxFocusActive ? "focus" : tmuxGuiActive ? "gui" : "regular";
   const tmuxViewModeLabel = TMUX_VIEW_MODE_LABELS[tmuxViewMode];
-  const currentTmuxTool = useMemo(() => tmuxTools.find((tool) => tool.id === selectedTmuxTool) ?? null, [selectedTmuxTool, tmuxTools]);
+  const tmuxToolGroups = useMemo(
+    () => groupTmuxTools(tmuxTools, customTmuxTools, pinnedTmuxToolIds),
+    [customTmuxTools, pinnedTmuxToolIds, tmuxTools]
+  );
+  const allTmuxTools = useMemo(
+    () => [...tmuxToolGroups.pinned, ...tmuxToolGroups.unpinned],
+    [tmuxToolGroups]
+  );
+  const customTmuxToolIds = useMemo(() => new Set(customTmuxTools.map((tool) => tool.id)), [customTmuxTools]);
+  const currentTmuxTool = useMemo(
+    () => allTmuxTools.find((tool) => tool.id === selectedTmuxTool) ?? null,
+    [allTmuxTools, selectedTmuxTool]
+  );
+  const currentTmuxToolIsCustom = currentTmuxTool ? customTmuxToolIds.has(currentTmuxTool.id) : false;
+  const currentTmuxToolIsPinned = currentTmuxTool ? pinnedTmuxToolIds.includes(currentTmuxTool.id) : false;
   const currentTmuxToolModeIds = useMemo(() => currentTmuxTool
     ? selectedTmuxToolModes[currentTmuxTool.id] ?? defaultTmuxToolModeIds(currentTmuxTool)
     : [], [currentTmuxTool, selectedTmuxToolModes]);
@@ -366,12 +398,10 @@ export function App() {
   const loadTmuxTools = useCallback(async () => {
     if (demoMode) {
       setTmuxTools(DEMO_TMUX_TOOLS);
-      setSelectedTmuxTool((current) => DEMO_TMUX_TOOLS.some((tool) => tool.id === current) ? current : DEMO_TMUX_TOOLS[0]?.id ?? "custom");
       return;
     }
     const result = await api<{ data: TmuxToolDto[] }>("/api/tmux/tools");
     setTmuxTools(result.data);
-    setSelectedTmuxTool((current) => result.data.some((tool) => tool.id === current) ? current : result.data[0]?.id ?? "custom");
   }, []);
 
   const captureTmux = useCallback(async (session = selectedTmux) => {
@@ -406,6 +436,12 @@ export function App() {
     loadTmuxSessions().catch(reportError(setError));
     loadTmuxTools().catch(reportError(setError));
   }, [loadStatus, loadTmuxSessions, loadTmuxTools]);
+
+  useEffect(() => {
+    if (allTmuxTools.length > 0 && !allTmuxTools.some((tool) => tool.id === selectedTmuxTool)) {
+      setSelectedTmuxTool(allTmuxTools[0]?.id ?? "");
+    }
+  }, [allTmuxTools, selectedTmuxTool]);
 
   useEffect(() => {
     if (demoMode) {
@@ -1188,7 +1224,7 @@ export function App() {
     }
 
     const tool = currentTmuxTool;
-    const command = selectedTmuxTool === "custom" ? customTmuxCommand.trim() : currentTmuxToolCommand;
+    const command = currentTmuxToolCommand;
     if (!command) {
       setError("Enter a CLI command to launch.");
       return;
@@ -1210,9 +1246,9 @@ export function App() {
       method: "POST",
       body: JSON.stringify({
         session: selectedTmux,
-        toolId: selectedTmuxTool === "custom" ? undefined : selectedTmuxTool,
+        toolId: currentTmuxToolIsCustom ? undefined : selectedTmuxTool,
         command,
-        modeIds: selectedTmuxTool === "custom" ? [] : currentTmuxToolModeIds
+        modeIds: currentTmuxToolIsCustom ? [] : currentTmuxToolModeIds
       })
     });
     queueTmuxOutputBottomScroll();
@@ -1237,6 +1273,63 @@ export function App() {
         [currentTmuxTool.id]: next
       };
     });
+  }
+
+  function addCustomTmuxTool(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    const label = newCustomTmuxToolLabel.trim();
+    const command = newCustomTmuxToolCommand.trim();
+    if (!label || !command) {
+      setError("Enter a name and command for the custom CLI launcher.");
+      return;
+    }
+    if (allTmuxTools.some((tool) => tool.label.localeCompare(label, undefined, { sensitivity: "base" }) === 0)) {
+      setError(`A CLI launcher named ${label} already exists.`);
+      return;
+    }
+
+    const tool = createCustomTmuxTool(createCustomTmuxToolId(), label, command);
+    if (!tool) {
+      setError("Enter a valid name and command for the custom CLI launcher.");
+      return;
+    }
+    const nextTools = [...customTmuxTools, tool];
+    setCustomTmuxTools(nextTools);
+    writeStoredJson(CUSTOM_TMUX_TOOLS_STORAGE_KEY, nextTools);
+    setSelectedTmuxTool(tool.id);
+    setNewCustomTmuxToolLabel("");
+    setNewCustomTmuxToolCommand("");
+    setCustomTmuxToolFormOpen(false);
+    setTerminalStatus(`added ${tool.label} launcher`);
+  }
+
+  function toggleSelectedTmuxToolPin() {
+    if (!currentTmuxTool) {
+      return;
+    }
+    const nextPinnedIds = togglePinnedTmuxToolId(pinnedTmuxToolIds, currentTmuxTool.id);
+    setPinnedTmuxToolIds(nextPinnedIds);
+    writeStoredJson(PINNED_TMUX_TOOLS_STORAGE_KEY, nextPinnedIds);
+    setTerminalStatus(`${nextPinnedIds.includes(currentTmuxTool.id) ? "pinned" : "unpinned"} ${currentTmuxTool.label}`);
+  }
+
+  function removeSelectedCustomTmuxTool() {
+    if (!currentTmuxTool || !currentTmuxToolIsCustom) {
+      return;
+    }
+    if (!window.confirm(`Remove the custom CLI launcher "${currentTmuxTool.label}"?`)) {
+      return;
+    }
+    const nextTools = customTmuxTools.filter((tool) => tool.id !== currentTmuxTool.id);
+    const nextPinnedIds = pinnedTmuxToolIds.filter((id) => id !== currentTmuxTool.id);
+    const nextGroups = groupTmuxTools(tmuxTools, nextTools, nextPinnedIds);
+    setCustomTmuxTools(nextTools);
+    setPinnedTmuxToolIds(nextPinnedIds);
+    writeStoredJson(CUSTOM_TMUX_TOOLS_STORAGE_KEY, nextTools);
+    writeStoredJson(PINNED_TMUX_TOOLS_STORAGE_KEY, nextPinnedIds);
+    setSelectedTmuxTool(nextGroups.pinned[0]?.id ?? nextGroups.unpinned[0]?.id ?? "");
+    setTerminalStatus(`removed ${currentTmuxTool.label} launcher`);
   }
 
   function selectTmuxSession(session: string) {
@@ -1719,24 +1812,73 @@ export function App() {
               <button aria-label="Destroy selected tmux session" title="Destroy selected tmux session" type="button" disabled={!selectedTmux} onClick={() => destroySession().catch(reportError(setError))}><Trash2 size={15} /></button>
             </div>
             <div className="tmux-tool-actions">
-              <select
-                aria-label="CLI tool"
-                value={selectedTmuxTool}
-                onChange={(event) => setSelectedTmuxTool(event.target.value)}
-              >
-                {tmuxTools.map((tool) => <option key={tool.id} value={tool.id}>{tool.label}</option>)}
-                <option value="custom">Custom</option>
-              </select>
-              <input
-                aria-label="Custom CLI command"
-                disabled={selectedTmuxTool !== "custom"}
-                value={selectedTmuxTool === "custom" ? customTmuxCommand : currentTmuxToolCommand}
-                onChange={(event) => setCustomTmuxCommand(event.target.value)}
-                placeholder="command"
-              />
-              <button aria-label="Start CLI tool in selected tmux session" title="Start CLI tool in selected tmux session" type="button" disabled={!selectedTmux} onClick={() => openSelectedTmuxTool().catch(reportError(setError))}><TerminalIcon size={15} /> Run</button>
+              <div className="tmux-tool-picker">
+                <select
+                  aria-label="CLI launcher"
+                  value={selectedTmuxTool}
+                  onChange={(event) => setSelectedTmuxTool(event.target.value)}
+                >
+                  {tmuxToolGroups.pinned.length > 0 && (
+                    <optgroup label="Pinned">
+                      {tmuxToolGroups.pinned.map((tool) => (
+                        <option key={tool.id} value={tool.id}>{tool.label}{customTmuxToolIds.has(tool.id) ? " (custom)" : ""}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                  <optgroup label={tmuxToolGroups.pinned.length > 0 ? "All launchers" : "Launchers"}>
+                    {tmuxToolGroups.unpinned.map((tool) => (
+                      <option key={tool.id} value={tool.id}>{tool.label}{customTmuxToolIds.has(tool.id) ? " (custom)" : ""}</option>
+                    ))}
+                  </optgroup>
+                </select>
+                <button
+                  aria-label={currentTmuxToolIsPinned ? "Unpin selected CLI launcher" : "Pin selected CLI launcher"}
+                  className={`tmux-tool-icon-button ${currentTmuxToolIsPinned ? "active" : ""}`}
+                  disabled={!currentTmuxTool}
+                  title={currentTmuxToolIsPinned ? "Unpin selected CLI launcher" : "Pin selected CLI launcher"}
+                  type="button"
+                  onClick={toggleSelectedTmuxToolPin}
+                >
+                  {currentTmuxToolIsPinned ? <PinOff size={15} /> : <Pin size={15} />}
+                </button>
+                <button
+                  aria-label="Add custom CLI launcher"
+                  aria-expanded={customTmuxToolFormOpen}
+                  className="tmux-tool-icon-button"
+                  title="Add custom CLI launcher"
+                  type="button"
+                  onClick={() => setCustomTmuxToolFormOpen((open) => !open)}
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+              <div className="tmux-tool-command">
+                <input aria-label="Selected CLI command" readOnly value={currentTmuxToolCommand} placeholder="No launcher selected" />
+                {currentTmuxToolIsCustom && (
+                  <button className="tmux-tool-icon-button" aria-label="Remove selected custom CLI launcher" title="Remove selected custom CLI launcher" type="button" onClick={removeSelectedCustomTmuxTool}>
+                    <Trash2 size={15} />
+                  </button>
+                )}
+                <button aria-label="Start CLI tool in selected tmux session" title="Start CLI tool in selected tmux session" type="button" disabled={!selectedTmux || !currentTmuxTool} onClick={() => openSelectedTmuxTool().catch(reportError(setError))}><TerminalIcon size={15} /> <span>Run</span></button>
+              </div>
+              {customTmuxToolFormOpen && (
+                <form className="tmux-custom-tool-form" onSubmit={addCustomTmuxTool}>
+                  <label>
+                    Name
+                    <input autoFocus value={newCustomTmuxToolLabel} onChange={(event) => setNewCustomTmuxToolLabel(event.target.value)} placeholder="My agent" />
+                  </label>
+                  <label>
+                    Command
+                    <input value={newCustomTmuxToolCommand} onChange={(event) => setNewCustomTmuxToolCommand(event.target.value)} placeholder="my-agent --flag" />
+                  </label>
+                  <div className="tmux-custom-tool-buttons">
+                    <button type="button" onClick={() => setCustomTmuxToolFormOpen(false)}><X size={15} /> Cancel</button>
+                    <button type="submit"><Check size={15} /> Add</button>
+                  </div>
+                </form>
+              )}
             </div>
-            {selectedTmuxTool !== "custom" && currentTmuxTool?.modes?.length ? (
+            {currentTmuxTool?.modes?.length ? (
               <div className="tmux-tool-modes" aria-label="CLI tool modes">
                 {currentTmuxTool.modes.map((mode) => (
                   <label className={mode.dangerous ? "dangerous" : ""} key={mode.id} title={mode.description}>
@@ -1757,16 +1899,17 @@ export function App() {
         <div className="tmux-workspace">
           <div className="tmux-terminal-toolbar">
             <details className="tmux-view-menu" ref={tmuxViewMenuRef}>
-              <summary aria-label="View and theme options" title="View and theme options">
-                <ListFilter size={15} />
+              <summary aria-label={`Change view. Current view: ${tmuxViewModeLabel}`} title="Change view or theme">
+                <span className="tmux-view-menu-prefix">View:</span>
                 <span className="tmux-view-menu-label">{tmuxViewModeLabel}</span>
+                <ChevronDown aria-hidden="true" className="tmux-view-menu-caret" size={15} />
               </summary>
               <div className="tmux-view-menu-content" role="menu">
                 <div className="tmux-view-menu-section">
                   <span>View</span>
                   <button className={tmuxViewMode === "regular" ? "active" : ""} role="menuitemradio" aria-checked={tmuxViewMode === "regular"} type="button" onClick={() => selectTmuxViewMode("regular")}>
                     <TerminalIcon size={15} />
-                    <span>Regular</span>
+                    <span>TTY</span>
                   </button>
                   <button className={tmuxViewMode === "gui" ? "active" : ""} role="menuitemradio" aria-checked={tmuxViewMode === "gui"} type="button" onClick={() => selectTmuxViewMode("gui")}>
                     <MessageSquare size={15} />
@@ -1818,14 +1961,6 @@ export function App() {
               <Bell size={15} />
             </button>
           </div>
-          {!terminalActive && !tmuxFocusActive && (
-            <TmuxAgentSummaryStrip
-              events={tmuxWatchEvents}
-              selectedSession={selectedTmux}
-              summary={tmuxAgentSummary}
-              onSelectSession={selectTmuxSession}
-            />
-          )}
           <div className="tmux-output-shell">
             {terminalActive && demoMode ? (
               <div className="tmux-terminal tmux-terminal-demo">
@@ -1937,49 +2072,6 @@ function TimelineCard({ entry }: { entry: TimelineEntry }) {
       </div>
       <pre>{entry.body ? <LinkifiedText text={entry.body} /> : " "}</pre>
     </article>
-  );
-}
-
-function TmuxAgentSummaryStrip({
-  events,
-  onSelectSession,
-  selectedSession,
-  summary
-}: {
-  events: TmuxWatchEvent[];
-  onSelectSession: (session: string) => void;
-  selectedSession: string;
-  summary: TmuxAgentSummary;
-}) {
-  const recentEvents = buildTmuxAttentionEvents(events, { selectedSession, limit: 3 });
-
-  return (
-    <section className={`tmux-agent-strip ${summary.kind}`} aria-label="Agent status">
-      <div className="tmux-agent-state">
-        <span className="tmux-agent-dot" />
-        <div>
-          <strong>{summary.title}</strong>
-          <span>{summary.detail}</span>
-        </div>
-      </div>
-      <div className="tmux-agent-action">{summary.action}</div>
-      {recentEvents.length > 0 && (
-        <div className="tmux-attention-list" aria-label="Recent waiting sessions">
-          {recentEvents.map((event) => (
-            <button
-              className={event.session === selectedSession ? "active" : ""}
-              key={event.id}
-              type="button"
-              onClick={() => onSelectSession(event.session)}
-            >
-              <AlertTriangle size={13} />
-              <span>{event.session}</span>
-              <small>{event.label}</small>
-            </button>
-          ))}
-        </div>
-      )}
-    </section>
   );
 }
 
@@ -2285,6 +2377,42 @@ function readInitialColorTheme(): ColorTheme {
   }
   const prefersLight = window.matchMedia?.("(prefers-color-scheme: light)").matches ?? false;
   return resolveInitialColorTheme(storedTheme, prefersLight);
+}
+
+function readInitialCustomTmuxTools(): TmuxToolDto[] {
+  return parseCustomTmuxTools(readStoredValue(CUSTOM_TMUX_TOOLS_STORAGE_KEY));
+}
+
+function readInitialPinnedTmuxToolIds(): string[] {
+  return parsePinnedTmuxToolIds(readStoredValue(PINNED_TMUX_TOOLS_STORAGE_KEY));
+}
+
+function readStoredValue(key: string): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredJson(key: string, value: unknown) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Some private browser modes block localStorage; in-memory preferences still apply.
+  }
+}
+
+function createCustomTmuxToolId(): string {
+  const randomId = globalThis.crypto?.randomUUID?.()
+    ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return `custom:${randomId}`;
 }
 
 function writeColorThemePreference(theme: ColorTheme) {

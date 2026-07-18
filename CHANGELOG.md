@@ -8,6 +8,20 @@ uploads, machine-specific service edits, or private signing material.
 
 ## Unreleased
 
+## 0.1.23 - 2026-07-18
+
+- Removed the redundant agent state viewer above TTY and GUI output, returning
+  that vertical space to the terminal while keeping sidebar status dots and the
+  detailed Focus view available.
+- Clarified the view dropdown with a `View: TTY`, `View: GUI`, `View: Focus`, or
+  `View: Raw` trigger and a standard dropdown chevron.
+- Renamed the previous `Regular` view label to the more descriptive `TTY`.
+- Sorted the CLI launcher dropdown alphabetically and added per-device pins that
+  promote favorite launchers into a dedicated top group.
+- Added a `+` launcher control for saving named custom CLI commands locally,
+  with run and remove controls in the existing session menu.
+- Bumped the public Android version defaults to `0.1.23` / version code `24`.
+
 ## 0.1.22 - 2026-07-18
 
 - Expanded the built-in tmux launcher catalog for OpenCode, Codex, Claude Code,

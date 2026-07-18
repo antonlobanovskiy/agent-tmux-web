@@ -206,6 +206,11 @@
           "target": "~/src/client/tmuxSessionTarget.ts"
         },
         {
+          "path": "src/client/tmuxToolPreferences.ts",
+          "type": "registry:file",
+          "target": "~/src/client/tmuxToolPreferences.ts"
+        },
+        {
           "path": "src/client/__tests__/browserNotifications.test.ts",
           "type": "registry:file",
           "target": "~/src/client/__tests__/browserNotifications.test.ts"
@@ -279,6 +284,11 @@
           "path": "src/client/__tests__/tmuxSessionTarget.test.ts",
           "type": "registry:file",
           "target": "~/src/client/__tests__/tmuxSessionTarget.test.ts"
+        },
+        {
+          "path": "src/client/__tests__/tmuxToolPreferences.test.ts",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/tmuxToolPreferences.test.ts"
         },
         {
           "path": "src/server/codexBridge.ts",

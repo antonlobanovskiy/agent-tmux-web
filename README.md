@@ -45,6 +45,8 @@ and desktop layout.
   controls.
 - Built-in launchers for OpenCode, Codex, Claude Code, Gemini CLI, GitHub
   Copilot, Cursor Agent, Qwen Code, Cline, Aider, goose, and Amp.
+- Alphabetical launcher selection with per-device pins for favorites and a `+`
+  control for saving named custom CLI commands.
 - Harness-specific Default, Plan, Auto, Auto Edit, Autopilot, and Yolo controls
   with incompatible permission modes kept mutually exclusive.
 - GUI mode for readable chat-style agent output.
@@ -154,10 +156,12 @@ mode, and notifications.
 ## Using The App
 
 1. Pick or create a tmux session from the session list.
-2. Choose a built-in harness or `Custom` launcher.
+2. Choose a launcher, pin favorites to the top, or use `+` to save a named
+   custom command on that device.
 3. Press `Run`, or type directly into the tmux input.
-4. Use `GUI` for readable agent output, `TTY` for plain pane text, and `Raw`
-   when you need exact terminal input.
+4. Open the clearly labeled `View` dropdown and use `GUI` for readable agent
+   output, `TTY` for plain pane text, or `Raw` when you need exact terminal
+   input.
 5. Use the bell button when you want task-done alerts.
 6. Use the paperclip button to upload files, or paste clipboard images directly
    into the chat input. Uploaded files are inserted as temporary server paths in
@@ -169,8 +173,9 @@ Status dots:
 - Yellow: idle, waiting for input, asking a question, or needing permission.
 - Red: recent captured output looks like an error.
 
-The top overview summarizes the selected session and shows recent attention
-targets from other sessions without repeating the selected session.
+The terminal output now starts directly below the toolbar without a separate
+state viewer. Session health remains visible through the sidebar status dots,
+and Focus view provides the detailed status and recent-attention overview.
 
 ## Android App
 

@@ -18,6 +18,8 @@ attach, and temporary file uploads over a private network path.
 - Mobile-first tmux control for terminal agents.
 - Launch OpenCode, Codex, Claude Code, Gemini CLI, GitHub Copilot, Cursor
   Agent, Qwen Code, Cline, Aider, goose, Amp, or custom commands.
+- Browse launchers alphabetically, pin favorites to the top, and save named
+  custom commands locally with the `+` control.
 - Use grouped launcher modes for Default, Plan, Auto, Auto Edit, Autopilot, and
   Yolo presets without stacking incompatible permission modes.
 - Switch between normalized chat capture and raw tmux terminal mode.
@@ -27,8 +29,8 @@ attach, and temporary file uploads over a private network path.
   to latest output when ready.
 - Force Sync manually refreshes the captured pane without attaching to tmux.
 - Upload files from Android or desktop browsers to temporary server paths.
-- Use the compact view dropdown for Regular, GUI, Focus, Raw, Light, and Dark
-  controls without crowding the tmux toolbar.
+- Use the clearly labeled view dropdown for TTY, GUI, Focus, Raw, Light, and
+  Dark controls without crowding the tmux toolbar.
 - Android sideload APK wraps the private server UI with native file picking and
   task-complete notifications.
 - Browser/native notifications can alert when a watched tmux task returns to
