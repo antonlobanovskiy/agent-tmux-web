@@ -290,7 +290,7 @@ app.post("/api/tmux/open-tool", asyncHandler(async (req, res) => {
   const configuredTool = requestedToolId
     ? listTmuxTools().find((tool) => tool.id === requestedToolId)
     : null;
-  const modeIds = stringArray(body.modeIds);
+  const modeIds = Array.isArray(body.modeIds) ? stringArray(body.modeIds) : undefined;
   const command = configuredTool?.command ?? requireString(body.command, "command");
   await openTmuxTool(session, configuredTool ?? { command }, configuredTool ? modeIds : []);
   tmuxWatch.startWatch(session, configuredTool?.label ?? command);

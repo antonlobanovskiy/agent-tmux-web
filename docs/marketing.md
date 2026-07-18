@@ -2,8 +2,9 @@
 
 ## One-Liner
 
-Agent Tmux Web lets you run Codex, Claude, Gemini, and custom terminal agents
-from your phone while tmux keeps the real sessions alive on your server.
+Agent Tmux Web lets you run OpenCode, Codex, Claude, Gemini, and custom
+terminal agents from your phone while tmux keeps the real sessions alive on your
+server.
 
 ## Short Description
 
@@ -16,7 +17,7 @@ attach, and temporary file uploads over a private network path.
 ## Key Points
 
 - Mobile-first tmux control for terminal agents.
-- Launch Codex, Claude Code, Gemini, or custom commands.
+- Launch OpenCode Auto, Codex, Claude Code, Gemini, or custom commands.
 - Switch between normalized chat capture and raw tmux terminal mode.
 - Use Focus mode and session status dots to see which tmux tab is running,
   waiting, or failing.

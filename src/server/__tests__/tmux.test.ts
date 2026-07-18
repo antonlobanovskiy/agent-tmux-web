@@ -112,6 +112,20 @@ describe("tmux command builders", () => {
   it("provides generic default agent CLI launchers", () => {
     expect(parseTmuxTools(undefined)).toEqual([
       {
+        id: "opencode",
+        label: "OpenCode",
+        command: "opencode",
+        defaultSessionName: "opencode",
+        modes: [
+          {
+            id: "auto",
+            label: "Auto",
+            args: "--auto",
+            defaultEnabled: true
+          }
+        ]
+      },
+      {
         id: "codex",
         label: "Codex",
         command: "codex",
@@ -173,6 +187,18 @@ describe("tmux command builders", () => {
   it("builds a generic CLI tool command for opening inside tmux", () => {
     expect(buildTmuxToolCommand({ command: "claude" })).toBe("claude");
     expect(buildTmuxToolCommand({ command: "gemini --sandbox" })).toBe("gemini --sandbox");
+    expect(buildTmuxToolCommand({
+      command: "opencode",
+      modes: [{ id: "auto", label: "Auto", args: "--auto", defaultEnabled: true }]
+    })).toBe("opencode --auto");
+    expect(buildTmuxToolCommand({
+      command: "opencode",
+      modes: [{ id: "auto", label: "Auto", args: "--auto", defaultEnabled: true }]
+    }, ["auto"])).toBe("opencode --auto");
+    expect(buildTmuxToolCommand({
+      command: "opencode",
+      modes: [{ id: "auto", label: "Auto", args: "--auto", defaultEnabled: true }]
+    }, [])).toBe("opencode");
     expect(buildTmuxToolCommand({
       command: "codex",
       modes: [{ id: "yolo", label: "Yolo", args: "--yolo" }]

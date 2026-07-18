@@ -4,8 +4,8 @@
   <img src="./public/agent-tmux-logo.png" alt="" width="72">
 </p>
 
-Run long-lived Codex, Claude, Gemini, and custom terminal agents from your
-phone or desktop while tmux keeps the real processes alive on your server.
+Run long-lived OpenCode, Codex, Claude, Gemini, and custom terminal agents from
+your phone or desktop while tmux keeps the real processes alive on your server.
 
 Agent Tmux Web is a private browser control surface for tmux-backed agent
 sessions. It is useful when SSH on a phone is too cramped, when mobile browsers
@@ -43,7 +43,8 @@ and desktop layout.
 - Long-running tmux sessions that survive browser disconnects and phone sleep.
 - Mobile-friendly session switching, creation, destruction, and launcher
   controls.
-- Built-in launchers for Codex, Claude, Gemini, plus custom commands.
+- Built-in launchers for OpenCode Auto, Codex, Claude, Gemini, plus custom
+  commands.
 - GUI mode for readable chat-style agent output.
 - TTY mode for plain tmux pane capture.
 - Raw mode for direct interactive tmux control, including shell and TUI work.
@@ -68,7 +69,7 @@ phone or desktop browser
 Agent Tmux Web server
         |
         v
-tmux sessions running Codex, Claude, Gemini, shells, or custom CLIs
+tmux sessions running OpenCode, Codex, Claude, Gemini, shells, or custom CLIs
 ```
 
 The web UI does not host an AI service. It sends keys to tmux, captures pane
@@ -81,8 +82,8 @@ agent CLIs and credentials stay on your server.
 - Node.js 22+
 - `pnpm`
 - `git`
-- At least one terminal agent command, such as `codex`, `claude`, `gemini`, or
-  your own script
+- At least one terminal agent command, such as `opencode`, `codex`, `claude`,
+  `gemini`, or your own script
 - Optional but recommended for phone use: Tailscale, a VPN, an SSH tunnel, LAN
   access, or an authenticated reverse proxy
 
@@ -151,7 +152,8 @@ mode, and notifications.
 ## Using The App
 
 1. Pick or create a tmux session from the session list.
-2. Choose a launcher such as `Codex`, `Claude`, `Gemini`, or `Custom`.
+2. Choose a launcher such as `OpenCode`, `Codex`, `Claude`, `Gemini`, or
+   `Custom`.
 3. Press `Run`, or type directly into the tmux input.
 4. Use `GUI` for readable agent output, `TTY` for plain pane text, and `Raw`
    when you need exact terminal input.
@@ -234,6 +236,13 @@ Example launcher config:
 
 ```json
 [
+  {
+    "id": "opencode",
+    "label": "OpenCode",
+    "command": "opencode",
+    "defaultSessionName": "opencode",
+    "modes": [{ "id": "auto", "label": "Auto", "args": "--auto", "defaultEnabled": true }]
+  },
   {
     "id": "codex",
     "label": "Codex",
