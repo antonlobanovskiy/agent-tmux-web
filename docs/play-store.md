@@ -57,8 +57,10 @@ pnpm android:build:public
 
 - Do not market this as a hosted AI service; it is a control surface for a
   user-owned server.
-- Do not imply the app includes OpenCode, Codex, Claude, Gemini, tmux, or any
-  hosted agent. Those tools run on the user's server.
+- Do not imply the app includes tmux, hosted agents, or third-party coding
+  harnesses such as OpenCode, Codex, Claude Code, Gemini CLI, GitHub Copilot,
+  Cursor Agent, Qwen Code, Cline, Aider, goose, or Amp. Those tools run on the
+  user's server.
 - Treat the auth token like terminal access. Store listing copy should recommend
   Tailscale, VPN, SSH tunnel, LAN-only access, or an authenticated reverse proxy.
 

@@ -2,6 +2,9 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 import type { TmuxToolDto } from "../shared/api.js";
+import { buildTmuxToolCommand, DEFAULT_TMUX_TOOLS } from "../shared/tmuxTools.js";
+
+export { buildTmuxToolCommand } from "../shared/tmuxTools.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -25,41 +28,6 @@ export type TmuxToolConfig = TmuxToolDto;
 export type TmuxSubmitKey = "enter" | "codex-enter" | "tab";
 export type TmuxInterruptKey = "escape" | "ctrl-c";
 
-const DEFAULT_TMUX_TOOLS: TmuxToolConfig[] = [
-  {
-    id: "opencode",
-    label: "OpenCode",
-    command: "opencode",
-    defaultSessionName: "opencode",
-    modes: [
-      {
-        id: "auto",
-        label: "Auto",
-        args: "--auto",
-        defaultEnabled: true
-      }
-    ]
-  },
-  {
-    id: "codex",
-    label: "Codex",
-    command: "codex",
-    defaultSessionName: "codex",
-    modes: [
-      {
-        id: "yolo",
-        label: "Yolo",
-        args: "--yolo"
-      }
-    ]
-  },
-  {
-    id: "claude",
-    label: "Claude",
-    command: "claude",
-    defaultSessionName: "claude"
-  }
-];
 const DEFAULT_DETACHED_TMUX_COLS = 160;
 const DEFAULT_DETACHED_TMUX_ROWS = 40;
 export const TMUX_LITERAL_SEND_CHUNK_SIZE = 16_000;
@@ -94,17 +62,22 @@ function parseTmuxToolModes(value: unknown): NonNullable<TmuxToolConfig["modes"]
       return [];
     }
     const record = entry as Record<string, unknown>;
-    const args = typeof record.args === "string" ? record.args.trim() : "";
-    if (!args) {
+    if (typeof record.args !== "string") {
       return [];
     }
+    const args = record.args.trim();
     const label = typeof record.label === "string" && record.label.trim() ? record.label.trim() : `Mode ${index + 1}`;
     const id = normalizeTmuxToolId(typeof record.id === "string" ? record.id : label) || `mode-${index + 1}`;
+    const exclusiveGroup = normalizeTmuxToolId(typeof record.exclusiveGroup === "string" ? record.exclusiveGroup : "");
+    const description = typeof record.description === "string" ? record.description.trim() : "";
     return [{
       id,
       label,
       args,
-      ...(record.defaultEnabled === true ? { defaultEnabled: true } : {})
+      ...(record.defaultEnabled === true ? { defaultEnabled: true } : {}),
+      ...(exclusiveGroup ? { exclusiveGroup } : {}),
+      ...(description ? { description } : {}),
+      ...(record.dangerous === true ? { dangerous: true } : {})
     }];
   });
 }
@@ -222,16 +195,6 @@ export function chunkTmuxLiteralText(text: string, maxChunkLength = TMUX_LITERAL
 
 export function buildCodexTmuxCommand(_options: CodexTmuxCommandOptions): string {
   return "codex";
-}
-
-export function buildTmuxToolCommand(tool: Pick<TmuxToolConfig, "command" | "modes">, modeIds?: string[]): string {
-  const selectedModeIds = modeIds ?? tool.modes?.filter((mode) => mode.defaultEnabled).map((mode) => mode.id) ?? [];
-  const modeIdSet = new Set(selectedModeIds.map(normalizeTmuxToolId).filter(Boolean));
-  const args = tool.modes
-    ?.filter((mode) => modeIdSet.has(mode.id))
-    .map((mode) => mode.args.trim())
-    .filter(Boolean) ?? [];
-  return [tool.command.trim(), ...args].filter(Boolean).join(" ");
 }
 
 export function parseTmuxSessions(output: string): TmuxSession[] {

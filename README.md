@@ -4,8 +4,8 @@
   <img src="./public/agent-tmux-logo.png" alt="" width="72">
 </p>
 
-Run long-lived OpenCode, Codex, Claude, Gemini, and custom terminal agents from
-your phone or desktop while tmux keeps the real processes alive on your server.
+Run long-lived coding-agent CLIs from your phone or desktop while tmux keeps
+the real processes alive on your server.
 
 Agent Tmux Web is a private browser control surface for tmux-backed agent
 sessions. It is useful when SSH on a phone is too cramped, when mobile browsers
@@ -43,8 +43,10 @@ and desktop layout.
 - Long-running tmux sessions that survive browser disconnects and phone sleep.
 - Mobile-friendly session switching, creation, destruction, and launcher
   controls.
-- Built-in launchers for OpenCode Auto, Codex, Claude, Gemini, plus custom
-  commands.
+- Built-in launchers for OpenCode, Codex, Claude Code, Gemini CLI, GitHub
+  Copilot, Cursor Agent, Qwen Code, Cline, Aider, goose, and Amp.
+- Harness-specific Default, Plan, Auto, Auto Edit, Autopilot, and Yolo controls
+  with incompatible permission modes kept mutually exclusive.
 - GUI mode for readable chat-style agent output.
 - TTY mode for plain tmux pane capture.
 - Raw mode for direct interactive tmux control, including shell and TUI work.
@@ -69,7 +71,7 @@ phone or desktop browser
 Agent Tmux Web server
         |
         v
-tmux sessions running OpenCode, Codex, Claude, Gemini, shells, or custom CLIs
+tmux sessions running coding agents, shells, or custom CLIs
 ```
 
 The web UI does not host an AI service. It sends keys to tmux, captures pane
@@ -83,7 +85,7 @@ agent CLIs and credentials stay on your server.
 - `pnpm`
 - `git`
 - At least one terminal agent command, such as `opencode`, `codex`, `claude`,
-  `gemini`, or your own script
+  `gemini`, `copilot`, `agent`, or your own script
 - Optional but recommended for phone use: Tailscale, a VPN, an SSH tunnel, LAN
   access, or an authenticated reverse proxy
 
@@ -152,12 +154,11 @@ mode, and notifications.
 ## Using The App
 
 1. Pick or create a tmux session from the session list.
-2. Choose a launcher such as `OpenCode`, `Codex`, `Claude`, `Gemini`, or
-   `Custom`.
+2. Choose a built-in harness or `Custom` launcher.
 3. Press `Run`, or type directly into the tmux input.
 4. Use `GUI` for readable agent output, `TTY` for plain pane text, and `Raw`
    when you need exact terminal input.
-5. Turn on `Notify` when you want task-done alerts.
+5. Use the bell button when you want task-done alerts.
 6. Use the paperclip button to upload files, or paste clipboard images directly
    into the chat input. Uploaded files are inserted as temporary server paths in
    prompts.
@@ -232,31 +233,64 @@ Common variables:
 - `CODEX_APP_SERVER_PORT`: optional Codex app-server port.
 - `CODEX_APP_SERVER_AUTOSTART`: set to `1` to start Codex app-server on boot.
 
-Example launcher config:
+Built-in launcher modes:
+
+| Harness | Command | Launch modes |
+| --- | --- | --- |
+| OpenCode | `opencode` | Default, Auto (default) |
+| Codex | `codex` | Default, Auto, Yolo |
+| Claude Code | `claude` | Default, Plan, Accept edits, Auto, Yolo |
+| Gemini CLI | `gemini` | Default, Plan, Auto edit, Yolo |
+| GitHub Copilot | `copilot` | Default, Auto tools, Yolo; optional Autopilot toggle |
+| Cursor Agent | `agent` | Default, Auto commands |
+| Qwen Code | `qwen` | Default, Plan, Auto edit, Auto, Yolo |
+| Cline | `cline --tui` | Auto (default), Ask |
+| Aider | `aider` | Default, Always yes |
+| goose | `goose session` | Harness defaults |
+| Amp | `amp` | Harness defaults |
+
+High-risk modes are marked in red. They can execute tools without individual
+approval and should be used only in trusted repositories or an external
+sandbox. Amp is autonomous by default, and Cline CLI defaults to auto approval;
+consult those harnesses' own security controls before launching them on an
+untrusted host.
+
+`CLI_WEB_TOOLS` replaces the complete built-in catalog. Each mode appends its
+`args` to the base command. Give mutually exclusive choices the same
+`exclusiveGroup`; ungrouped modes remain independent checkboxes. `description`
+becomes hover help, and `dangerous` adds the high-risk treatment.
+
+Example custom launcher config:
 
 ```json
 [
   {
-    "id": "opencode",
-    "label": "OpenCode",
-    "command": "opencode",
-    "defaultSessionName": "opencode",
-    "modes": [{ "id": "auto", "label": "Auto", "args": "--auto", "defaultEnabled": true }]
-  },
-  {
-    "id": "codex",
-    "label": "Codex",
-    "command": "codex",
-    "defaultSessionName": "codex",
-    "modes": [{ "id": "yolo", "label": "Yolo", "args": "--yolo" }]
-  },
-  { "id": "claude", "label": "Claude", "command": "claude", "defaultSessionName": "claude" },
-  { "id": "gemini", "label": "Gemini", "command": "gemini", "defaultSessionName": "gemini" }
+    "id": "claude",
+    "label": "Claude Code",
+    "command": "claude",
+    "defaultSessionName": "claude",
+    "modes": [
+      {
+        "id": "default",
+        "label": "Default",
+        "args": "",
+        "defaultEnabled": true,
+        "exclusiveGroup": "permissions"
+      },
+      {
+        "id": "yolo",
+        "label": "Yolo",
+        "args": "--dangerously-skip-permissions",
+        "exclusiveGroup": "permissions",
+        "description": "Bypass all permission checks.",
+        "dangerous": true
+      }
+    ]
+  }
 ]
 ```
 
-Use `modes` for reusable flags. Use `Custom` in the UI for one-off commands such
-as:
+Use `Custom` in the UI for one-off commands such as:
 
 ```bash
 codex -C /workspace/project -m gpt-5.5

@@ -351,9 +351,19 @@
           "target": "~/src/shared/tmuxStatus.ts"
         },
         {
+          "path": "src/shared/tmuxTools.ts",
+          "type": "registry:file",
+          "target": "~/src/shared/tmuxTools.ts"
+        },
+        {
           "path": "src/shared/__tests__/codexEvents.test.ts",
           "type": "registry:file",
           "target": "~/src/shared/__tests__/codexEvents.test.ts"
+        },
+        {
+          "path": "src/shared/__tests__/tmuxTools.test.ts",
+          "type": "registry:file",
+          "target": "~/src/shared/__tests__/tmuxTools.test.ts"
         }
       ],
       "docs": "After installing source files, run pnpm install, copy .env.example to .env, and build with pnpm build. The app needs tmux and at least one terminal agent CLI on the server.",
