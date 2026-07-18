@@ -15,7 +15,7 @@ const showcaseScenes = [
   {
     eyebrow: "Private server control",
     title: "Terminal agents keep running when your phone disconnects",
-    body: "Run Codex, Claude, Gemini, and custom CLIs inside tmux on your own server. The browser or Android app is only the control surface.",
+    body: "Run OpenCode, Codex, Claude, Gemini, and custom CLIs inside tmux on your own server. The browser or Android app is only the control surface.",
     bullets: ["tmux owns the process", "phone and laptop can reconnect", "private network friendly"],
     media: "../mobile-chat.png",
     layout: "phone"
@@ -63,7 +63,7 @@ const showcaseScenes = [
   {
     eyebrow: "Session control",
     title: "See live tmux sessions and launch the right tool",
-    body: "Switch between active sessions, create a new one, or start Codex, Claude, Gemini, or a custom command from the same panel.",
+    body: "Switch between active sessions, create a new one, or start OpenCode Auto, Codex, Claude, Gemini, or a custom command from the same panel.",
     bullets: ["session list", "tool launcher menu", "custom commands"],
     media: "../mobile-launchers.png",
     layout: "phone"

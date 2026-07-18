@@ -136,6 +136,7 @@ const DEMO_TMUX_WATCH_EVENTS: TmuxWatchEvent[] = [
   }
 ];
 const DEMO_TMUX_TOOLS: TmuxToolDto[] = [
+  { id: "opencode", label: "OpenCode", command: "opencode", defaultSessionName: "opencode", modes: [{ id: "auto", label: "Auto", args: "--auto", defaultEnabled: true }] },
   { id: "codex", label: "Codex", command: "codex", defaultSessionName: "codex", modes: [{ id: "yolo", label: "Yolo", args: "--yolo" }] },
   { id: "claude", label: "Claude", command: "claude", defaultSessionName: "claude" },
   { id: "gemini", label: "Gemini", command: "gemini", defaultSessionName: "gemini" }
@@ -145,7 +146,7 @@ const DEMO_TMUX_OUTPUT = [
   "",
   "• Mobile layout checked at 390px wide.",
   "• Tmux sessions keep running on the server while the browser stays lightweight.",
-  "• Codex, Claude, Gemini, and custom CLI commands can launch from the same menu.",
+  "• OpenCode Auto, Codex, Claude, Gemini, and custom CLI commands can launch from the same menu.",
   "• Force Sync updates the captured pane without stealing your scroll position.",
   "",
   "```terminal",
@@ -231,7 +232,7 @@ export function App() {
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [error, setError] = useState("");
   const [newTmuxName, setNewTmuxName] = useState("agent");
-  const [selectedTmuxTool, setSelectedTmuxTool] = useState("codex");
+  const [selectedTmuxTool, setSelectedTmuxTool] = useState("opencode");
   const [selectedTmuxToolModes, setSelectedTmuxToolModes] = useState<Record<string, string[]>>({});
   const [customTmuxCommand, setCustomTmuxCommand] = useState("");
   const [slashIndex, setSlashIndex] = useState(0);

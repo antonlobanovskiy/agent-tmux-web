@@ -27,6 +27,20 @@ export type TmuxInterruptKey = "escape" | "ctrl-c";
 
 const DEFAULT_TMUX_TOOLS: TmuxToolConfig[] = [
   {
+    id: "opencode",
+    label: "OpenCode",
+    command: "opencode",
+    defaultSessionName: "opencode",
+    modes: [
+      {
+        id: "auto",
+        label: "Auto",
+        args: "--auto",
+        defaultEnabled: true
+      }
+    ]
+  },
+  {
     id: "codex",
     label: "Codex",
     command: "codex",
@@ -210,8 +224,9 @@ export function buildCodexTmuxCommand(_options: CodexTmuxCommandOptions): string
   return "codex";
 }
 
-export function buildTmuxToolCommand(tool: Pick<TmuxToolConfig, "command" | "modes">, modeIds: string[] = []): string {
-  const modeIdSet = new Set(modeIds.map(normalizeTmuxToolId).filter(Boolean));
+export function buildTmuxToolCommand(tool: Pick<TmuxToolConfig, "command" | "modes">, modeIds?: string[]): string {
+  const selectedModeIds = modeIds ?? tool.modes?.filter((mode) => mode.defaultEnabled).map((mode) => mode.id) ?? [];
+  const modeIdSet = new Set(selectedModeIds.map(normalizeTmuxToolId).filter(Boolean));
   const args = tool.modes
     ?.filter((mode) => modeIdSet.has(mode.id))
     .map((mode) => mode.args.trim())
@@ -306,7 +321,7 @@ export async function openCodexInTmux(session: string, options: CodexTmuxCommand
   await sendTmuxText(session, buildCodexTmuxCommand(options), true);
 }
 
-export async function openTmuxTool(session: string, tool: Pick<TmuxToolConfig, "command" | "modes">, modeIds: string[] = []): Promise<void> {
+export async function openTmuxTool(session: string, tool: Pick<TmuxToolConfig, "command" | "modes">, modeIds?: string[]): Promise<void> {
   await sendTmuxText(session, buildTmuxToolCommand(tool, modeIds), true);
 }
 

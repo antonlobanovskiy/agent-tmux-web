@@ -8,6 +8,13 @@ uploads, machine-specific service edits, or private signing material.
 
 ## Unreleased
 
+## 0.1.21 - 2026-07-18
+
+- Added OpenCode as the first built-in launcher.
+- Enabled the OpenCode `Auto` mode by default so new installs launch
+  `opencode --auto` from the default tool selection.
+- Bumped the public Android version defaults to `0.1.21` / version code `22`.
+
 ## 0.1.20 - 2026-07-07
 
 - Removed the Android popup-link fallback that created a hidden WebView before
