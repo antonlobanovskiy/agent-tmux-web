@@ -63,8 +63,8 @@ const showcaseScenes = [
   {
     eyebrow: "Session control",
     title: "See live tmux sessions and launch the right tool",
-    body: "Switch between active sessions, create a new one, or start any built-in coding harness or custom command from the same panel.",
-    bullets: ["session list", "tool launcher menu", "custom commands"],
+    body: "Switch sessions, browse launchers alphabetically, pin favorites, or save a named custom command from the same panel.",
+    bullets: ["alphabetical launchers", "pinned favorites", "custom commands"],
     media: "../mobile-launchers.png",
     layout: "phone"
   },
@@ -159,7 +159,7 @@ try {
   await evaluate(page, "document.querySelector('.tmux-jump-bottom')?.click()");
   await delay(350);
 
-  await chooseView(page, "Regular");
+  await chooseView(page, "TTY");
   await delay(250);
   await capture(page, path.join(assetsDir, "mobile-tty.png"));
   await chooseTheme(page, "Light");
@@ -192,7 +192,7 @@ try {
   await delay(350);
   await capture(page, path.join(assetsDir, "mobile-raw-terminal.png"));
 
-  await chooseView(page, "Regular");
+  await chooseView(page, "TTY");
   await delay(250);
   await setViewport(page, 1440, 900);
   await delay(500);
