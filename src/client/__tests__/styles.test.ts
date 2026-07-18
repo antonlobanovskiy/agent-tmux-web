@@ -18,11 +18,15 @@ describe("responsive mobile CSS", () => {
     expect(mobileBlock).toContain("flex: 1 1 auto");
   });
 
-  it("keeps the mobile tmux toolbar stable with seven action buttons", () => {
+  it("keeps the mobile tmux toolbar stable with compact view controls and a bell notify button", () => {
     const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");
     const mobileBlock = css.slice(css.indexOf("@media (max-width: 760px)"));
 
-    expect(mobileBlock).toContain("grid-template-columns: 36px 36px 36px 36px 36px 36px 36px minmax(0, 1fr)");
+    expect(css).toContain(".tmux-view-menu");
+    expect(css).toContain(".tmux-view-menu-content");
+    expect(css).toContain(".tmux-notify-button");
+    expect(mobileBlock).toContain("grid-template-columns: minmax(0, auto) 36px 36px minmax(0, 1fr) 36px");
+    expect(mobileBlock).not.toContain("grid-template-columns: 36px 36px 36px 36px 36px 36px 36px minmax(0, 1fr)");
   });
 
   it("defines green yellow and red tmux session status dots", () => {

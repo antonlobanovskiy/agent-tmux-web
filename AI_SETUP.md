@@ -62,23 +62,31 @@ deployment is separate. Keep user-specific runtime config out of git.
 
 5. Configure CLI launchers.
 
-   Default launcher shape:
+   The built-in catalog includes OpenCode, Codex, Claude Code, Gemini CLI,
+   GitHub Copilot, Cursor Agent, Qwen Code, Cline, Aider, goose, and Amp. It
+   exposes each harness's supported Default, Plan, Auto, Auto Edit, Autopilot,
+   and Yolo choices where applicable.
+
+   `CLI_WEB_TOOLS` replaces that catalog when you need custom commands. Example:
 
    ```json
    [
      {
-       "id": "codex",
-       "label": "Codex",
-       "command": "codex",
-       "defaultSessionName": "codex",
-       "modes": [{ "id": "yolo", "label": "Yolo", "args": "--yolo" }]
-     },
-     { "id": "claude", "label": "Claude", "command": "claude", "defaultSessionName": "claude" },
-     { "id": "gemini", "label": "Gemini", "command": "gemini", "defaultSessionName": "gemini" }
+       "id": "custom-agent",
+       "label": "Custom Agent",
+       "command": "custom-agent",
+       "defaultSessionName": "custom-agent",
+       "modes": [
+         { "id": "default", "label": "Default", "args": "", "defaultEnabled": true, "exclusiveGroup": "permissions" },
+         { "id": "yolo", "label": "Yolo", "args": "--yolo", "exclusiveGroup": "permissions", "dangerous": true }
+       ]
+     }
    ]
    ```
 
-   Use `modes` for reusable flag toggles. Use the UI's `Custom` launcher for
+   Modes in the same `exclusiveGroup` render as radio choices. Ungrouped modes
+   render as independent checkboxes. Add `description` for hover help and
+   `dangerous: true` for high-risk styling. Use the UI's `Custom` launcher for
    one-off commands with custom flags.
 
 6. Run locally first.

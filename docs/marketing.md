@@ -2,9 +2,8 @@
 
 ## One-Liner
 
-Agent Tmux Web lets you run OpenCode, Codex, Claude, Gemini, and custom
-terminal agents from your phone while tmux keeps the real sessions alive on your
-server.
+Agent Tmux Web lets you run coding-agent CLIs from your phone while tmux keeps
+the real sessions alive on your server.
 
 ## Short Description
 
@@ -17,7 +16,10 @@ attach, and temporary file uploads over a private network path.
 ## Key Points
 
 - Mobile-first tmux control for terminal agents.
-- Launch OpenCode Auto, Codex, Claude Code, Gemini, or custom commands.
+- Launch OpenCode, Codex, Claude Code, Gemini CLI, GitHub Copilot, Cursor
+  Agent, Qwen Code, Cline, Aider, goose, Amp, or custom commands.
+- Use grouped launcher modes for Default, Plan, Auto, Auto Edit, Autopilot, and
+  Yolo presets without stacking incompatible permission modes.
 - Switch between normalized chat capture and raw tmux terminal mode.
 - Use Focus mode and session status dots to see which tmux tab is running,
   waiting, or failing.
@@ -25,7 +27,8 @@ attach, and temporary file uploads over a private network path.
   to latest output when ready.
 - Force Sync manually refreshes the captured pane without attaching to tmux.
 - Upload files from Android or desktop browsers to temporary server paths.
-- Toggle light/dark mode for bright or dark environments.
+- Use the compact view dropdown for Regular, GUI, Focus, Raw, Light, and Dark
+  controls without crowding the tmux toolbar.
 - Android sideload APK wraps the private server UI with native file picking and
   task-complete notifications.
 - Browser/native notifications can alert when a watched tmux task returns to

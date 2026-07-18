@@ -110,47 +110,45 @@ describe("tmux command builders", () => {
   });
 
   it("provides generic default agent CLI launchers", () => {
-    expect(parseTmuxTools(undefined)).toEqual([
-      {
-        id: "opencode",
-        label: "OpenCode",
-        command: "opencode",
-        defaultSessionName: "opencode",
-        modes: [
-          {
-            id: "auto",
-            label: "Auto",
-            args: "--auto",
-            defaultEnabled: true
-          }
-        ]
-      },
-      {
-        id: "codex",
-        label: "Codex",
-        command: "codex",
-        defaultSessionName: "codex",
-        modes: [
-          {
-            id: "yolo",
-            label: "Yolo",
-            args: "--yolo"
-          }
-        ]
-      },
-      {
-        id: "claude",
-        label: "Claude",
-        command: "claude",
-        defaultSessionName: "claude"
-      }
+    const tools = parseTmuxTools(undefined);
+    expect(tools.map((tool) => tool.id)).toEqual([
+      "opencode",
+      "codex",
+      "claude",
+      "gemini",
+      "copilot",
+      "cursor",
+      "qwen",
+      "cline",
+      "aider",
+      "goose",
+      "amp"
     ]);
+    expect(tools.find((tool) => tool.id === "codex")?.modes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "auto", args: "--sandbox workspace-write --ask-for-approval on-request" }),
+      expect.objectContaining({ id: "yolo", args: "--dangerously-bypass-approvals-and-sandbox", dangerous: true })
+    ]));
+    expect(tools.find((tool) => tool.id === "claude")?.label).toBe("Claude Code");
+    expect(tools.find((tool) => tool.id === "cline")?.command).toBe("cline --tui");
+    expect(tools.find((tool) => tool.id === "goose")?.command).toBe("goose session");
   });
 
   it("parses configured generic tmux tools from JSON", () => {
     expect(parseTmuxTools(JSON.stringify([
       { label: "Gemini CLI", command: "gemini", defaultSessionName: "gemini work" },
-      { id: "claude-plan", label: "Claude Plan", command: "claude", modes: [{ label: "Plan", args: "--permission-mode plan", defaultEnabled: true }] }
+      {
+        id: "claude-plan",
+        label: "Claude Plan",
+        command: "claude",
+        modes: [{
+          label: "Plan",
+          args: "--permission-mode plan",
+          defaultEnabled: true,
+          exclusiveGroup: "Permission Mode",
+          description: "Read-only planning",
+          dangerous: true
+        }]
+      }
     ]))).toEqual([
       {
         id: "gemini-cli",
@@ -168,11 +166,35 @@ describe("tmux command builders", () => {
             id: "plan",
             label: "Plan",
             args: "--permission-mode plan",
-            defaultEnabled: true
+            defaultEnabled: true,
+            exclusiveGroup: "permission-mode",
+            description: "Read-only planning",
+            dangerous: true
           }
         ]
       }
     ]);
+  });
+
+  it("keeps empty-argument default choices for custom mode groups", () => {
+    expect(parseTmuxTools(JSON.stringify([{
+      id: "custom-agent",
+      label: "Custom Agent",
+      command: "custom-agent",
+      modes: [{
+        id: "default",
+        label: "Default",
+        args: "",
+        defaultEnabled: true,
+        exclusiveGroup: "permissions"
+      }]
+    }]))[0]?.modes).toEqual([{
+      id: "default",
+      label: "Default",
+      args: "",
+      defaultEnabled: true,
+      exclusiveGroup: "permissions"
+    }]);
   });
 
   it("builds a plain Codex command for opening inside tmux", () => {
@@ -203,6 +225,14 @@ describe("tmux command builders", () => {
       command: "codex",
       modes: [{ id: "yolo", label: "Yolo", args: "--yolo" }]
     }, ["yolo"])).toBe("codex --yolo");
+    expect(buildTmuxToolCommand({
+      command: "codex",
+      modes: [
+        { id: "default", label: "Default", args: "", defaultEnabled: true, exclusiveGroup: "permissions" },
+        { id: "auto", label: "Auto", args: "--full-auto", exclusiveGroup: "permissions" },
+        { id: "yolo", label: "Yolo", args: "--yolo", exclusiveGroup: "permissions" }
+      ]
+    }, ["auto", "yolo"])).toBe("codex --yolo");
   });
 
   it("builds kill-session args for destroying a tmux session", () => {

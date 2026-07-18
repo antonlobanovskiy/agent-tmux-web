@@ -8,6 +8,18 @@ uploads, machine-specific service edits, or private signing material.
 
 ## Unreleased
 
+## 0.1.22 - 2026-07-18
+
+- Expanded the built-in tmux launcher catalog for OpenCode, Codex, Claude Code,
+  Gemini CLI, GitHub Copilot, Cursor Agent, Qwen Code, Cline, Aider, goose, and
+  Amp.
+- Added grouped launcher modes so incompatible permission presets render as
+  exclusive choices, with high-risk modes marked as dangerous.
+- Collapsed tmux view/theme controls into a compact dropdown for Regular, GUI,
+  Focus, Raw, Light, and Dark options.
+- Moved tmux notifications to a top-right bell-only toolbar button.
+- Bumped the public Android version defaults to `0.1.22` / version code `23`.
+
 ## 0.1.21 - 2026-07-18
 
 - Added OpenCode as the first built-in launcher.

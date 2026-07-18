@@ -31,13 +31,13 @@ import {
   Sun,
   Terminal as TerminalIcon,
   Trash2,
-  X,
   Wrench
 } from "lucide-react";
 import { ClipboardEvent, FormEvent, KeyboardEvent, UIEvent, forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { AppStatus, CodexModel, CodexSkill, TmuxSessionDto, TmuxToolDto, TmuxWatchEvent, UploadedFileDto } from "../shared/api.js";
 import { describeThreadItem, type UiEventDescription } from "../shared/codexEvents.js";
+import { buildTmuxToolCommand, DEFAULT_TMUX_TOOLS, defaultTmuxToolModeIds, toggleTmuxToolModeId } from "../shared/tmuxTools.js";
 import {
   filterSlashCommands,
   parseSlashCommand,
@@ -45,7 +45,7 @@ import {
   slashQueryForMessage,
   type SlashCommand
 } from "./slashCommands.js";
-import { COLOR_THEME_STORAGE_KEY, nextColorTheme, resolveInitialColorTheme, type ColorTheme } from "./theme.js";
+import { COLOR_THEME_STORAGE_KEY, resolveInitialColorTheme, type ColorTheme } from "./theme.js";
 import { buildCompactTmuxMessages, summarizeTmuxAgent, type CompactTmuxMessage, type TmuxAgentSummary } from "./agentStatus.js";
 import { writeClipboardText } from "./clipboard.js";
 import { applyTextareaPaste, buildPastedPromptText, extractPastedImageFiles, shouldSubmitTextareaEnter } from "./inputBehavior.js";
@@ -75,6 +75,15 @@ type ThreadSummary = {
   cwd: string;
   status: string;
   updatedAt: number;
+};
+
+type TmuxViewMode = "regular" | "gui" | "focus" | "raw";
+
+const TMUX_VIEW_MODE_LABELS: Record<TmuxViewMode, string> = {
+  regular: "Regular",
+  gui: "GUI",
+  focus: "Focus",
+  raw: "Raw"
 };
 
 type WsPayload = {
@@ -135,18 +144,13 @@ const DEMO_TMUX_WATCH_EVENTS: TmuxWatchEvent[] = [
     finishedAt: "2026-05-14T13:05:00.000Z"
   }
 ];
-const DEMO_TMUX_TOOLS: TmuxToolDto[] = [
-  { id: "opencode", label: "OpenCode", command: "opencode", defaultSessionName: "opencode", modes: [{ id: "auto", label: "Auto", args: "--auto", defaultEnabled: true }] },
-  { id: "codex", label: "Codex", command: "codex", defaultSessionName: "codex", modes: [{ id: "yolo", label: "Yolo", args: "--yolo" }] },
-  { id: "claude", label: "Claude", command: "claude", defaultSessionName: "claude" },
-  { id: "gemini", label: "Gemini", command: "gemini", defaultSessionName: "gemini" }
-];
+const DEMO_TMUX_TOOLS: TmuxToolDto[] = DEFAULT_TMUX_TOOLS;
 const DEMO_TMUX_OUTPUT = [
   "› Review the mobile release checklist and prep the launch notes.",
   "",
   "• Mobile layout checked at 390px wide.",
   "• Tmux sessions keep running on the server while the browser stays lightweight.",
-  "• OpenCode Auto, Codex, Claude, Gemini, and custom CLI commands can launch from the same menu.",
+  "• Eleven built-in coding harnesses and custom CLI commands can launch from the same menu.",
   "• Force Sync updates the captured pane without stealing your scroll position.",
   "",
   "```terminal",
@@ -259,6 +263,7 @@ export function App() {
   const tmuxFileInputRef = useRef<HTMLInputElement | null>(null);
   const tmuxOutputRef = useRef<HTMLPreElement | null>(null);
   const tmuxChatRef = useRef<HTMLDivElement | null>(null);
+  const tmuxViewMenuRef = useRef<HTMLDetailsElement | null>(null);
   const tmuxFollowTimersRef = useRef<number[]>([]);
   const tmuxNotificationsEnabledRef = useRef(tmuxNotificationsEnabled);
   const tmuxStickToBottomRef = useRef(true);
@@ -297,12 +302,14 @@ export function App() {
   );
   const tmuxCompactMessages = useMemo(() => buildCompactTmuxMessages(tmuxChatMessages), [tmuxChatMessages]);
   const showTmuxSendForm = shouldShowTmuxSendForm({ terminalActive });
+  const tmuxViewMode: TmuxViewMode = terminalActive ? "raw" : tmuxFocusActive ? "focus" : tmuxGuiActive ? "gui" : "regular";
+  const tmuxViewModeLabel = TMUX_VIEW_MODE_LABELS[tmuxViewMode];
   const currentTmuxTool = useMemo(() => tmuxTools.find((tool) => tool.id === selectedTmuxTool) ?? null, [selectedTmuxTool, tmuxTools]);
   const currentTmuxToolModeIds = useMemo(() => currentTmuxTool
     ? selectedTmuxToolModes[currentTmuxTool.id] ?? defaultTmuxToolModeIds(currentTmuxTool)
     : [], [currentTmuxTool, selectedTmuxToolModes]);
   const currentTmuxToolCommand = useMemo(() => currentTmuxTool
-    ? buildTmuxToolCommandPreview(currentTmuxTool, currentTmuxToolModeIds)
+    ? buildTmuxToolCommand(currentTmuxTool, currentTmuxToolModeIds)
     : "", [currentTmuxTool, currentTmuxToolModeIds]);
 
   const baseUrl = useMemo(() => {
@@ -1012,37 +1019,37 @@ export function App() {
     await copyTmuxAssistantText(latestTmuxAssistantMessage.text);
   }
 
-  function toggleTmuxGui() {
+  function closeTmuxViewMenu() {
+    tmuxViewMenuRef.current?.removeAttribute("open");
+  }
+
+  function selectTmuxViewMode(mode: TmuxViewMode) {
+    closeTmuxViewMenu();
     if (!selectedTmux) {
       return;
     }
 
-    const nextActive = !tmuxGuiActive;
-    clearTmuxFollowTimers(tmuxFollowTimersRef);
-    setTerminalActive(false);
-    setTmuxFocusActive(false);
-    setTmuxGuiActive(nextActive);
-    queueTmuxOutputBottomScroll();
-    setTerminalStatus(nextActive ? `gui view for ${selectedTmux}` : selectedTmux);
-    void captureTmux(selectedTmux).catch(reportError(setError));
-  }
-
-  function toggleTmuxFocus() {
-    if (!selectedTmux) {
+    if (mode === "raw") {
+      openRawTerminal();
       return;
     }
+
     clearTmuxFollowTimers(tmuxFollowTimersRef);
     setTerminalActive(false);
-    setTmuxFocusActive((current) => !current);
+    setTmuxFocusActive(mode === "focus");
+    setTmuxGuiActive(mode === "gui");
     queueTmuxOutputBottomScroll();
-    setTerminalStatus(tmuxFocusActive ? selectedTmux : `focus view for ${selectedTmux}`);
+    setTerminalStatus(mode === "regular" ? selectedTmux : `${TMUX_VIEW_MODE_LABELS[mode].toLowerCase()} view for ${selectedTmux}`);
     void captureTmux(selectedTmux).catch(reportError(setError));
   }
 
-  function toggleColorTheme() {
-    const nextTheme = nextColorTheme(colorTheme);
-    setColorTheme(nextTheme);
-    setTerminalStatus(nextTheme === "light" ? "light mode on" : "dark mode on");
+  function selectColorTheme(theme: ColorTheme) {
+    closeTmuxViewMenu();
+    if (theme === colorTheme) {
+      return;
+    }
+    setColorTheme(theme);
+    setTerminalStatus(theme === "light" ? "light mode on" : "dark mode on");
   }
 
   async function toggleTmuxNotifications() {
@@ -1224,9 +1231,7 @@ export function App() {
 
     setSelectedTmuxToolModes((current) => {
       const existing = current[currentTmuxTool.id] ?? defaultTmuxToolModeIds(currentTmuxTool);
-      const next = existing.includes(modeId)
-        ? existing.filter((entry) => entry !== modeId)
-        : [...existing, modeId];
+      const next = toggleTmuxToolModeId(currentTmuxTool, existing, modeId);
       return {
         ...current,
         [currentTmuxTool.id]: next
@@ -1734,11 +1739,13 @@ export function App() {
             {selectedTmuxTool !== "custom" && currentTmuxTool?.modes?.length ? (
               <div className="tmux-tool-modes" aria-label="CLI tool modes">
                 {currentTmuxTool.modes.map((mode) => (
-                  <label key={mode.id}>
+                  <label className={mode.dangerous ? "dangerous" : ""} key={mode.id} title={mode.description}>
                     <input
+                      aria-label={`${currentTmuxTool.label} ${mode.label}`}
                       checked={currentTmuxToolModeIds.includes(mode.id)}
                       onChange={() => toggleSelectedTmuxToolMode(mode.id)}
-                      type="checkbox"
+                      name={mode.exclusiveGroup ? `${currentTmuxTool.id}-${mode.exclusiveGroup}` : undefined}
+                      type={mode.exclusiveGroup ? "radio" : "checkbox"}
                     />
                     <span>{mode.label}</span>
                   </label>
@@ -1749,16 +1756,44 @@ export function App() {
         </div>
         <div className="tmux-workspace">
           <div className="tmux-terminal-toolbar">
-            <button
-              aria-label={tmuxFocusActive ? "Show detailed tmux output" : "Show focus view"}
-              className={tmuxFocusActive ? "active" : ""}
-              title={tmuxFocusActive ? "Show detailed tmux output" : "Show focus view"}
-              type="button"
-              onClick={toggleTmuxFocus}
-            >
-              <ListFilter size={15} />
-              <span>Focus</span>
-            </button>
+            <details className="tmux-view-menu" ref={tmuxViewMenuRef}>
+              <summary aria-label="View and theme options" title="View and theme options">
+                <ListFilter size={15} />
+                <span className="tmux-view-menu-label">{tmuxViewModeLabel}</span>
+              </summary>
+              <div className="tmux-view-menu-content" role="menu">
+                <div className="tmux-view-menu-section">
+                  <span>View</span>
+                  <button className={tmuxViewMode === "regular" ? "active" : ""} role="menuitemradio" aria-checked={tmuxViewMode === "regular"} type="button" onClick={() => selectTmuxViewMode("regular")}>
+                    <TerminalIcon size={15} />
+                    <span>Regular</span>
+                  </button>
+                  <button className={tmuxViewMode === "gui" ? "active" : ""} role="menuitemradio" aria-checked={tmuxViewMode === "gui"} type="button" onClick={() => selectTmuxViewMode("gui")}>
+                    <MessageSquare size={15} />
+                    <span>GUI</span>
+                  </button>
+                  <button className={tmuxViewMode === "focus" ? "active" : ""} role="menuitemradio" aria-checked={tmuxViewMode === "focus"} type="button" onClick={() => selectTmuxViewMode("focus")}>
+                    <ListFilter size={15} />
+                    <span>Focus</span>
+                  </button>
+                  <button className={tmuxViewMode === "raw" ? "active" : ""} role="menuitemradio" aria-checked={tmuxViewMode === "raw"} type="button" onClick={() => selectTmuxViewMode("raw")}>
+                    <Keyboard size={15} />
+                    <span>Raw</span>
+                  </button>
+                </div>
+                <div className="tmux-view-menu-section">
+                  <span>Theme</span>
+                  <button className={colorTheme === "light" ? "active" : ""} role="menuitemradio" aria-checked={colorTheme === "light"} type="button" onClick={() => selectColorTheme("light")}>
+                    <Sun size={15} />
+                    <span>Light</span>
+                  </button>
+                  <button className={colorTheme === "dark" ? "active" : ""} role="menuitemradio" aria-checked={colorTheme === "dark"} type="button" onClick={() => selectColorTheme("dark")}>
+                    <Moon size={15} />
+                    <span>Dark</span>
+                  </button>
+                </div>
+              </div>
+            </details>
             <button aria-label="Force sync selected tmux output" title="Force sync selected tmux output" type="button" onClick={forceSyncTmuxOutput}>
               <Download size={15} /> <span>Force Sync</span>
             </button>
@@ -1772,45 +1807,16 @@ export function App() {
               <Copy size={15} />
               <span>Copy</span>
             </button>
-            <button
-              aria-label={tmuxGuiActive ? "Show terminal capture" : "Show GUI chat"}
-              className={tmuxGuiActive ? "active" : ""}
-              title={tmuxGuiActive ? "Show terminal capture" : "Show GUI chat"}
-              type="button"
-              onClick={toggleTmuxGui}
-            >
-              <MessageSquare size={15} />
-              <span>{tmuxGuiActive ? "TTY" : "GUI"}</span>
-            </button>
-            <button
-              aria-label={terminalActive ? "Detach raw tmux terminal" : "Attach raw tmux terminal"}
-              title={terminalActive ? "Detach raw tmux terminal" : "Attach raw tmux terminal"}
-              type="button"
-              onClick={terminalActive ? closeRawTerminal : openRawTerminal}
-            >
-              {terminalActive ? <X size={15} /> : <Keyboard size={15} />}
-              <span>{terminalActive ? "Detach" : "Raw"}</span>
-            </button>
-            <button
-              aria-label={colorTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-              title={colorTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-              type="button"
-              onClick={toggleColorTheme}
-            >
-              {colorTheme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
-              <span>{colorTheme === "dark" ? "Light" : "Dark"}</span>
-            </button>
+            <span className="tmux-terminal-status">{tmuxCopyNotice || terminalStatus || selectedTmux || "no session selected"}</span>
             <button
               aria-label={tmuxNotificationsEnabled ? "Disable browser notifications" : "Enable browser notifications"}
-              className={tmuxNotificationsEnabled ? "active" : ""}
+              className={`tmux-notify-button ${tmuxNotificationsEnabled ? "active" : ""}`}
               title={tmuxNotificationsEnabled ? "Disable browser notifications" : "Enable browser notifications"}
               type="button"
               onClick={() => toggleTmuxNotifications().catch(reportError(setError))}
             >
               <Bell size={15} />
-              <span>Notify</span>
             </button>
-            <span>{tmuxCopyNotice || terminalStatus || selectedTmux || "no session selected"}</span>
           </div>
           {!terminalActive && !tmuxFocusActive && (
             <TmuxAgentSummaryStrip
@@ -2190,19 +2196,6 @@ function formatUploadedFilesForPrompt(files: UploadedFileDto[]): string {
 
 function browserAccessToken(): string {
   return typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("token")?.trim() ?? "";
-}
-
-function defaultTmuxToolModeIds(tool: TmuxToolDto): string[] {
-  return tool.modes?.filter((mode) => mode.defaultEnabled).map((mode) => mode.id) ?? [];
-}
-
-function buildTmuxToolCommandPreview(tool: TmuxToolDto, modeIds: string[]): string {
-  const modeIdSet = new Set(modeIds);
-  const args = tool.modes
-    ?.filter((mode) => modeIdSet.has(mode.id))
-    .map((mode) => mode.args.trim())
-    .filter(Boolean) ?? [];
-  return [tool.command.trim(), ...args].filter(Boolean).join(" ");
 }
 
 function readInitialRequestedTmuxSession(): string {

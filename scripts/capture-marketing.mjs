@@ -15,7 +15,7 @@ const showcaseScenes = [
   {
     eyebrow: "Private server control",
     title: "Terminal agents keep running when your phone disconnects",
-    body: "Run OpenCode, Codex, Claude, Gemini, and custom CLIs inside tmux on your own server. The browser or Android app is only the control surface.",
+    body: "Run OpenCode, Codex, Claude Code, Gemini CLI, GitHub Copilot, Cursor Agent, Qwen Code, Cline, Aider, goose, Amp, and custom CLIs inside tmux on your own server. The browser or Android app is only the control surface.",
     bullets: ["tmux owns the process", "phone and laptop can reconnect", "private network friendly"],
     media: "../mobile-chat.png",
     layout: "phone"
@@ -63,7 +63,7 @@ const showcaseScenes = [
   {
     eyebrow: "Session control",
     title: "See live tmux sessions and launch the right tool",
-    body: "Switch between active sessions, create a new one, or start OpenCode Auto, Codex, Claude, Gemini, or a custom command from the same panel.",
+    body: "Switch between active sessions, create a new one, or start any built-in coding harness or custom command from the same panel.",
     bullets: ["session list", "tool launcher menu", "custom commands"],
     media: "../mobile-launchers.png",
     layout: "phone"
@@ -87,7 +87,7 @@ const showcaseScenes = [
   {
     eyebrow: "Desktop too",
     title: "Same server, wider control surface on PC",
-    body: "The desktop layout uses horizontal space for the active tmux session while keeping sessions, launchers, mode switches, and notifications nearby.",
+    body: "The desktop layout uses horizontal space for the active tmux session while keeping sessions, launchers, the compact view menu, and notifications nearby.",
     bullets: ["phone-first", "desktop-aware", "GUI, TTY, raw, and Focus"],
     media: "../desktop-overview.png",
     layout: "desktop"
@@ -136,12 +136,12 @@ try {
   await delay(1200);
   await capture(page, path.join(assetsDir, "mobile-chat.png"));
 
-  await evaluate(page, "document.querySelector('[aria-label=\"Show focus view\"]')?.click()");
+  await chooseView(page, "Focus");
   await delay(300);
   await evaluate(page, "document.querySelector('.tmux-focus')?.scrollTo({ top: 0 })");
   await delay(100);
   await capture(page, path.join(assetsDir, "mobile-focus.png"));
-  await evaluate(page, "document.querySelector('[aria-label=\"Show detailed tmux output\"]')?.click()");
+  await chooseView(page, "GUI");
   await delay(250);
 
   await evaluate(page, `
@@ -159,16 +159,16 @@ try {
   await evaluate(page, "document.querySelector('.tmux-jump-bottom')?.click()");
   await delay(350);
 
-  await evaluate(page, "document.querySelector('[aria-label=\"Show terminal capture\"]')?.click()");
+  await chooseView(page, "Regular");
   await delay(250);
   await capture(page, path.join(assetsDir, "mobile-tty.png"));
-  await evaluate(page, "document.querySelector('[aria-label=\"Switch to light mode\"]')?.click()");
+  await chooseTheme(page, "Light");
   await delay(250);
   await capture(page, path.join(assetsDir, "mobile-light.png"));
-  await evaluate(page, "document.querySelector('[aria-label=\"Switch to dark mode\"]')?.click()");
+  await chooseTheme(page, "Dark");
   await delay(250);
 
-  await evaluate(page, "document.querySelector('[aria-label=\"Show GUI chat\"]')?.click()");
+  await chooseView(page, "GUI");
   await delay(250);
   await evaluate(page, "document.querySelector('.tmux-session-menu-button')?.click()");
   await delay(250);
@@ -188,11 +188,11 @@ try {
 
   await evaluate(page, "document.querySelector('.tmux-session-menu-button')?.click()");
   await delay(250);
-  await evaluate(page, "document.querySelector('[aria-label=\"Attach raw tmux terminal\"]')?.click()");
+  await chooseView(page, "Raw");
   await delay(350);
   await capture(page, path.join(assetsDir, "mobile-raw-terminal.png"));
 
-  await evaluate(page, "document.querySelector('[aria-label=\"Detach raw tmux terminal\"]')?.click()");
+  await chooseView(page, "Regular");
   await delay(250);
   await setViewport(page, 1440, 900);
   await delay(500);
@@ -701,6 +701,18 @@ async function setViewport(page, width, height) {
 
 async function evaluate(page, expression) {
   await page.evaluate(expression);
+}
+
+async function chooseView(page, label) {
+  await page.locator(".tmux-view-menu summary").click();
+  await page.getByRole("menuitemradio", { name: label }).click();
+  await delay(250);
+}
+
+async function chooseTheme(page, label) {
+  await page.locator(".tmux-view-menu summary").click();
+  await page.getByRole("menuitemradio", { name: label }).click();
+  await delay(250);
 }
 
 async function waitForHttp(url) {
