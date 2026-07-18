@@ -201,6 +201,10 @@ Google Play upload bundles:
 pnpm android:build:play
 ```
 
+Play uploads require a dedicated upload key and never fall back to debug
+signing. App setup remains configured across normal Play updates; migration from
+the current sideload/private packages requires one initial setup.
+
 Private personal APKs can prefill your server URL/token and use a separate
 package id so they install next to the public app:
 
@@ -217,7 +221,8 @@ pnpm android:stage-apk android/app/build/outputs/apk/release/agent-tmux-web-v<ve
 ```
 
 Android details: [android/README.md](./android/README.md)<br>
-Play Store checklist: [docs/play-store.md](./docs/play-store.md)
+Play Store guide: [docs/play-store.md](./docs/play-store.md)<br>
+Privacy policy: [PRIVACY.md](./PRIVACY.md)
 
 ## Configuration
 

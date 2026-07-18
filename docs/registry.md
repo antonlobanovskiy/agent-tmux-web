@@ -22,7 +22,8 @@ Registry items:
 - `full-project`: composed project bundle for source inspection and adaptation.
 - `web-app`: Vite, React, Express, tmux, upload, and Codex bridge source.
 - `vps-deploy`: installer, systemd templates, environment example, and setup docs.
-- `android-wrapper`: sideload-only Android WebView wrapper source.
+- `android-wrapper`: Android WebView wrapper source for sideload APKs or a
+  generic Google Play App Bundle.
 - `notifications`: notification routing and waiting-tab source slice.
 
 The registry intentionally focuses on editable source, docs, scripts, and config.

@@ -1,72 +1,127 @@
-# Google Play Readiness
+# Google Play Publishing Guide
 
-Agent Tmux Web can be published to Google Play as a generic WebView client for a
-user-owned Agent Tmux Web server. The store artifact must not include a private
-server URL, auth token, local signing material, staged APKs, uploads, or
-machine-specific files.
+Agent Tmux Web is published as a generic Android client for a server selected
+and operated by the user. A Play artifact must never contain a maintainer server
+URL, auth token, local signing material, staged APK, upload, or machine-specific
+configuration.
 
-## Build Artifact
+## Technical Baseline
 
-Google Play uses Android App Bundles to generate device-specific APKs. Build the
-public upload bundle with blank defaults:
+- Application ID: `com.agenttmux.web`
+- Minimum Android version: API 26 (Android 8.0)
+- Compile and target API: 36
+- Version name: `0.1.24`
+- Version code: `25`
+- App format: Android App Bundle (`.aab`)
+- Privacy policy: [PRIVACY.md](../PRIVACY.md)
+
+The public app starts on its setup screen and asks for a user-owned server URL
+and optional token. HTTP remains available for private LAN, VPN, and Tailscale
+deployments; HTTPS is recommended whenever the network path is not trusted.
+
+## Build Validation
+
+CI can build a generic, non-uploadable bundle without production credentials:
+
+```bash
+pnpm android:build:play:check
+```
+
+This validates the AAB and confirms that no server URL or token is embedded. It
+uses local debug signing and must not be uploaded to Play Console.
+
+## Play Upload Key
+
+Enroll in Play App Signing and use a dedicated upload key. Let Google generate
+and protect the app-signing key. Keep the upload keystore and credentials
+outside this repository and back them up securely.
+
+After creating the upload key, add these values to the ignored
+`android/local.properties` file:
+
+```properties
+agentTmuxPlayStoreFile=/absolute/path/to/agent-tmux-play-upload.jks
+agentTmuxPlayStorePassword=replace-me
+agentTmuxPlayKeyAlias=agent-tmux-upload
+agentTmuxPlayKeyPassword=replace-me
+```
+
+Build the uploadable bundle:
 
 ```bash
 pnpm android:build:play
 ```
 
-The bundle is written to:
+The command refuses to run without all four Play signing properties, rejects a
+keystore named `debug.keystore`, verifies the generic artifact contents, checks
+the AAB signature, and rejects Android's debug certificate. Its output is:
 
 ```text
 android/app/build/outputs/bundle/release/app-release.aab
 ```
 
-The command also runs the public Android artifact string check against the AAB.
+Do not use the Play upload key for private APKs. The existing
+`agentTmuxRelease*` properties remain a separate local/private sideload signing
+profile.
 
-For sideload releases, continue using:
+## Updates And Existing Installs
+
+The server URL, optional token, WebView preferences, launcher pins, and custom
+launchers remain configured across normal updates when the application ID and
+signing identity do not change. Android cloud backup is disabled so the auth
+token is not copied into device backups.
+
+The current GitHub public APK is signed with a development certificate, and
+private builds use the separate `com.agenttmux.web.private` application ID.
+Neither can be updated in place by the first Play Store install. Those users
+must uninstall or keep the apps side by side, install the Play version, and
+configure it once. Updates delivered by Play after that preserve app data.
+
+## Console Checklist
+
+1. Create `Agent Tmux Web` in Play Console as an app, not a game.
+2. Enroll in Play App Signing and register the dedicated upload certificate.
+3. Complete the main store listing using [play-store-listing.md](./play-store-listing.md).
+4. Upload the assets under `docs/play-store/assets/`.
+5. Link the public privacy policy URL in Play Console.
+6. Complete App access, Data safety, content rating, ads, target audience, and
+   government-app declarations.
+7. Upload `app-release.aab` to Internal testing first.
+8. Test setup persistence, notifications, notification-to-session routing,
+   file uploads, browser links, Tailscale/private HTTP, GUI, TTY, and raw tmux
+   on a physical Android device.
+9. If this is a new personal developer account, complete the required closed
+   test before applying for production access.
+
+## Review Access
+
+The app requires a user-owned server, so Google reviewers need a stable way to
+reach a functioning review environment plus precise setup credentials and
+instructions in the App access declaration. Do not expose a maintainer's normal
+private server. Create a limited review server or a purpose-built demo account
+before production review, and remove access after the review when appropriate.
+
+## Store Assets
+
+Generate current assets from the real demo UI:
 
 ```bash
-pnpm android:build:public
+pnpm build
+pnpm capture:play-store
 ```
 
-## Current Technical Fit
+The committed package includes:
 
-- `targetSdk` is `35`, matching Google Play's Android 15 target API requirement
-  for new apps and updates.
-- Public Play builds use package id `com.agenttmux.web`.
-- Public builds open to the setup screen and require the user to enter their own
-  private server URL and optional token.
-- The app allows HTTP because common private deployments use LAN, VPN, or
-  Tailscale. The store listing and privacy policy should explain that users
-  control their own server endpoint.
-
-## Play Console Checklist
-
-- Create the app in Play Console.
-- Enroll in Play App Signing and keep the upload key outside the repository.
-- Upload `app-release.aab` to an internal testing track first.
-- Complete Data safety truthfully. The app stores the server URL and optional
-  token locally on device and sends requests only to the user-configured server.
-- Publish a privacy policy URL before wider testing or production release.
-- Add store listing text, screenshots, icon, feature graphic, content rating,
-  app category, and contact email.
-- Verify the app starts at setup with no embedded maintainer server URL/token.
-- Test notification permission, file picker uploads, Tailscale/private HTTP
-  setup, and session-opening notification routing on a real Android device.
-
-## Policy Notes
-
-- Do not market this as a hosted AI service; it is a control surface for a
-  user-owned server.
-- Do not imply the app includes tmux, hosted agents, or third-party coding
-  harnesses such as OpenCode, Codex, Claude Code, Gemini CLI, GitHub Copilot,
-  Cursor Agent, Qwen Code, Cline, Aider, goose, or Amp. Those tools run on the
-  user's server.
-- Treat the auth token like terminal access. Store listing copy should recommend
-  Tailscale, VPN, SSH tunnel, LAN-only access, or an authenticated reverse proxy.
+- `icon-512.png`: 512 by 512 Play Store icon.
+- `feature-graphic-1024x500.png`: 1024 by 500 feature graphic.
+- Four 1080 by 1920 phone screenshots covering GUI, launchers, raw tmux, and
+  light mode.
 
 ## References
 
-- Target API level requirement: https://developer.android.com/google/play/requirements/target-sdk
-- Android App Bundles in Play Console: https://support.google.com/googleplay/android-developer/answer/9859152
+- Target API requirements: https://developer.android.com/google/play/requirements/target-sdk
 - Play App Signing: https://support.google.com/googleplay/android-developer/answer/9842756
-- Data safety form: https://support.google.com/googleplay/android-developer/answer/10787469
+- App testing requirements: https://support.google.com/googleplay/android-developer/answer/14151465
+- Data safety: https://support.google.com/googleplay/android-developer/answer/10787469
+- Preview assets: https://support.google.com/googleplay/android-developer/answer/9866151
+- App access review: https://support.google.com/googleplay/android-developer/answer/15191715

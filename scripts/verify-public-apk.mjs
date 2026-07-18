@@ -21,6 +21,8 @@ if (existsSync(buildConfigPath)) {
 }
 
 const strings = dexStrings(artifactPath);
+const privacyPolicyUrl = "https://github.com/antonlobanovskiy/agent-tmux-web/blob/main/PRIVACY.md";
+const inspectedStrings = strings.replaceAll(privacyPolicyUrl, "");
 const forbidden = [
   /https?:\/\/(?!["'\s]*$)[^\s"'<>]+/i,
   /\b100\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/,
@@ -30,7 +32,7 @@ const forbidden = [
 ];
 
 for (const pattern of forbidden) {
-  const match = strings.match(pattern);
+  const match = inspectedStrings.match(pattern);
   if (match) {
     fail(`Public APK contains a forbidden private-looking string: ${match[0]}`);
   }

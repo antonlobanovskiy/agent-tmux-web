@@ -11,6 +11,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.Paint;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -341,12 +342,21 @@ public final class MainActivity extends Activity {
         TextView note = label("The Android app does not run tmux locally. It loads your private server and keeps the same GUI, raw tmux mode, uploads, and launchers.", 13, "#87918D");
         note.setPadding(0, dp(16), 0, 0);
 
+        TextView privacy = label("Privacy policy", 14, "#67D2B5");
+        privacy.setPaintFlags(privacy.getPaintFlags() | Paint.UNDERLINE_TEXT_FLAG);
+        privacy.setPadding(0, dp(18), 0, dp(12));
+        privacy.setClickable(true);
+        privacy.setFocusable(true);
+        privacy.setContentDescription("Open privacy policy in browser");
+        privacy.setOnClickListener(view -> openExternalUri(Uri.parse(BuildConfig.PRIVACY_POLICY_URL)));
+
         panel.addView(title);
         panel.addView(subtitle);
         panel.addView(serverField, matchWrap());
         panel.addView(tokenField, matchWrap());
         panel.addView(connect, matchWrap());
         panel.addView(note);
+        panel.addView(privacy);
 
         setupView = scrollView;
         root.addView(setupView, new FrameLayout.LayoutParams(

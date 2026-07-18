@@ -1,6 +1,6 @@
 {
   "name": "agent-tmux-web",
-  "version": "0.1.23",
+  "version": "0.1.24",
   "description": "Mobile-friendly browser control panel for terminal agent CLIs running inside tmux.",
   "license": "MIT",
   "type": "module",
@@ -9,12 +9,14 @@
     "build": "vite build && tsc -p tsconfig.server.json",
     "android:build": "pnpm build && cd android && ./gradlew assembleDebug assembleRelease",
     "android:build:public": "pnpm build && cd android && ./gradlew assembleRelease -PagentTmuxDefaultUrl= -PagentTmuxDefaultToken= -PagentTmuxApplicationIdSuffix= -PagentTmuxAppLabel=\"Agent Tmux\" && cd .. && pnpm android:verify-public-apk",
-    "android:build:play": "pnpm build && cd android && ./gradlew bundleRelease -PagentTmuxDefaultUrl= -PagentTmuxDefaultToken= -PagentTmuxApplicationIdSuffix= -PagentTmuxAppLabel=\"Agent Tmux\" && cd .. && pnpm android:verify-public-apk android/app/build/outputs/bundle/release/app-release.aab",
+    "android:build:play": "pnpm build && cd android && ./gradlew bundleRelease -PagentTmuxDefaultUrl= -PagentTmuxDefaultToken= -PagentTmuxApplicationIdSuffix= -PagentTmuxAppLabel=\"Agent Tmux\" -PagentTmuxPlaySigning=true && cd .. && pnpm android:verify-public-apk android/app/build/outputs/bundle/release/app-release.aab && node scripts/verify-play-bundle.mjs",
+    "android:build:play:check": "pnpm build && cd android && ./gradlew bundleRelease -PagentTmuxDefaultUrl= -PagentTmuxDefaultToken= -PagentTmuxApplicationIdSuffix= -PagentTmuxAppLabel=\"Agent Tmux\" && cd .. && pnpm android:verify-public-apk android/app/build/outputs/bundle/release/app-release.aab",
     "android:build:private": "node scripts/build-private-apk.mjs",
     "android:stage-apk": "node scripts/stage-apk-download.mjs",
     "android:verify-public-apk": "node scripts/verify-public-apk.mjs",
     "android:install": "cd android && ./gradlew installDebug",
     "capture:marketing": "node scripts/capture-marketing.mjs",
+    "capture:play-store": "node scripts/capture-play-store.mjs",
     "start": "node dist/server/server/index.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json"
