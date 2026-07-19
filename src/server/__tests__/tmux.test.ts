@@ -12,11 +12,19 @@ import {
   buildTmuxNewSessionArgs,
   detectTmuxInterruptKey,
   detectTmuxSubmitKey,
+  fitTmuxCaptureSizeForPane,
   tmuxSubmitDelayMs,
   normalizeTmuxSessionName,
   normalizeTmuxToolId,
+  openCodeHelpSupportsMiniUi,
+  isOpenCodeFullTuiPane,
+  parseTmuxPaneMetadata,
   parseTmuxSessions,
-  parseTmuxTools
+  parseTmuxTools,
+  resolveTmuxToolsForCapabilities,
+  splitDisplayLineAtColumn,
+  splitOpenCodeTuiCapture,
+  trimTmuxCapture
 } from "../tmux.js";
 
 describe("parseTmuxSessions", () => {
@@ -128,9 +136,24 @@ describe("tmux command builders", () => {
       expect.objectContaining({ id: "auto", args: "--sandbox workspace-write --ask-for-approval on-request" }),
       expect.objectContaining({ id: "yolo", args: "--dangerously-bypass-approvals-and-sandbox", dangerous: true })
     ]));
+    expect(tools.find((tool) => tool.id === "opencode")?.modes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "mini-ui", args: "--mini --replay-limit 100" }),
+      expect.objectContaining({ id: "full-tui", args: "", defaultEnabled: true })
+    ]));
     expect(tools.find((tool) => tool.id === "claude")?.label).toBe("Claude Code");
     expect(tools.find((tool) => tool.id === "cline")?.command).toBe("cline --tui");
     expect(tools.find((tool) => tool.id === "goose")?.command).toBe("goose session");
+  });
+
+  it("falls back to full OpenCode TUI when the installed CLI lacks mini mode", () => {
+    const tools = resolveTmuxToolsForCapabilities(parseTmuxTools(undefined), { opencodeMiniUi: false });
+    const opencode = tools.find((tool) => tool.id === "opencode");
+
+    expect(opencode?.modes?.some((mode) => mode.id === "mini-ui")).toBe(false);
+    expect(opencode?.modes?.find((mode) => mode.id === "full-tui")?.defaultEnabled).toBe(true);
+    expect(buildTmuxToolCommand(opencode!)).toBe("opencode --auto");
+    expect(openCodeHelpSupportsMiniUi("--mini  minimal UI\n--replay-limit  newest messages")).toBe(true);
+    expect(openCodeHelpSupportsMiniUi("--mini  minimal UI")).toBe(false);
   });
 
   it("parses configured generic tmux tools from JSON", () => {
@@ -276,5 +299,61 @@ describe("tmux command builders", () => {
     expect(chunks).toEqual(["abcd", "🙂efg", "h"]);
     expect(chunkTmuxLiteralText("abcdef", 3)).toEqual(["abc", "def"]);
     expect(() => chunkTmuxLiteralText("abc", 0)).toThrow("maxChunkLength");
+  });
+
+  it("removes terminal-only blank rows without changing captured history", () => {
+    expect(trimTmuxCapture("first\nsecond\n   \n\n")).toBe("first\nsecond");
+    expect(trimTmuxCapture("prompt $ ")).toBe("prompt $");
+    expect(trimTmuxCapture("\n \t\n")).toBe("");
+  });
+
+  it("recognizes wide OpenCode alternate-screen panes", () => {
+    expect(parseTmuxPaneMetadata("opencode\t172\t1\n")).toEqual({
+      currentCommand: "opencode",
+      width: 172,
+      alternateScreen: true
+    });
+    expect(isOpenCodeFullTuiPane({ currentCommand: "opencode", width: 172, alternateScreen: true })).toBe(true);
+    expect(isOpenCodeFullTuiPane({ currentCommand: "opencode", width: 120, alternateScreen: true })).toBe(false);
+    expect(isOpenCodeFullTuiPane({ currentCommand: "zsh", width: 172, alternateScreen: true })).toBe(false);
+    expect(() => parseTmuxPaneMetadata("opencode\twide\t1")).toThrow("Invalid tmux pane metadata");
+    expect(fitTmuxCaptureSizeForPane(
+      { cols: 44, rows: 40 },
+      { currentCommand: "opencode", width: 44, alternateScreen: true }
+    )).toEqual({ cols: 44, rows: 40 });
+    expect(fitTmuxCaptureSizeForPane(
+      { cols: 135, rows: 40 },
+      { currentCommand: "opencode", width: 135, alternateScreen: true }
+    )).toEqual({ cols: 150, rows: 40 });
+    expect(fitTmuxCaptureSizeForPane(
+      { cols: 44, rows: 40 },
+      { currentCommand: "opencode", width: 44, alternateScreen: false }
+    )).toEqual({ cols: 44, rows: 40 });
+  });
+
+  it("splits display columns without breaking wide glyphs", () => {
+    expect(splitDisplayLineAtColumn("ab界cd", 4)).toEqual(["ab界", "cd"]);
+    expect(splitDisplayLineAtColumn("terminal", 4)).toEqual(["term", "inal"]);
+  });
+
+  it("extracts OpenCode's fixed-width sidebar from a full TUI capture", () => {
+    const mainWidth = 88;
+    const row = (main: string, sidebar: string) => `${main.padEnd(mainWidth)}${sidebar}`;
+    const capture = [
+      row("Reply with exactly OK.", "Session title"),
+      row("OK", "Context"),
+      row("", "25,467 tokens"),
+      row("Build auto", "MCP"),
+      row("", "• OpenCode 1.18.3")
+    ].join("\n");
+
+    expect(splitOpenCodeTuiCapture(capture, 130)).toEqual({
+      output: "Reply with exactly OK.\nOK\n\nBuild auto",
+      sidebar: {
+        kind: "opencode",
+        output: "Session title\nContext\n25,467 tokens\nMCP\n• OpenCode 1.18.3"
+      }
+    });
+    expect(splitOpenCodeTuiCapture(row("terminal only", "not a sidebar"), 130)).toBeNull();
   });
 });

@@ -67,6 +67,8 @@ describe("browser tmux terminal helpers", () => {
   });
 
   it("maps wide GUI/TTY capture surfaces to tmux columns", () => {
+    expect(buildTmuxCaptureSizeFromClientWidth(320)).toEqual({ cols: 80, rows: 40 });
+    expect(buildTmuxCaptureSizeFromClientWidth(390)).toEqual({ cols: 80, rows: 40 });
     expect(buildTmuxCaptureSizeFromClientWidth(640)).toEqual({ cols: 80, rows: 40 });
     expect(buildTmuxCaptureSizeFromClientWidth(1280)).toEqual({ cols: 154, rows: 40 });
     expect(buildTmuxCaptureSizeFromClientWidth(2200)).toEqual({ cols: 240, rows: 40 });

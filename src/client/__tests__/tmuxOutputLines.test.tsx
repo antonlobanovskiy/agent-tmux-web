@@ -28,4 +28,15 @@ describe("TmuxOutputLines", () => {
     expect(html).toContain("data-tmux-anchor-index=\"1\"");
     expect(html).toContain("href=\"https://www.example.com/\"");
   });
+
+  it("can omit scroll anchors in a secondary terminal pane", () => {
+    const html = renderToStaticMarkup(
+      <pre>
+        <TmuxOutputLines anchors={false} output="Context" />
+      </pre>
+    );
+
+    expect(html).not.toContain("data-tmux-anchor-index");
+    expect(html).not.toContain("data-tmux-scroll-anchor");
+  });
 });

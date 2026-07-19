@@ -1,8 +1,10 @@
-import { execFile } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import { promisify } from "node:util";
+import stringWidth from "string-width";
 
 import type { TmuxToolDto } from "../shared/api.js";
 import { buildTmuxToolCommand, DEFAULT_TMUX_TOOLS } from "../shared/tmuxTools.js";
+import type { TerminalSize } from "./terminal.js";
 
 export { buildTmuxToolCommand } from "../shared/tmuxTools.js";
 
@@ -24,6 +26,26 @@ export type CodexTmuxCommandOptions = {
 };
 
 export type TmuxToolConfig = TmuxToolDto;
+
+export type TmuxToolCapabilities = {
+  opencodeMiniUi: boolean;
+};
+
+export type TmuxPaneMetadata = {
+  currentCommand: string;
+  width: number;
+  alternateScreen: boolean;
+};
+
+export type TmuxPaneCapture = {
+  output: string;
+  sidebar?: {
+    kind: "opencode";
+    output: string;
+  };
+};
+
+export const MIN_OPENCODE_TUI_CAPTURE_COLS = 150;
 
 export type TmuxSubmitKey = "enter" | "codex-enter" | "tab";
 export type TmuxInterruptKey = "escape" | "ctrl-c";
@@ -120,7 +142,37 @@ export function parseTmuxTools(value: string | undefined = process.env.CLI_WEB_T
 }
 
 export function listTmuxTools(): TmuxToolConfig[] {
-  return parseTmuxTools();
+  const tools = parseTmuxTools();
+  if (!tools.some((tool) => tool.id === "opencode" && tool.modes?.some((mode) => mode.id === "mini-ui"))) {
+    return tools;
+  }
+  return resolveTmuxToolsForCapabilities(tools, {
+    opencodeMiniUi: detectOpenCodeMiniUiSupport()
+  });
+}
+
+export function resolveTmuxToolsForCapabilities(
+  tools: TmuxToolConfig[],
+  capabilities: TmuxToolCapabilities
+): TmuxToolConfig[] {
+  if (capabilities.opencodeMiniUi) {
+    return tools;
+  }
+  return tools.map((tool) => {
+    if (tool.id !== "opencode" || !tool.modes?.some((mode) => mode.id === "mini-ui")) {
+      return tool;
+    }
+    return {
+      ...tool,
+      modes: tool.modes
+        .filter((mode) => mode.id !== "mini-ui")
+        .map((mode) => mode.id === "full-tui" ? { ...mode, defaultEnabled: true } : mode)
+    };
+  });
+}
+
+export function openCodeHelpSupportsMiniUi(help: string): boolean {
+  return /(?:^|\s)--mini(?:\s|$)/m.test(help) && /(?:^|\s)--replay-limit(?:\s|$)/m.test(help);
 }
 
 export function buildTmuxNewSessionArgs(name: string, cwd?: string | null): string[] {
@@ -298,7 +350,125 @@ export async function captureTmuxPane(session: string, lines = 1000): Promise<st
     "-S",
     `-${safeLines}`
   ]);
-  return stdout;
+  return trimTmuxCapture(stdout);
+}
+
+export async function captureTmuxPaneView(session: string, lines = 1000): Promise<TmuxPaneCapture> {
+  const [output, metadata] = await Promise.all([
+    captureTmuxPane(session, lines),
+    inspectTmuxPane(session).catch(() => null)
+  ]);
+
+  if (!metadata || !isOpenCodeFullTuiPane(metadata)) {
+    return { output };
+  }
+
+  return splitOpenCodeTuiCapture(output, metadata.width) ?? { output };
+}
+
+export async function inspectTmuxPane(session: string): Promise<TmuxPaneMetadata> {
+  const { stdout } = await execFileAsync("tmux", [
+    "display-message",
+    "-p",
+    "-t",
+    session,
+    "#{pane_current_command}\t#{pane_width}\t#{alternate_on}"
+  ]);
+  return parseTmuxPaneMetadata(stdout);
+}
+
+export function parseTmuxPaneMetadata(output: string): TmuxPaneMetadata {
+  const [currentCommand = "", widthValue = "", alternateValue = ""] = output.trim().split("\t");
+  const width = Number(widthValue);
+  if (!currentCommand || !Number.isInteger(width) || width < 1 || !/^[01]$/.test(alternateValue)) {
+    throw new Error("Invalid tmux pane metadata");
+  }
+  return {
+    currentCommand,
+    width,
+    alternateScreen: alternateValue === "1"
+  };
+}
+
+export function isOpenCodeFullTuiPane(metadata: TmuxPaneMetadata): boolean {
+  return isOpenCodeTuiPane(metadata) && metadata.width > 120;
+}
+
+export function isOpenCodeTuiPane(metadata: TmuxPaneMetadata): boolean {
+  return metadata.alternateScreen && /(?:^|[/\\])opencode(?:\.exe)?$/i.test(metadata.currentCommand);
+}
+
+export function fitTmuxCaptureSizeForPane(size: TerminalSize, metadata: TmuxPaneMetadata | null): TerminalSize {
+  if (!metadata || !isOpenCodeTuiPane(metadata) || size.cols <= 120) {
+    return size;
+  }
+  return {
+    ...size,
+    cols: Math.max(size.cols, MIN_OPENCODE_TUI_CAPTURE_COLS)
+  };
+}
+
+export function splitOpenCodeTuiCapture(output: string, paneWidth: number): TmuxPaneCapture | null {
+  const sidebarWidth = 42;
+  if (!Number.isInteger(paneWidth) || paneWidth <= 120 || paneWidth <= sidebarWidth) {
+    return null;
+  }
+
+  const splitColumn = paneWidth - sidebarWidth;
+  const mainLines: string[] = [];
+  const sidebarLines: string[] = [];
+  for (const line of output.split(/\r?\n/)) {
+    const [main, sidebar] = splitDisplayLineAtColumn(line, splitColumn);
+    mainLines.push(main.trimEnd());
+    sidebarLines.push(sidebar.trimEnd());
+  }
+
+  const sidebar = trimBlankCaptureRows(sidebarLines.join("\n"));
+  if (!/\bContext\b/u.test(sidebar) || !/\bOpenCode\s+\d/u.test(sidebar)) {
+    return null;
+  }
+
+  return {
+    output: trimTmuxCapture(mainLines.join("\n")),
+    sidebar: {
+      kind: "opencode",
+      output: sidebar
+    }
+  };
+}
+
+export function splitDisplayLineAtColumn(line: string, splitColumn: number): [string, string] {
+  if (splitColumn <= 0) {
+    return ["", line];
+  }
+
+  let column = 0;
+  let main = "";
+  let sidebar = "";
+  const segments = new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(line);
+  for (const { segment } of segments) {
+    const width = stringWidth(segment);
+    if (column >= splitColumn) {
+      sidebar += segment;
+    } else {
+      main += segment;
+    }
+    column += width;
+  }
+  return [main, sidebar];
+}
+
+export function trimBlankCaptureRows(output: string): string {
+  return output
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .join("\n")
+    .replace(/^(?:[\t ]*\n)+/u, "")
+    .replace(/[\t\n ]+$/u, "");
+}
+
+export function trimTmuxCapture(output: string): string {
+  return output.replace(/[\t\r\n ]+$/u, "");
 }
 
 export async function sendTmuxText(session: string, text: string, enter: boolean, submitKey: TmuxSubmitKey = "enter"): Promise<void> {
@@ -349,4 +519,17 @@ function isCodexTmuxOutput(output: string): boolean {
   return normalized.includes("openai codex")
     || normalized.includes("use /skills to list available skills")
     || /gpt-[\w.-]+.*\/model to change/.test(normalized);
+}
+
+function detectOpenCodeMiniUiSupport(): boolean {
+  try {
+    const result = spawnSync("opencode", ["--help"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 3000
+    });
+    return openCodeHelpSupportsMiniUi(`${result.stdout ?? ""}\n${result.stderr ?? ""}`);
+  } catch {
+    return false;
+  }
 }

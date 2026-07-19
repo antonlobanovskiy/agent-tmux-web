@@ -49,6 +49,17 @@ describe("responsive mobile CSS", () => {
     expect(css).toContain(".tmux-session-status-dot.yellow");
     expect(css).toContain(".tmux-session-status-dot.red");
   });
+
+  it("separates OpenCode's sidebar and uses tabs on mobile", () => {
+    const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");
+    const mobileBlock = css.slice(css.indexOf("@media (max-width: 760px)"));
+
+    expect(css).toContain(".tmux-output.tmux-opencode-layout");
+    expect(css).toContain("grid-template-columns: minmax(0, 1fr) minmax(280px, 336px)");
+    expect(css).toContain(".tmux-opencode-sidebar");
+    expect(mobileBlock).toContain(".tmux-opencode-tabs");
+    expect(mobileBlock).toContain(".tmux-opencode-terminal.mobile-active");
+  });
 });
 
 describe("color theme CSS", () => {
