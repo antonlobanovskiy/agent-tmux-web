@@ -436,6 +436,18 @@ textarea:focus {
   height: 34px;
 }
 
+.tmux-compact-bar button,
+.tmux-terminal-toolbar button,
+.tmux-view-menu summary,
+.tmux-actions button,
+.tmux-tool-actions button,
+.tmux-send button,
+.tmux-soft-keys button {
+  border: 1px solid var(--border-strong);
+  background: var(--surface-control);
+  color: var(--text-control);
+}
+
 .skill-list,
 .selected-skills,
 .threads,

@@ -91,4 +91,15 @@ describe("color theme CSS", () => {
     expect(css).toContain("background: var(--surface-base)");
     expect(css).toContain("color: var(--text-primary)");
   });
+
+  it("uses dark workbench surfaces for tmux utility controls", () => {
+    const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");
+    const utilityRule = css.match(
+      /\.tmux-compact-bar button,\n\.tmux-terminal-toolbar button,\n\.tmux-view-menu summary,\n\.tmux-actions button,\n\.tmux-tool-actions button,\n\.tmux-send button,\n\.tmux-soft-keys button \{([^}]*)\}/
+    )?.[1] ?? "";
+
+    expect(utilityRule).toContain("background: var(--surface-control)");
+    expect(utilityRule).toContain("color: var(--text-control)");
+    expect(utilityRule).toContain("border: 1px solid var(--border-strong)");
+  });
 });
