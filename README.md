@@ -50,7 +50,8 @@ and desktop layout.
 - Harness-specific Default, Plan, Auto, Auto Edit, Autopilot, and Yolo controls
   with incompatible permission modes kept mutually exclusive.
 - GUI mode for readable chat-style agent output.
-- TTY mode for plain tmux pane capture.
+- TTY mode for plain tmux pane capture, including a separately rendered
+  OpenCode context/details panel on wide sessions.
 - Raw mode for direct interactive tmux control, including shell and TUI work.
 - Focus mode for quick phone check-ins without defaulting away from the detailed
   view.
@@ -161,7 +162,8 @@ mode, and notifications.
 3. Press `Run`, or type directly into the tmux input.
 4. Open the clearly labeled `View` dropdown and use `GUI` for readable agent
    output, `TTY` for plain pane text, or `Raw` when you need exact terminal
-   input.
+   input. Wide OpenCode TTY sessions keep their context sidebar separate; on a
+   phone, use the `Terminal` and `Details` tabs when that sidebar is present.
 5. Use the bell button when you want task-done alerts.
 6. Use the paperclip button to upload files, or paste clipboard images directly
    into the chat input. Uploaded files are inserted as temporary server paths in
@@ -242,7 +244,7 @@ Built-in launcher modes:
 
 | Harness | Command | Launch modes |
 | --- | --- | --- |
-| OpenCode | `opencode` | Default, Auto (default) |
+| OpenCode | `opencode` | Full UI (default), Linear TTY; Default, Auto (default) |
 | Codex | `codex` | Default, Auto, Yolo |
 | Claude Code | `claude` | Default, Plan, Accept edits, Auto, Yolo |
 | Gemini CLI | `gemini` | Default, Plan, Auto edit, Yolo |

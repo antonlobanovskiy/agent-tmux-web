@@ -8,6 +8,16 @@ uploads, machine-specific service edits, or private signing material.
 
 ## Unreleased
 
+- Separated OpenCode's 42-column context sidebar from the conversation and
+  prompt area in captured TTY view instead of allowing terminal wrapping to
+  merge the two regions.
+- Added responsive `Terminal` and `Details` tabs when a wide OpenCode pane is
+  viewed on a phone, with independent scroll positions for each tab.
+- Added `Full UI` and capability-detected `Linear TTY` OpenCode launcher modes;
+  Full UI remains the default and Linear TTY provides native tmux scrollback.
+- Kept OpenCode desktop captures wide enough for centered dialogs such as the
+  model picker to remain inside the terminal region.
+
 ## 0.1.23 - 2026-07-18
 
 - Removed the redundant agent state viewer above TTY and GUI output, returning

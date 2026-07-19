@@ -40,7 +40,7 @@ import {
 } from "lucide-react";
 import { ClipboardEvent, FormEvent, KeyboardEvent, UIEvent, forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import type { AppStatus, CodexModel, CodexSkill, TmuxSessionDto, TmuxToolDto, TmuxWatchEvent, UploadedFileDto } from "../shared/api.js";
+import type { AppStatus, CodexModel, CodexSkill, TmuxCaptureDto, TmuxSessionDto, TmuxToolDto, TmuxWatchEvent, UploadedFileDto } from "../shared/api.js";
 import { describeThreadItem, type UiEventDescription } from "../shared/codexEvents.js";
 import { buildTmuxToolCommand, DEFAULT_TMUX_TOOLS, defaultTmuxToolModeIds, toggleTmuxToolModeId } from "../shared/tmuxTools.js";
 import {
@@ -59,7 +59,7 @@ import { shouldShowTmuxSendForm } from "./rawTerminalMode.js";
 import { parseTmuxChatOutput, splitTmuxChatMessage, type TmuxChatMessage } from "./tmuxGui.js";
 import { cleanTmuxAssistantCopyText } from "./tmuxCopy.js";
 import { shouldAutoCaptureTmux, TMUX_CAPTURE_POLL_INTERVAL_MS, TMUX_SEND_FOLLOW_DELAYS_MS } from "./tmuxFollow.js";
-import { TmuxOutputLines } from "./tmuxOutputLines.js";
+import { TmuxTtyView } from "./TmuxTtyView.js";
 import {
   createCustomTmuxTool,
   CUSTOM_TMUX_TOOLS_STORAGE_KEY,
@@ -237,6 +237,7 @@ export function App() {
   const [tmuxTools, setTmuxTools] = useState<TmuxToolDto[]>(demoMode ? DEMO_TMUX_TOOLS : []);
   const [selectedTmux, setSelectedTmux] = useState(demoMode ? "agent-demo" : "");
   const [tmuxOutput, setTmuxOutput] = useState(demoMode ? DEMO_TMUX_OUTPUT : "");
+  const [tmuxSidebar, setTmuxSidebar] = useState<TmuxCaptureDto["sidebar"]>();
   const [tmuxInput, setTmuxInput] = useState(demoMode ? "Ask Claude to check the mobile layout and summarize risks" : "");
   const [threadId, setThreadId] = useState("");
   const [activeTurnId, setActiveTurnId] = useState("");
@@ -279,7 +280,7 @@ export function App() {
   const terminalSessionRef = useRef("");
   const tmuxInputRef = useRef<HTMLTextAreaElement | null>(null);
   const tmuxFileInputRef = useRef<HTMLInputElement | null>(null);
-  const tmuxOutputRef = useRef<HTMLPreElement | null>(null);
+  const tmuxOutputRef = useRef<HTMLElement | null>(null);
   const tmuxChatRef = useRef<HTMLDivElement | null>(null);
   const tmuxViewMenuRef = useRef<HTMLDetailsElement | null>(null);
   const tmuxFollowTimersRef = useRef<number[]>([]);
@@ -420,11 +421,11 @@ export function App() {
       lines: String(TMUX_CAPTURE_HISTORY_LINES),
       clientWidth: String(resolveTmuxCaptureClientWidth())
     });
-    const result = await api<{ output: string }>(`/api/tmux/capture?${params.toString()}`);
+    const result = await api<TmuxCaptureDto>(`/api/tmux/capture?${params.toString()}`);
     if (tmuxCaptureRequestIdRef.current !== requestId || selectedTmuxRef.current !== session) {
       return;
     }
-    setCapturedTmuxOutput(result.output);
+    setCapturedTmuxOutput(result.output, result.sidebar);
   }, [selectedTmux, tmuxGuiActive]);
 
   useEffect(() => {
@@ -535,7 +536,7 @@ export function App() {
     }
     tmuxScrollSnapshotRef.current = null;
     updateTmuxBottomState(node);
-  }, [terminalActive, tmuxFocusActive, tmuxGuiActive, tmuxOutput]);
+  }, [terminalActive, tmuxFocusActive, tmuxGuiActive, tmuxOutput, tmuxSidebar]);
 
   useLayoutEffect(() => {
     resizeTmuxInput(tmuxInputRef.current);
@@ -1569,9 +1570,10 @@ export function App() {
     }
   }
 
-  function setCapturedTmuxOutput(output: string) {
+  function setCapturedTmuxOutput(output: string, sidebar?: TmuxCaptureDto["sidebar"]) {
     rememberTmuxScrollPosition();
     setTmuxOutput(output);
+    setTmuxSidebar(sidebar);
   }
 
   function currentTmuxScrollNode() {
@@ -1992,9 +1994,13 @@ export function App() {
                 onScroll={handleTmuxOutputScroll}
               />
             ) : (
-              <pre ref={tmuxOutputRef} className="tmux-output" onScroll={handleTmuxOutputScroll}>
-                <TmuxOutputLines output={tmuxOutput || "No tmux output captured."} />
-              </pre>
+              <TmuxTtyView
+                key={`${selectedTmux}-${tmuxSidebar?.kind ?? "terminal"}`}
+                ref={tmuxOutputRef}
+                onScroll={handleTmuxOutputScroll}
+                output={tmuxOutput}
+                sidebar={tmuxSidebar}
+              />
             )}
             {!terminalActive && !tmuxAtBottom && (
               <button className="tmux-jump-bottom" aria-label="Jump to latest tmux output" title="Jump to latest tmux output" type="button" onClick={jumpTmuxOutputToBottom}>

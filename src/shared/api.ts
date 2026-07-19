@@ -38,6 +38,15 @@ export type TmuxSessionStatusDto = {
   title: string;
 };
 
+export type TmuxCaptureDto = {
+  session: string;
+  output: string;
+  sidebar?: {
+    kind: "opencode";
+    output: string;
+  };
+};
+
 export type TmuxToolModeDto = {
   id: string;
   label: string;

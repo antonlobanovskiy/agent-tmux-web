@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 import express, { type Request, type Response, type NextFunction } from "express";
 import { WebSocketServer, type RawData, type WebSocket } from "ws";
 
-import { type AppStatus, type TmuxSessionDto } from "../shared/api.js";
+import { type AppStatus, type TmuxCaptureDto, type TmuxSessionDto } from "../shared/api.js";
 import { describeCodexNotification } from "../shared/codexEvents.js";
 import { classifyTmuxStatus } from "../shared/tmuxStatus.js";
 import { CodexBridge } from "./codexBridge.js";
@@ -27,10 +27,13 @@ import {
 } from "./terminal.js";
 import {
   captureTmuxPane,
+  captureTmuxPaneView,
   createTmuxSession,
   detectTmuxInterruptKey,
   detectTmuxSubmitKey,
   destroyTmuxSession,
+  fitTmuxCaptureSizeForPane,
+  inspectTmuxPane,
   interruptTmuxPane,
   listTmuxSessions,
   listTmuxTools,
@@ -238,14 +241,21 @@ app.get("/api/tmux/tools", asyncHandler(async (_req, res) => {
 app.get("/api/tmux/capture", asyncHandler(async (req, res) => {
   const session = requireString(req.query.session, "session");
   const lines = typeof req.query.lines === "string" ? Number(req.query.lines) : tmuxCaptureHistoryLines;
-  const captureSize = buildTmuxCaptureSizeFromClientWidth(req.query.clientWidth);
-  const preserveExistingClientSize = await hasAttachedTmuxClients(session).catch(() => false);
+  const [preserveExistingClientSize, paneMetadata] = await Promise.all([
+    hasAttachedTmuxClients(session).catch(() => false),
+    inspectTmuxPane(session).catch(() => null)
+  ]);
+  const captureSize = fitTmuxCaptureSizeForPane(
+    buildTmuxCaptureSizeFromClientWidth(req.query.clientWidth),
+    paneMetadata
+  );
   if (!preserveExistingClientSize) {
     await resizeTmuxWindowIfNeeded(session, captureSize).catch(() => {
       // Best-effort: capture remains useful even if tmux rejects a resize.
     });
   }
-  res.json({ session, output: await captureTmuxPane(session, lines) });
+  const capture = await captureTmuxPaneView(session, lines);
+  res.json({ session, ...capture } satisfies TmuxCaptureDto);
 }));
 
 app.post("/api/tmux/create", asyncHandler(async (req, res) => {
