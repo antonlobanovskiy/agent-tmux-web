@@ -1770,11 +1770,11 @@ export function App() {
       </main>
 
       <aside className="tmux-panel">
-        <div className="tmux-control-rail">
+        <div className="tmux-app-toolbar">
           <div className="tmux-compact-bar">
             <div className="tmux-title">
               <img alt="" src="/agent-tmux-logo.png" />
-              Tmux
+              Agent Tmux
             </div>
             <button className="tmux-session-menu-button" type="button" onClick={() => setTmuxMenuOpen((current) => !current)}>
               <span>{selectedTmux || "no session"}</span>
@@ -1784,7 +1784,74 @@ export function App() {
               <RefreshCw size={14} />
             </button>
           </div>
+          <div className="tmux-terminal-toolbar">
+            <details className="tmux-view-menu" ref={tmuxViewMenuRef}>
+              <summary aria-label={`Change view. Current view: ${tmuxViewModeLabel}`} title="Change view or theme">
+                <span className="tmux-view-menu-prefix">View:</span>
+                <span className="tmux-view-menu-label">{tmuxViewModeLabel}</span>
+                <ChevronDown aria-hidden="true" className="tmux-view-menu-caret" size={15} />
+              </summary>
+              <div className="tmux-view-menu-content" role="menu">
+                <div className="tmux-view-menu-section">
+                  <span>View</span>
+                  <button className={tmuxViewMode === "regular" ? "active" : ""} role="menuitemradio" aria-checked={tmuxViewMode === "regular"} type="button" onClick={() => selectTmuxViewMode("regular")}>
+                    <TerminalIcon size={15} />
+                    <span>TTY</span>
+                  </button>
+                  <button className={tmuxViewMode === "gui" ? "active" : ""} role="menuitemradio" aria-checked={tmuxViewMode === "gui"} type="button" onClick={() => selectTmuxViewMode("gui")}>
+                    <MessageSquare size={15} />
+                    <span>GUI</span>
+                  </button>
+                  <button className={tmuxViewMode === "focus" ? "active" : ""} role="menuitemradio" aria-checked={tmuxViewMode === "focus"} type="button" onClick={() => selectTmuxViewMode("focus")}>
+                    <ListFilter size={15} />
+                    <span>Focus</span>
+                  </button>
+                  <button className={tmuxViewMode === "raw" ? "active" : ""} role="menuitemradio" aria-checked={tmuxViewMode === "raw"} type="button" onClick={() => selectTmuxViewMode("raw")}>
+                    <Keyboard size={15} />
+                    <span>Raw</span>
+                  </button>
+                </div>
+                <div className="tmux-view-menu-section">
+                  <span>Theme</span>
+                  <button className={colorTheme === "light" ? "active" : ""} role="menuitemradio" aria-checked={colorTheme === "light"} type="button" onClick={() => selectColorTheme("light")}>
+                    <Sun size={15} />
+                    <span>Light</span>
+                  </button>
+                  <button className={colorTheme === "dark" ? "active" : ""} role="menuitemradio" aria-checked={colorTheme === "dark"} type="button" onClick={() => selectColorTheme("dark")}>
+                    <Moon size={15} />
+                    <span>Dark</span>
+                  </button>
+                </div>
+              </div>
+            </details>
+            <button aria-label="Force sync selected tmux output" title="Force sync selected tmux output" type="button" onClick={forceSyncTmuxOutput}>
+              <Download size={15} /> <span>Force Sync</span>
+            </button>
+            <button
+              aria-label="Copy latest clean agent reply"
+              disabled={!latestTmuxAssistantMessage}
+              title="Copy latest clean agent reply"
+              type="button"
+              onClick={() => copyLatestTmuxAssistantText().catch(reportError(setError))}
+            >
+              <Copy size={15} />
+              <span>Copy</span>
+            </button>
+            <span className="tmux-terminal-status">{tmuxCopyNotice || terminalStatus || selectedTmux || "no session selected"}</span>
+            <button
+              aria-label={tmuxNotificationsEnabled ? "Disable browser notifications" : "Enable browser notifications"}
+              className={`tmux-notify-button ${tmuxNotificationsEnabled ? "active" : ""}`}
+              title={tmuxNotificationsEnabled ? "Disable browser notifications" : "Enable browser notifications"}
+              type="button"
+              onClick={() => toggleTmuxNotifications().catch(reportError(setError))}
+            >
+              <Bell size={15} />
+            </button>
+          </div>
+        </div>
+        <div className="tmux-control-rail">
           <div className={tmuxMenuOpen ? "tmux-menu open" : "tmux-menu"}>
+            <div className="tmux-rail-section-title">Sessions</div>
             <div className="tmux-sessions">
               {tmuxSessions.map((session) => {
                 const sessionStatus = tmuxStatusForSession(session);
@@ -1808,11 +1875,13 @@ export function App() {
                 );
               })}
             </div>
+            <div className="tmux-rail-section-title">New Session</div>
             <div className="tmux-actions">
               <input value={newTmuxName} onChange={(event) => setNewTmuxName(event.target.value)} placeholder="new session" />
               <button aria-label="Create tmux session" title="Create tmux session" type="button" onClick={() => createSession().catch(reportError(setError))}><Plus size={15} /></button>
               <button aria-label="Destroy selected tmux session" title="Destroy selected tmux session" type="button" disabled={!selectedTmux} onClick={() => destroySession().catch(reportError(setError))}><Trash2 size={15} /></button>
             </div>
+            <div className="tmux-rail-section-title">CLI Launcher</div>
             <div className="tmux-tool-actions">
               <div className="tmux-tool-picker">
                 <select
@@ -1882,87 +1951,35 @@ export function App() {
             </div>
             {currentTmuxTool?.modes?.length ? (
               <div className="tmux-tool-modes" aria-label="CLI tool modes">
-                {currentTmuxTool.modes.map((mode) => (
-                  <label className={mode.dangerous ? "dangerous" : ""} key={mode.id} title={mode.description}>
-                    <input
-                      aria-label={`${currentTmuxTool.label} ${mode.label}`}
-                      checked={currentTmuxToolModeIds.includes(mode.id)}
-                      onChange={() => toggleSelectedTmuxToolMode(mode.id)}
-                      name={mode.exclusiveGroup ? `${currentTmuxTool.id}-${mode.exclusiveGroup}` : undefined}
-                      type={mode.exclusiveGroup ? "radio" : "checkbox"}
-                    />
-                    <span>{mode.label}</span>
-                  </label>
+                {[
+                  { label: "UI Mode", modes: currentTmuxTool.modes.filter((mode) => mode.exclusiveGroup === "interface") },
+                  { label: "Output Mode", modes: currentTmuxTool.modes.filter((mode) => mode.exclusiveGroup !== "interface") }
+                ].map((section) => section.modes.length > 0 && (
+                  <div className="tmux-mode-section" key={section.label}>
+                    <div className="tmux-rail-section-title">{section.label}</div>
+                    {section.modes.map((mode) => (
+                      <label className={mode.dangerous ? "dangerous" : ""} key={mode.id} title={mode.description}>
+                        <input
+                          aria-label={`${currentTmuxTool.label} ${mode.label}`}
+                          checked={currentTmuxToolModeIds.includes(mode.id)}
+                          onChange={() => toggleSelectedTmuxToolMode(mode.id)}
+                          name={mode.exclusiveGroup ? `${currentTmuxTool.id}-${mode.exclusiveGroup}` : undefined}
+                          type={mode.exclusiveGroup ? "radio" : "checkbox"}
+                        />
+                        <span>{mode.label}</span>
+                      </label>
+                    ))}
+                  </div>
                 ))}
               </div>
             ) : null}
           </div>
+          <div className="tmux-connection-status">
+            <span className={status?.tailscaleDns || status?.tailscaleIp ? "dot online" : "dot"} />
+            <span>{status?.tailscaleDns || status?.tailscaleIp ? "Tailscale connected" : "Local service"}</span>
+          </div>
         </div>
         <div className="tmux-workspace">
-          <div className="tmux-terminal-toolbar">
-            <details className="tmux-view-menu" ref={tmuxViewMenuRef}>
-              <summary aria-label={`Change view. Current view: ${tmuxViewModeLabel}`} title="Change view or theme">
-                <span className="tmux-view-menu-prefix">View:</span>
-                <span className="tmux-view-menu-label">{tmuxViewModeLabel}</span>
-                <ChevronDown aria-hidden="true" className="tmux-view-menu-caret" size={15} />
-              </summary>
-              <div className="tmux-view-menu-content" role="menu">
-                <div className="tmux-view-menu-section">
-                  <span>View</span>
-                  <button className={tmuxViewMode === "regular" ? "active" : ""} role="menuitemradio" aria-checked={tmuxViewMode === "regular"} type="button" onClick={() => selectTmuxViewMode("regular")}>
-                    <TerminalIcon size={15} />
-                    <span>TTY</span>
-                  </button>
-                  <button className={tmuxViewMode === "gui" ? "active" : ""} role="menuitemradio" aria-checked={tmuxViewMode === "gui"} type="button" onClick={() => selectTmuxViewMode("gui")}>
-                    <MessageSquare size={15} />
-                    <span>GUI</span>
-                  </button>
-                  <button className={tmuxViewMode === "focus" ? "active" : ""} role="menuitemradio" aria-checked={tmuxViewMode === "focus"} type="button" onClick={() => selectTmuxViewMode("focus")}>
-                    <ListFilter size={15} />
-                    <span>Focus</span>
-                  </button>
-                  <button className={tmuxViewMode === "raw" ? "active" : ""} role="menuitemradio" aria-checked={tmuxViewMode === "raw"} type="button" onClick={() => selectTmuxViewMode("raw")}>
-                    <Keyboard size={15} />
-                    <span>Raw</span>
-                  </button>
-                </div>
-                <div className="tmux-view-menu-section">
-                  <span>Theme</span>
-                  <button className={colorTheme === "light" ? "active" : ""} role="menuitemradio" aria-checked={colorTheme === "light"} type="button" onClick={() => selectColorTheme("light")}>
-                    <Sun size={15} />
-                    <span>Light</span>
-                  </button>
-                  <button className={colorTheme === "dark" ? "active" : ""} role="menuitemradio" aria-checked={colorTheme === "dark"} type="button" onClick={() => selectColorTheme("dark")}>
-                    <Moon size={15} />
-                    <span>Dark</span>
-                  </button>
-                </div>
-              </div>
-            </details>
-            <button aria-label="Force sync selected tmux output" title="Force sync selected tmux output" type="button" onClick={forceSyncTmuxOutput}>
-              <Download size={15} /> <span>Force Sync</span>
-            </button>
-            <button
-              aria-label="Copy latest clean agent reply"
-              disabled={!latestTmuxAssistantMessage}
-              title="Copy latest clean agent reply"
-              type="button"
-              onClick={() => copyLatestTmuxAssistantText().catch(reportError(setError))}
-            >
-              <Copy size={15} />
-              <span>Copy</span>
-            </button>
-            <span className="tmux-terminal-status">{tmuxCopyNotice || terminalStatus || selectedTmux || "no session selected"}</span>
-            <button
-              aria-label={tmuxNotificationsEnabled ? "Disable browser notifications" : "Enable browser notifications"}
-              className={`tmux-notify-button ${tmuxNotificationsEnabled ? "active" : ""}`}
-              title={tmuxNotificationsEnabled ? "Disable browser notifications" : "Enable browser notifications"}
-              type="button"
-              onClick={() => toggleTmuxNotifications().catch(reportError(setError))}
-            >
-              <Bell size={15} />
-            </button>
-          </div>
           <div className="tmux-output-shell">
             {terminalActive && demoMode ? (
               <div className="tmux-terminal tmux-terminal-demo">

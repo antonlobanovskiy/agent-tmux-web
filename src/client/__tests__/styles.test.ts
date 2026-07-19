@@ -60,6 +60,24 @@ describe("responsive mobile CSS", () => {
     expect(mobileBlock).toContain(".tmux-opencode-tabs");
     expect(mobileBlock).toContain(".tmux-opencode-terminal.mobile-active");
   });
+
+  it("builds a dense desktop workbench while retaining the mobile terminal layout", () => {
+    const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");
+    const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
+    const mobileBlock = css.slice(css.indexOf("@media (max-width: 760px)"));
+
+    expect(app).toContain('className="tmux-app-toolbar"');
+    expect(app).toContain('className="tmux-rail-section-title">Sessions');
+    expect(app).toContain('className="tmux-rail-section-title">New Session');
+    expect(app).toContain('className="tmux-rail-section-title">CLI Launcher');
+    expect(app).toContain('className="tmux-connection-status"');
+    expect(css).toContain(".tmux-app-toolbar");
+    expect(css).toContain("grid-template-columns: 260px minmax(0, 1fr)");
+    expect(css).toContain("border-radius: 2px");
+    expect(mobileBlock).toContain(".tmux-app-toolbar");
+    expect(mobileBlock).toContain("grid-template-columns: minmax(0, auto) 36px 36px minmax(0, 1fr) 36px");
+    expect(mobileBlock).toContain(".tmux-menu.open");
+  });
 });
 
 describe("color theme CSS", () => {
