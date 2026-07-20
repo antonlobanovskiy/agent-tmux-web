@@ -9,6 +9,7 @@ Make Raw the default terminal experience for every tmux-backed harness, remove T
 - Raw is the default view for the initial session, every newly selected session, and a session after a CLI is launched.
 - TTY is removed from the view menu and client rendering path.
 - GUI and Focus remain optional views.
+- Raw shortcut buttons are hidden in desktop browsers and shown only for mobile browser input or the Android app.
 - Default, Auto, Plan, Yolo, and related safety choices are labeled `Permission Mode`, not `Output Mode`.
 - Only internal upload paths are forbidden. A safe user-relative attachment reference may appear in the shared tmux prompt so arbitrary CLI agents can read the file.
 - The behavior must work for OpenCode, Codex, Claude, built-in launchers, and custom harnesses without per-harness adapters.
@@ -20,6 +21,8 @@ Make Raw the default terminal experience for every tmux-backed harness, remove T
 The view menu contains `Raw`, `GUI`, and `Focus`. Selecting GUI or Focus closes the Raw socket and uses the existing capture-based views. Selecting another session always applies the Raw default rather than carrying a normalized view across sessions.
 
 The toolbar action currently named `Force Sync` becomes `Reconnect` while Raw is active. Reconnect tears down the current terminal socket and establishes a fresh connection to the same session without changing the tmux process. In GUI or Focus, the action remains `Force Sync` and refreshes captured output.
+
+The Raw shortcut row (`Esc`, `Tab`, control keys, arrows, and `Enter`) is rendered only when the existing input-device detection identifies a mobile browser or when the Android bridge is present. Desktop browsers do not render the row, regardless of window width, because the physical keyboard already supplies those keys.
 
 The unused TTY client component, tests, OpenCode Terminal/Details tabs, and TTY-only CSS are removed. Server capture and OpenCode sidebar parsing remain available because GUI, Focus, status classification, and background task watching still consume captured output.
 
@@ -73,7 +76,7 @@ If alias creation fails, the upload request fails and removes the newly stored f
 
 ## Component Boundaries
 
-- `App.tsx`: Raw-default lifecycle, xterm addon wiring, reconnect behavior, selection status, and removal of TTY rendering.
+- `App.tsx`: Raw-default lifecycle, xterm addon wiring, reconnect behavior, mobile-only shortcut visibility, selection status, and removal of TTY rendering.
 - `rawTerminalLinks.ts`: approved URL normalization and device-local opening policy.
 - `rawTerminalSelection.ts`: selection deduplication and clipboard orchestration independent of React and xterm rendering.
 - `clipboard.ts`: existing device-local clipboard implementation; no server fallback.
@@ -101,12 +104,12 @@ If alias creation fails, the upload request fails and removes the newly stored f
 - Selection copying ignores empty/repeated selections, resets after clearing, and routes through the supplied clipboard writer.
 - Android tests verify the JavaScript bridge method and approved-scheme external intent policy.
 - Upload tests verify alias creation, safe references, path sanitization, rollback on alias failure, expiry cleanup, and that API-facing DTOs contain no absolute storage path.
-- App/style tests verify Raw default, no TTY menu/rendering, GUI and Focus retention, Reconnect copy, `Permission Mode`, and the corrected 761-1120px grid behavior.
+- App/style tests verify Raw default, no TTY menu/rendering, GUI and Focus retention, Reconnect copy, mobile-only Raw shortcuts, `Permission Mode`, and the corrected 761-1120px grid behavior.
 
 ### Rendered Tests
 
-- Desktop browser: initial Raw connection, HTTP/HTTPS link click, selection auto-copy, Reconnect, GUI/Focus opt-in, session switch back to Raw, composer and notifications.
-- Mobile browser: Raw default, tap link opens a browser tab, touch selection copies locally, Raw scrolling, soft keys, and no clipped controls.
+- Desktop browser: initial Raw connection, no shortcut row, HTTP/HTTPS link click, selection auto-copy, Reconnect, GUI/Focus opt-in, session switch back to Raw, composer and notifications.
+- Mobile browser: Raw default, visible shortcut row, tap link opens a browser tab, touch selection copies locally, Raw scrolling, soft-key input, and no clipped controls.
 - Android wrapper: Raw default, canvas link opens the external browser, selection writes the Android clipboard, file chooser produces only a safe attachment reference, and no internal path appears.
 - Responsive boundary checks: 760x600, 761x600, 800x600, 1120x700, 1121x700, and 1440x900 with usable terminal height, visible controls, and no horizontal overflow.
 
