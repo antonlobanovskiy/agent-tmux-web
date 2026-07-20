@@ -137,7 +137,9 @@ deployment is separate. Keep user-specific runtime config out of git.
    - Enable notifications with the bell button if the user wants done alerts.
      Browser installs need HTTPS or localhost; the Android wrapper can use its
      native notification bridge against the private server URL.
-   - Confirm uploads use a temporary server path and are not kept forever.
+   - Confirm uploads remain temporary, clients receive only safe
+     `~/.agent-tmux/attachments/...` references, and expired files and aliases
+     are removed.
    - If setting up Android for one private device, build
      `pnpm android:build:private` to create a separate private package, then
      use `pnpm android:stage-apk` to serve it from the private server over LAN,

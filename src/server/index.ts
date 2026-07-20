@@ -46,8 +46,9 @@ import {
 import {
   cleanupExpiredUploads,
   resolveLegacyUploadRoot,
+  resolveUploadAliasRoot,
   resolveUploadRoot,
-  saveUploadedFile
+  saveUploadedFileForClient
 } from "./uploads.js";
 import { TmuxWatchStore } from "./tmuxWatch.js";
 
@@ -389,7 +390,7 @@ async function listTmuxSessionsWithStatus(): Promise<TmuxSessionDto[]> {
 
 app.post("/api/uploads", asyncHandler(async (req, res) => {
   const originalName = requireString(req.query.filename, "filename");
-  const file = await saveUploadedFile(req, {
+  const file = await saveUploadedFileForClient(req, {
     originalName,
     mimeType: stringOrNull(req.header("content-type"))
   });
@@ -685,7 +686,7 @@ function rawToString(raw: RawData): string {
 
 function startUploadCleanup(): void {
   const clean = () => {
-    const roots = [...new Set([resolveUploadRoot(), resolveLegacyUploadRoot()])];
+    const roots = [...new Set([resolveUploadRoot(), resolveLegacyUploadRoot(), resolveUploadAliasRoot()])];
     void Promise.all(roots.map((root) => cleanupExpiredUploads(root))).catch((error: unknown) => {
       console.error("Failed to clean expired uploads", error);
     });

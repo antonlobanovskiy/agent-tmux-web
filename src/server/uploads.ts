@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createWriteStream } from "node:fs";
-import { lstat, mkdir, readdir, rm, rmdir } from "node:fs/promises";
+import { lstat, mkdir, readdir, rm, rmdir, symlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { Transform, type TransformCallback, type Readable } from "node:stream";
@@ -10,6 +10,24 @@ import type { UploadedFileDto } from "../shared/api.js";
 
 export const DEFAULT_UPLOAD_MAX_BYTES = 50 * 1024 * 1024;
 export const DEFAULT_UPLOAD_TTL_MS = 24 * 60 * 60 * 1000;
+
+export type SavedUploadedFile = {
+  filePath: string;
+  storedName: string;
+  name: string;
+  size: number;
+  mimeType: string | null;
+};
+
+type SaveUploadedFileOptions = {
+  originalName: string;
+  mimeType?: string | null;
+  root?: string;
+  aliasRoot?: string;
+  maxBytes?: number;
+  now?: Date;
+  id?: string;
+};
 
 export class UploadTooLargeError extends Error {
   statusCode = 413;
@@ -27,6 +45,10 @@ export function resolveUploadRoot(): string {
 
 export function resolveLegacyUploadRoot(): string {
   return path.join(process.env.HOME ?? os.homedir() ?? process.cwd(), ".codex-web", "uploads");
+}
+
+export function resolveUploadAliasRoot(): string {
+  return path.join(os.homedir(), ".agent-tmux", "attachments");
 }
 
 export function resolveUploadMaxBytes(): number {
@@ -71,14 +93,14 @@ export function buildUploadTarget(
 
 export async function saveUploadedFile(
   input: Readable,
-  options: {
-    originalName: string;
-    mimeType?: string | null;
-    root?: string;
-    maxBytes?: number;
-  }
-): Promise<UploadedFileDto> {
-  const target = buildUploadTarget(options.root ?? resolveUploadRoot(), options.originalName);
+  options: SaveUploadedFileOptions
+): Promise<SavedUploadedFile> {
+  const target = buildUploadTarget(
+    options.root ?? resolveUploadRoot(),
+    options.originalName,
+    options.now,
+    options.id
+  );
   await mkdir(target.directory, { recursive: true });
 
   const limiter = new ByteLimitTransform(options.maxBytes ?? resolveUploadMaxBytes());
@@ -91,9 +113,35 @@ export async function saveUploadedFile(
 
   return {
     name: path.basename(options.originalName) || target.storedName,
-    path: target.filePath,
+    filePath: target.filePath,
+    storedName: target.storedName,
     size: limiter.bytes,
     mimeType: options.mimeType ?? null
+  };
+}
+
+export async function saveUploadedFileForClient(
+  input: Readable,
+  options: SaveUploadedFileOptions
+): Promise<UploadedFileDto> {
+  const saved = await saveUploadedFile(input, options);
+  const date = path.basename(path.dirname(saved.filePath));
+  const aliasDirectory = path.join(options.aliasRoot ?? resolveUploadAliasRoot(), date);
+  const aliasPath = path.join(aliasDirectory, saved.storedName);
+
+  try {
+    await mkdir(aliasDirectory, { recursive: true });
+    await symlink(saved.filePath, aliasPath, "file");
+  } catch (error) {
+    await rm(saved.filePath, { force: true });
+    throw error;
+  }
+
+  return {
+    name: saved.name,
+    reference: `~/.agent-tmux/attachments/${date}/${saved.storedName}`,
+    size: saved.size,
+    mimeType: saved.mimeType
   };
 }
 

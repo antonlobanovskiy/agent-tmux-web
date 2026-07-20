@@ -54,7 +54,7 @@ import {
 import { COLOR_THEME_STORAGE_KEY, resolveInitialColorTheme, type ColorTheme } from "./theme.js";
 import { buildCompactTmuxMessages, summarizeTmuxAgent, type CompactTmuxMessage, type TmuxAgentSummary } from "./agentStatus.js";
 import { writeClipboardText } from "./clipboard.js";
-import { applyTextareaPaste, buildPastedPromptText, extractPastedImageFiles, isMobileInputDevice, readInputDeviceContext, shouldSubmitTextareaEnter } from "./inputBehavior.js";
+import { applyTextareaPaste, buildPastedPromptText, extractPastedImageFiles, formatUploadedFilesForPrompt, isMobileInputDevice, readInputDeviceContext, shouldSubmitTextareaEnter } from "./inputBehavior.js";
 import { LinkifiedText } from "./LinkifiedText.js";
 import { openRawTerminalLink } from "./rawTerminalLinks.js";
 import { shouldShowRawTerminalShortcuts, shouldShowTmuxJumpToLatest, shouldShowTmuxSendForm } from "./rawTerminalMode.js";
@@ -976,7 +976,7 @@ export function App() {
     if (demoMode) {
       return selectedFiles.map((file) => ({
         name: file.name || "upload",
-        path: `/tmp/agent-tmux-web/uploads/demo/${file.name || "upload"}`,
+        reference: `~/.agent-tmux/attachments/demo/${file.name || "upload"}`,
         size: file.size,
         mimeType: file.type || null
       }));
@@ -2483,11 +2483,6 @@ async function registerTmuxTaskWatch(session: string, label: string): Promise<vo
     method: "POST",
     body: JSON.stringify({ session, label })
   });
-}
-
-function formatUploadedFilesForPrompt(files: UploadedFileDto[]): string {
-  const label = files.length === 1 ? "Attached file on server" : "Attached files on server";
-  return `${label}: ${files.map((file) => file.path).join(" ")}`;
 }
 
 function browserAccessToken(): string {

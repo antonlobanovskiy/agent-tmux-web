@@ -58,7 +58,7 @@ and desktop layout.
 - Green/yellow/red status dots for running, waiting/idle, and error sessions.
 - Stable scrollback while new tmux output continues arriving.
 - File uploads and pasted clipboard images from Android, iOS, or desktop
-  browsers to temporary server paths.
+  browsers, with safe `~/.agent-tmux/attachments/...` prompt references.
 - Browser and Android notifications when watched tasks return to a prompt.
 - Light and dark themes.
 - Generic public Android APK plus optional private APK builds for your own
@@ -166,8 +166,9 @@ mode, and notifications.
    phone, use the `Terminal` and `Details` tabs when that sidebar is present.
 5. Use the bell button when you want task-done alerts.
 6. Use the paperclip button to upload files, or paste clipboard images directly
-   into the chat input. Uploaded files are inserted as temporary server paths in
-   prompts.
+   into the chat input. Uploads remain temporary on the server, while prompts
+   receive safe `~/.agent-tmux/attachments/...` references readable by local
+   CLIs.
 
 Status dots:
 
@@ -235,8 +236,9 @@ Common variables:
 - `AGENT_TMUX_WEB_JSON_LIMIT`: request body limit for large pasted prompts and
   tmux sends. Defaults to `25mb`.
 - `AGENT_TMUX_WEB_UPLOAD_DIR`: upload directory. Defaults to
-  `/tmp/agent-tmux-web/uploads`.
-- `AGENT_TMUX_WEB_UPLOAD_TTL_MS`: upload expiry. Defaults to 24 hours.
+  `/tmp/agent-tmux-web/uploads`. This internal path is not sent to clients.
+- `AGENT_TMUX_WEB_UPLOAD_TTL_MS`: upload and safe-reference expiry. Defaults to
+  24 hours.
 - `CODEX_APP_SERVER_PORT`: optional Codex app-server port.
 - `CODEX_APP_SERVER_AUTOSTART`: set to `1` to start Codex app-server on boot.
 

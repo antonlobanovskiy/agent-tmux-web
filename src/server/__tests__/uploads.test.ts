@@ -1,4 +1,4 @@
-import { access, mkdir, mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, readdir, readlink, rm, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -9,9 +9,11 @@ import {
   buildUploadTarget,
   cleanupExpiredUploads,
   DEFAULT_UPLOAD_TTL_MS,
+  resolveUploadAliasRoot,
   resolveUploadRoot,
   sanitizeUploadName,
   saveUploadedFile,
+  saveUploadedFileForClient,
   UploadTooLargeError
 } from "../uploads.js";
 
@@ -41,6 +43,10 @@ describe("upload helpers", () => {
         process.env.CODEX_WEB_UPLOAD_DIR = previousLegacy;
       }
     }
+  });
+
+  it("resolves upload aliases below the user's home directory", () => {
+    expect(resolveUploadAliasRoot()).toBe(path.join(os.homedir(), ".agent-tmux", "attachments"));
   });
 
   it("sanitizes remote browser filenames before storing them on the server", () => {
@@ -76,10 +82,81 @@ describe("upload helpers", () => {
     });
 
     expect(file.name).toBe("photo.png");
-    expect(file.path.startsWith(root)).toBe(true);
+    expect(file.filePath.startsWith(root)).toBe(true);
+    expect(file.storedName).toBe(path.basename(file.filePath));
     expect(file.size).toBe(18);
     expect(file.mimeType).toBe("image/png");
-    await expect(readFile(file.path, "utf8")).resolves.toBe("hello from android");
+    await expect(readFile(file.filePath, "utf8")).resolves.toBe("hello from android");
+  });
+
+  it("returns a deterministic safe reference instead of the storage path", async () => {
+    const storageRoot = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-storage-test-"));
+    const aliasRoot = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-alias-test-"));
+    tempRoots.push(storageRoot, aliasRoot);
+
+    const file = await saveUploadedFileForClient(Readable.from(["image"]), {
+      originalName: "photo.png",
+      mimeType: "image/png",
+      root: storageRoot,
+      aliasRoot,
+      maxBytes: 1024,
+      now: new Date("2026-07-20T02:38:49.000Z"),
+      id: "abc12345"
+    });
+
+    expect(file).toEqual({
+      name: "photo.png",
+      reference: "~/.agent-tmux/attachments/2026-07-20/20260720T023849Z-abc12345-photo.png",
+      size: 5,
+      mimeType: "image/png"
+    });
+    expect(file).not.toHaveProperty("path");
+    expect(JSON.stringify({ file })).not.toContain(storageRoot);
+  });
+
+  it("creates unique readable symlink aliases", async () => {
+    const storageRoot = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-storage-test-"));
+    const aliasRoot = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-alias-test-"));
+    tempRoots.push(storageRoot, aliasRoot);
+    const now = new Date("2026-07-20T02:38:49.000Z");
+
+    const first = await saveUploadedFileForClient(Readable.from(["first"]), {
+      originalName: "report.txt",
+      root: storageRoot,
+      aliasRoot,
+      now,
+      id: "first-id"
+    });
+    const second = await saveUploadedFileForClient(Readable.from(["second"]), {
+      originalName: "report.txt",
+      root: storageRoot,
+      aliasRoot,
+      now,
+      id: "second-id"
+    });
+
+    expect(first.reference).not.toBe(second.reference);
+    const firstAlias = path.join(aliasRoot, "2026-07-20", path.basename(first.reference));
+    const secondAlias = path.join(aliasRoot, "2026-07-20", path.basename(second.reference));
+    expect(await readlink(firstAlias)).toContain(storageRoot);
+    await expect(readFile(firstAlias, "utf8")).resolves.toBe("first");
+    await expect(readFile(secondAlias, "utf8")).resolves.toBe("second");
+  });
+
+  it("removes the stored file when alias creation fails", async () => {
+    const storageRoot = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-storage-test-"));
+    const aliasParent = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-alias-test-"));
+    const aliasRoot = path.join(aliasParent, "not-a-directory");
+    tempRoots.push(storageRoot, aliasParent);
+    await writeFile(aliasRoot, "blocked");
+
+    await expect(saveUploadedFileForClient(Readable.from(["image"]), {
+      originalName: "photo.png",
+      root: storageRoot,
+      aliasRoot,
+      maxBytes: 1024
+    })).rejects.toThrow();
+    await expect(readdir(storageRoot, { recursive: true })).resolves.toHaveLength(1);
   });
 
   it("rejects oversized uploads and removes partial files", async () => {

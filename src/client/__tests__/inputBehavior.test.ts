@@ -4,6 +4,7 @@ import {
   applyTextareaPaste,
   buildPastedPromptText,
   extractPastedImageFiles,
+  formatUploadedFilesForPrompt,
   isMobileInputDevice,
   shouldSubmitTextareaEnter
 } from "../inputBehavior.js";
@@ -49,11 +50,43 @@ describe("input behavior", () => {
     expect(files).toEqual([image]);
   });
 
-  it("preserves clipboard text before inserted uploaded file paths", () => {
-    expect(buildPastedPromptText("please review this", "Attached file on server: /tmp/paste.png"))
-      .toBe("please review this\n\nAttached file on server: /tmp/paste.png");
-    expect(buildPastedPromptText("", "Attached file on server: /tmp/paste.png"))
-      .toBe("Attached file on server: /tmp/paste.png");
+  it("preserves clipboard text before inserted uploaded file references", () => {
+    const attachment = "Attached file: ~/.agent-tmux/attachments/2026-07-20/paste.png";
+    expect(buildPastedPromptText("please review this", attachment))
+      .toBe(`please review this\n\n${attachment}`);
+    expect(buildPastedPromptText("", attachment)).toBe(attachment);
+  });
+
+  it("formats safe attachment references without internal server wording", () => {
+    const attachment = formatUploadedFilesForPrompt([{
+      name: "photo.png",
+      reference: "~/.agent-tmux/attachments/2026-07-20/photo.png",
+      size: 5,
+      mimeType: "image/png"
+    }]);
+    expect(attachment).toBe("Attached file: ~/.agent-tmux/attachments/2026-07-20/photo.png");
+    expect(attachment).not.toContain("/tmp/");
+    expect(attachment).not.toContain("on server");
+  });
+
+  it("formats multiple safe attachment references", () => {
+    const attachment = formatUploadedFilesForPrompt([
+      {
+        name: "first.png",
+        reference: "~/.agent-tmux/attachments/2026-07-20/first.png",
+        size: 5,
+        mimeType: "image/png"
+      },
+      {
+        name: "second.png",
+        reference: "~/.agent-tmux/attachments/2026-07-20/second.png",
+        size: 6,
+        mimeType: "image/png"
+      }
+    ]);
+    expect(attachment).toBe(
+      "Attached files: ~/.agent-tmux/attachments/2026-07-20/first.png ~/.agent-tmux/attachments/2026-07-20/second.png"
+    );
   });
 
   it("submits Enter on desktop textareas but keeps Shift+Enter for newlines", () => {
