@@ -67,6 +67,31 @@ describe("responsive mobile CSS", () => {
     expect(app).toMatch(/\.then\(\(applied\) => \{\s+if \(applied\) \{\s+setTerminalStatus\(`synced \$\{session\}`\)/);
   });
 
+  it("serializes Force Sync and avoids capture work while Raw is active", () => {
+    const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
+    const rawGuard = "if (!session || terminalActiveRef.current)";
+    const requestAllocation = "const requestId = ++tmuxCaptureRequestIdRef.current";
+
+    expect(app).toContain(rawGuard);
+    expect(app.indexOf(rawGuard)).toBeLessThan(app.indexOf(requestAllocation));
+    expect(app).not.toContain("captureTmux(requestedTmuxSession)");
+    expect(app).toContain("const manualCaptureInFlightRef = useRef(false)");
+    expect(app).toContain("if (manualCaptureInFlightRef.current)");
+    expect(app).toContain("manualCaptureInFlightRef.current = true;");
+    expect(app).toContain("manualCaptureInFlight: manualCaptureInFlightRef.current");
+    expect(app).toMatch(/\.finally\(\(\) => \{\s+manualCaptureInFlightRef\.current = false;/);
+  });
+
+  it("renders and gates controls for the no-session state", () => {
+    const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
+
+    expect(app).toContain("!selectedTmux ? (");
+    expect(app).toContain('className="tmux-empty-session"');
+    expect(app).toContain("No tmux session selected");
+    expect(app).toContain("disabled={!selectedTmux}");
+    expect(app).toContain("sessionSelected: Boolean(selectedTmux)");
+  });
+
   it("guards queued Raw selection status callbacks after cleanup", () => {
     const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
 

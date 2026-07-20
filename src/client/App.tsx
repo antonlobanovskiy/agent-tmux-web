@@ -286,6 +286,7 @@ export function App() {
   const tmuxChatRef = useRef<HTMLDivElement | null>(null);
   const tmuxViewMenuRef = useRef<HTMLDetailsElement | null>(null);
   const tmuxFollowTimersRef = useRef<number[]>([]);
+  const manualCaptureInFlightRef = useRef(false);
   const tmuxNotificationsEnabledRef = useRef(tmuxNotificationsEnabled);
   const tmuxStickToBottomRef = useRef(true);
   const forceTmuxScrollBottomRef = useRef(false);
@@ -329,7 +330,8 @@ export function App() {
     || isMobileInputDevice(readInputDeviceContext());
   const showRawTerminalShortcuts = shouldShowRawTerminalShortcuts({
     terminalActive,
-    mobileInput: mobileRawInput
+    mobileInput: mobileRawInput,
+    sessionSelected: Boolean(selectedTmux)
   });
   const tmuxViewMode: TmuxViewMode = terminalActive ? "raw" : tmuxFocusActive ? "focus" : "gui";
   const tmuxViewModeLabel = TMUX_VIEW_MODE_LABELS[tmuxViewMode];
@@ -416,7 +418,7 @@ export function App() {
   }, []);
 
   const captureTmux = useCallback(async (session = selectedTmux): Promise<boolean> => {
-    if (!session) {
+    if (!session || terminalActiveRef.current) {
       return false;
     }
     const requestId = ++tmuxCaptureRequestIdRef.current;
@@ -529,7 +531,6 @@ export function App() {
     setSelectedTmux(requestedTmuxSession);
     setTerminalStatus(`${requestedTmuxSession} is waiting for input`);
     queueTmuxOutputBottomScroll();
-    void captureTmux(requestedTmuxSession).catch(reportError(setError));
     clearRequestedTmuxSessionFromAddressBar();
     setRequestedTmuxSession("");
   }, [captureTmux, requestedTmuxSession]);
@@ -576,7 +577,12 @@ export function App() {
     }
 
     const interval = window.setInterval(() => {
-      if (shouldAutoCaptureTmux({ selectedTmux, terminalActive, documentHidden: document.hidden })) {
+      if (shouldAutoCaptureTmux({
+        selectedTmux,
+        terminalActive,
+        documentHidden: document.hidden,
+        manualCaptureInFlight: manualCaptureInFlightRef.current
+      })) {
         captureTmux(selectedTmux).catch(reportError(setError));
       }
     }, TMUX_CAPTURE_POLL_INTERVAL_MS);
@@ -1080,6 +1086,10 @@ export function App() {
       setRawTerminalConnectionId((current) => current + 1);
       return;
     }
+    if (manualCaptureInFlightRef.current) {
+      return;
+    }
+    manualCaptureInFlightRef.current = true;
     setTerminalStatus(`syncing ${session}`);
     void captureTmux(session)
       .then((applied) => {
@@ -1087,7 +1097,10 @@ export function App() {
           setTerminalStatus(`synced ${session}`);
         }
       })
-      .catch(reportError(setError));
+      .catch(reportError(setError))
+      .finally(() => {
+        manualCaptureInFlightRef.current = false;
+      });
   }
 
   function showTmuxCopyNotice(message: string) {
@@ -1908,6 +1921,7 @@ export function App() {
             </details>
             <button
               aria-label={terminalActive ? "Reconnect raw terminal" : "Force sync selected tmux output"}
+              disabled={!selectedTmux}
               title={terminalActive ? "Reconnect raw terminal" : "Force sync selected tmux output"}
               type="button"
               onClick={syncOrReconnectTmux}
@@ -2069,7 +2083,13 @@ export function App() {
         </div>
         <div className="tmux-workspace">
           <div className="tmux-output-shell">
-            {terminalActive ? (
+            {!selectedTmux ? (
+              <div className="tmux-empty-session" role="status">
+                <TerminalIcon size={26} />
+                <strong>No tmux session selected</strong>
+                <span>Create a session or choose one from the session list.</span>
+              </div>
+            ) : terminalActive ? (
               <div
                 ref={terminalHostRef}
                 aria-label="Raw interactive tmux terminal"

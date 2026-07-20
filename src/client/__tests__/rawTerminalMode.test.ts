@@ -8,8 +8,9 @@ describe("raw terminal mode", () => {
   });
 
   it("shows Raw shortcut buttons only for mobile input", () => {
-    expect(shouldShowRawTerminalShortcuts({ terminalActive: true, mobileInput: true })).toBe(true);
-    expect(shouldShowRawTerminalShortcuts({ terminalActive: true, mobileInput: false })).toBe(false);
-    expect(shouldShowRawTerminalShortcuts({ terminalActive: false, mobileInput: true })).toBe(false);
+    expect(shouldShowRawTerminalShortcuts({ terminalActive: true, mobileInput: true, sessionSelected: true })).toBe(true);
+    expect(shouldShowRawTerminalShortcuts({ terminalActive: true, mobileInput: false, sessionSelected: true })).toBe(false);
+    expect(shouldShowRawTerminalShortcuts({ terminalActive: false, mobileInput: true, sessionSelected: true })).toBe(false);
+    expect(shouldShowRawTerminalShortcuts({ terminalActive: true, mobileInput: true, sessionSelected: false })).toBe(false);
   });
 });

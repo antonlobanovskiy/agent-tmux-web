@@ -4,10 +4,12 @@ export function shouldShowTmuxSendForm({ terminalActive }: { terminalActive: boo
 
 export function shouldShowRawTerminalShortcuts({
   terminalActive,
-  mobileInput
+  mobileInput,
+  sessionSelected
 }: {
   terminalActive: boolean;
   mobileInput: boolean;
+  sessionSelected: boolean;
 }): boolean {
-  return terminalActive && mobileInput;
+  return terminalActive && mobileInput && sessionSelected;
 }

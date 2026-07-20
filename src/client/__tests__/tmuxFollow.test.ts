@@ -8,10 +8,11 @@ import {
 
 describe("tmux follow behavior", () => {
   it("polls captured tmux output only when a capture pane is visible", () => {
-    expect(shouldAutoCaptureTmux({ selectedTmux: "codex", terminalActive: false, documentHidden: false })).toBe(true);
-    expect(shouldAutoCaptureTmux({ selectedTmux: "", terminalActive: false, documentHidden: false })).toBe(false);
-    expect(shouldAutoCaptureTmux({ selectedTmux: "codex", terminalActive: true, documentHidden: false })).toBe(false);
-    expect(shouldAutoCaptureTmux({ selectedTmux: "codex", terminalActive: false, documentHidden: true })).toBe(false);
+    expect(shouldAutoCaptureTmux({ selectedTmux: "codex", terminalActive: false, documentHidden: false, manualCaptureInFlight: false })).toBe(true);
+    expect(shouldAutoCaptureTmux({ selectedTmux: "", terminalActive: false, documentHidden: false, manualCaptureInFlight: false })).toBe(false);
+    expect(shouldAutoCaptureTmux({ selectedTmux: "codex", terminalActive: true, documentHidden: false, manualCaptureInFlight: false })).toBe(false);
+    expect(shouldAutoCaptureTmux({ selectedTmux: "codex", terminalActive: false, documentHidden: true, manualCaptureInFlight: false })).toBe(false);
+    expect(shouldAutoCaptureTmux({ selectedTmux: "codex", terminalActive: false, documentHidden: false, manualCaptureInFlight: true })).toBe(false);
   });
 
   it("uses frequent follow-up captures after sending input", () => {

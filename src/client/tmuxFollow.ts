@@ -5,8 +5,9 @@ export type TmuxFollowState = {
   selectedTmux: string;
   terminalActive: boolean;
   documentHidden: boolean;
+  manualCaptureInFlight: boolean;
 };
 
-export function shouldAutoCaptureTmux({ selectedTmux, terminalActive, documentHidden }: TmuxFollowState): boolean {
-  return Boolean(selectedTmux) && !terminalActive && !documentHidden;
+export function shouldAutoCaptureTmux({ selectedTmux, terminalActive, documentHidden, manualCaptureInFlight }: TmuxFollowState): boolean {
+  return Boolean(selectedTmux) && !terminalActive && !documentHidden && !manualCaptureInFlight;
 }
