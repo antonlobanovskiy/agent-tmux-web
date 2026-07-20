@@ -48,6 +48,13 @@ export class UploadStorageError extends Error {
   }
 }
 
+export function combineUploadFailureCauses(uploadError: unknown, rollbackError: unknown): AggregateError {
+  return new AggregateError(
+    [uploadError, rollbackError],
+    "Upload failed and stored target rollback also failed"
+  );
+}
+
 export function resolveUploadRoot(): string {
   return path.resolve(process.env.AGENT_TMUX_WEB_UPLOAD_DIR
     ?? process.env.CODEX_WEB_UPLOAD_DIR
@@ -172,10 +179,15 @@ export async function saveUploadedFileForClient(
     if (error instanceof UploadTooLargeError) {
       throw error;
     }
+    let cause = error;
     if (saved) {
-      await rm(saved.filePath, { force: true }).catch(() => undefined);
+      try {
+        await rm(saved.filePath, { force: true });
+      } catch (rollbackError) {
+        cause = combineUploadFailureCauses(error, rollbackError);
+      }
     }
-    throw new UploadStorageError(error);
+    throw new UploadStorageError(cause);
   }
 }
 
@@ -203,10 +215,22 @@ export async function cleanupUploadRoots(
   options: CleanupUploadsOptions = {}
 ): Promise<void> {
   const roots = [...new Set(targetRoots.map((root) => path.resolve(root)))];
+  const failures: unknown[] = [];
   for (const root of roots) {
-    await cleanupExpiredUploads(root, options);
+    try {
+      await cleanupExpiredUploads(root, options);
+    } catch (error) {
+      failures.push(error);
+    }
   }
-  await cleanupExpiredUploadAliases(aliasRoot, options);
+  try {
+    await cleanupExpiredUploadAliases(aliasRoot, options);
+  } catch (error) {
+    failures.push(error);
+  }
+  if (failures.length > 0) {
+    throw new AggregateError(failures, "Failed to clean one or more upload roots");
+  }
 }
 
 async function cleanupExpiredUploadsInDirectory(

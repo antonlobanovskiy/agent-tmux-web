@@ -10,6 +10,7 @@ import {
   cleanupExpiredUploadAliases,
   cleanupExpiredUploads,
   cleanupUploadRoots,
+  combineUploadFailureCauses,
   DEFAULT_UPLOAD_TTL_MS,
   resolveUploadAliasRoot,
   resolveUploadRoot,
@@ -309,6 +310,19 @@ describe("upload helpers", () => {
     await expect(readdir(storageRoot, { recursive: true })).resolves.toHaveLength(1);
   });
 
+  it("preserves alias creation and rollback failures behind the fixed public error", () => {
+    const aliasError = new Error("alias creation failed");
+    const rollbackError = new Error("stored target removal failed");
+    const error = new UploadStorageError(combineUploadFailureCauses(aliasError, rollbackError));
+
+    expect(error.message).toBe("Unable to store uploaded file");
+    expect(error.cause).toBeInstanceOf(AggregateError);
+    expect((error.cause as AggregateError).errors).toEqual([aliasError, rollbackError]);
+    const responseBody = JSON.stringify({ error: error.message });
+    expect(responseBody).not.toContain(aliasError.message);
+    expect(responseBody).not.toContain(rollbackError.message);
+  });
+
   it("rejects oversized uploads and removes partial files", async () => {
     const storageRoot = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-web-upload-test-"));
     const aliasRoot = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-alias-test-"));
@@ -420,6 +434,46 @@ describe("upload helpers", () => {
 
     await expect(access(targetPath)).rejects.toThrow();
     await expect(access(legacyPath)).rejects.toThrow();
+    await expect(lstat(aliasPath)).rejects.toThrow();
+  });
+
+  it("attempts every target and alias cleanup before reporting all failures", async () => {
+    const failureParent = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-cleanup-failure-test-"));
+    const firstFailingRoot = path.join(failureParent, "first-file-root");
+    const secondFailingRoot = path.join(failureParent, "second-file-root");
+    const storageRoot = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-storage-test-"));
+    const aliasRoot = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-alias-test-"));
+    const date = "2026-05-13";
+    const storageDirectory = path.join(storageRoot, date);
+    const aliasDirectory = path.join(aliasRoot, date);
+    tempRoots.push(failureParent, storageRoot, aliasRoot);
+    await writeFile(firstFailingRoot, "blocked");
+    await writeFile(secondFailingRoot, "blocked");
+    await mkdir(storageDirectory);
+    await mkdir(aliasDirectory);
+
+    const targetPath = path.join(storageDirectory, "target.txt");
+    const aliasPath = path.join(aliasDirectory, "target.txt");
+    await writeFile(targetPath, "target");
+    await symlink(targetPath, aliasPath, "file");
+    const expiredTime = new Date("2026-05-13T11:00:00.000Z");
+    const freshTime = new Date("2026-05-14T11:00:00.000Z");
+    await utimes(targetPath, expiredTime, expiredTime);
+    await lutimes(aliasPath, freshTime, freshTime);
+
+    const error = await cleanupUploadRoots(
+      [firstFailingRoot, storageRoot, secondFailingRoot],
+      aliasRoot,
+      { now: new Date("2026-05-14T12:00:00.000Z"), ttlMs: DEFAULT_UPLOAD_TTL_MS }
+    ).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(AggregateError);
+    expect((error as AggregateError).errors).toHaveLength(2);
+    expect((error as AggregateError).errors.map((cause) => (cause as Error).message).join(" "))
+      .toContain(firstFailingRoot);
+    expect((error as AggregateError).errors.map((cause) => (cause as Error).message).join(" "))
+      .toContain(secondFailingRoot);
+    await expect(access(targetPath)).rejects.toThrow();
     await expect(lstat(aliasPath)).rejects.toThrow();
   });
 
