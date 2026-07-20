@@ -7,6 +7,7 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Build;
 import android.webkit.JavascriptInterface;
 import android.widget.Toast;
 
@@ -70,20 +71,29 @@ public final class AgentNotificationBridge {
 
     @JavascriptInterface
     public boolean openExternalLink(String url) {
-        String safeUrl = url == null ? "" : url.trim();
-        if (!ExternalLinkPolicy.isHttpWebLink(safeUrl)) {
+        String safeUrl = ExternalLinkPolicy.normalizeHttpWebLink(url);
+        if (safeUrl == null || activityUnavailable()) {
             return false;
         }
         activity.runOnUiThread(() -> {
+            if (activityUnavailable()) {
+                return;
+            }
             try {
                 Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(safeUrl));
                 intent.addCategory(Intent.CATEGORY_BROWSABLE);
                 activity.startActivity(intent);
-            } catch (ActivityNotFoundException error) {
+            } catch (ActivityNotFoundException | SecurityException error) {
                 Toast.makeText(activity, "No app can open this link", Toast.LENGTH_SHORT).show();
             }
         });
         return true;
+    }
+
+    private boolean activityUnavailable() {
+        return activity.isFinishing()
+            || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1
+                && activity.isDestroyed());
     }
 
     private void postNotification(String title, String body, String tag, String tmuxSession) {
