@@ -667,7 +667,6 @@ textarea:focus {
     max-width: none;
   }
 
-  .tmux-output,
   .tmux-chat,
   .tmux-terminal {
     flex: 1 1 auto;
@@ -770,8 +769,7 @@ textarea:focus {
   font-size: 13px;
 }
 
-.timeline-card pre,
-.tmux-output {
+.timeline-card pre {
   margin: 0;
   overflow-anchor: none;
   white-space: pre-wrap;
@@ -781,17 +779,11 @@ textarea:focus {
   line-height: 1.5;
 }
 
-.tmux-output-line {
-  display: block;
-  min-height: 1.5em;
-}
-
 .timeline-card pre {
   padding: 12px;
 }
 
 .timeline-card a,
-.tmux-output a,
 .tmux-chat-bubble a {
   color: var(--accent);
   overflow-wrap: anywhere;
@@ -805,13 +797,11 @@ textarea:focus {
 }
 
 .timeline-card a:hover,
-.tmux-output a:hover,
 .tmux-chat-bubble a:hover {
   text-decoration-thickness: 2px;
 }
 
 .timeline-card a:focus-visible,
-.tmux-output a:focus-visible,
 .tmux-chat-bubble a:focus-visible {
   border-radius: 3px;
   outline: 2px solid var(--accent);
@@ -881,54 +871,6 @@ textarea:focus {
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.tmux-output {
-  height: calc(100vh - 230px);
-  overflow: auto;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface-output);
-  color: var(--text-output);
-}
-
-.tmux-output.tmux-opencode-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 336px);
-  align-items: start;
-  padding: 0;
-  white-space: normal;
-  word-break: normal;
-}
-
-.tmux-opencode-terminal,
-.tmux-opencode-sidebar pre {
-  min-width: 0;
-  margin: 0;
-  padding: 12px;
-  color: inherit;
-  font: inherit;
-  line-height: inherit;
-  white-space: pre;
-  word-break: normal;
-  overflow-wrap: normal;
-}
-
-.tmux-opencode-sidebar pre {
-  white-space: pre-wrap;
-}
-
-.tmux-opencode-sidebar {
-  align-self: stretch;
-  min-width: 0;
-  min-height: 100%;
-  border-left: 1px solid var(--border);
-  background: var(--surface-subtle);
-}
-
-.tmux-opencode-tabs {
-  display: none;
 }
 
 .tmux-send {
@@ -1267,23 +1209,6 @@ textarea:focus {
   box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
-.tmux-terminal-demo {
-  overflow: auto;
-  padding: 12px;
-  color: var(--text-output);
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  -webkit-overflow-scrolling: touch;
-}
-
-.tmux-terminal-demo pre {
-  margin: 0;
-  color: inherit;
-  font: inherit;
-  font-size: 12px;
-  line-height: 1.55;
-  white-space: pre-wrap;
-}
-
 .tmux-terminal .xterm {
   height: 100%;
   padding: 10px;
@@ -1301,7 +1226,6 @@ textarea:focus {
   min-height: 0;
 }
 
-.tmux-output-shell > .tmux-output,
 .tmux-output-shell > .tmux-chat,
 .tmux-output-shell > .tmux-focus,
 .tmux-output-shell > .tmux-terminal {
@@ -1313,7 +1237,6 @@ textarea:focus {
   box-shadow: none;
 }
 
-.tmux-output-shell > .tmux-output,
 .tmux-output-shell > .tmux-terminal {
   font-size: 12px;
 }
@@ -1625,7 +1548,6 @@ textarea:focus {
     border-left: 0;
   }
 
-  .tmux-output,
   .tmux-chat {
     flex: 1 1 auto;
     height: auto;
@@ -1809,7 +1731,6 @@ textarea:focus {
     max-width: calc(100vw - 20px);
   }
 
-  .tmux-output,
   .tmux-chat,
   .tmux-focus,
   .tmux-terminal {
@@ -1818,60 +1739,10 @@ textarea:focus {
     min-height: 0;
   }
 
-  .tmux-output,
   .tmux-chat,
   .tmux-focus {
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-  }
-
-  .tmux-output.tmux-opencode-layout {
-    display: block;
-    overflow: auto;
-  }
-
-  .tmux-opencode-tabs {
-    position: sticky;
-    z-index: 2;
-    top: 0;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    padding: 6px;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface-output);
-  }
-
-  .tmux-opencode-tabs button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    min-width: 0;
-    height: 34px;
-    border: 0;
-    border-radius: 4px;
-    background: transparent;
-    color: var(--text-soft);
-  }
-
-  .tmux-opencode-tabs button.active {
-    background: var(--surface-control);
-    color: var(--text-primary);
-  }
-
-  .tmux-opencode-terminal,
-  .tmux-opencode-sidebar {
-    display: none;
-  }
-
-  .tmux-opencode-terminal.mobile-active,
-  .tmux-opencode-sidebar.mobile-active {
-    display: block;
-  }
-
-  .tmux-opencode-sidebar {
-    min-height: 0;
-    border-left: 0;
   }
 
   .tmux-chat,

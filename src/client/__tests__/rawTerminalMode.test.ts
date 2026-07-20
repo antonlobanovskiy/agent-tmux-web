@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { shouldShowTmuxSendForm } from "../rawTerminalMode.js";
+import { shouldShowRawTerminalShortcuts, shouldShowTmuxSendForm } from "../rawTerminalMode.js";
 
 describe("raw terminal mode", () => {
-  it("hides the tmux send form while raw terminal input is active", () => {
+  it("hides the tmux send form while Raw input is active", () => {
     expect(shouldShowTmuxSendForm({ terminalActive: true })).toBe(false);
   });
 
-  it("shows the tmux send form outside raw terminal input mode", () => {
-    expect(shouldShowTmuxSendForm({ terminalActive: false })).toBe(true);
+  it("shows Raw shortcut buttons only for mobile input", () => {
+    expect(shouldShowRawTerminalShortcuts({ terminalActive: true, mobileInput: true })).toBe(true);
+    expect(shouldShowRawTerminalShortcuts({ terminalActive: true, mobileInput: false })).toBe(false);
+    expect(shouldShowRawTerminalShortcuts({ terminalActive: false, mobileInput: true })).toBe(false);
   });
 });

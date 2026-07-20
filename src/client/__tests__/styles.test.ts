@@ -28,10 +28,25 @@ describe("responsive mobile CSS", () => {
     expect(css).toContain(".tmux-view-menu-caret");
     expect(css).toContain(".tmux-notify-button");
     expect(app).toContain("View:");
-    expect(app).toContain("regular: \"TTY\"");
+    expect(app).toContain('raw: "Raw"');
     expect(mobileBlock).toContain("max-width: 150px");
     expect(mobileBlock).toContain("grid-template-columns: minmax(0, auto) 36px 36px minmax(0, 1fr) 36px");
     expect(mobileBlock).not.toContain("grid-template-columns: 36px 36px 36px 36px 36px 36px 36px minmax(0, 1fr)");
+  });
+
+  it("makes Raw the default terminal view without TTY-only code", () => {
+    const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
+    const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");
+
+    expect(app).not.toContain('regular: "TTY"');
+    expect(app).not.toContain('selectTmuxViewMode("regular")');
+    expect(app).not.toContain("TmuxTtyView");
+    expect(app).toContain("Reconnect");
+    expect(app).toContain("shouldShowRawTerminalShortcuts");
+    expect(app).toContain("WebLinksAddon");
+    expect(app).toContain("createRawTerminalSelectionHandler");
+    expect(app).toContain('role="menuitemradio"');
+    expect(css).not.toContain(".tmux-opencode-tabs");
   });
 
   it("does not reserve terminal height for the removed agent state viewer", () => {
@@ -48,17 +63,6 @@ describe("responsive mobile CSS", () => {
     expect(css).toContain(".tmux-session-status-dot.green");
     expect(css).toContain(".tmux-session-status-dot.yellow");
     expect(css).toContain(".tmux-session-status-dot.red");
-  });
-
-  it("separates OpenCode's sidebar and uses tabs on mobile", () => {
-    const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");
-    const mobileBlock = css.slice(css.indexOf("@media (max-width: 760px)"));
-
-    expect(css).toContain(".tmux-output.tmux-opencode-layout");
-    expect(css).toContain("grid-template-columns: minmax(0, 1fr) minmax(280px, 336px)");
-    expect(css).toContain(".tmux-opencode-sidebar");
-    expect(mobileBlock).toContain(".tmux-opencode-tabs");
-    expect(mobileBlock).toContain(".tmux-opencode-terminal.mobile-active");
   });
 
   it("builds a dense desktop workbench while retaining the mobile terminal layout", () => {
