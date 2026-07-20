@@ -7,6 +7,14 @@ import org.junit.Test;
 
 public final class ExternalLinkPolicyTest {
     @Test
+    public void onlyRawHttpLinksUseTheExternalLinkBridge() {
+        assertTrue(ExternalLinkPolicy.isHttpWebLink("https://example.com/docs"));
+        assertTrue(ExternalLinkPolicy.isHttpWebLink("http://example.com"));
+        assertFalse(ExternalLinkPolicy.isHttpWebLink("javascript:alert(1)"));
+        assertFalse(ExternalLinkPolicy.isHttpWebLink("file:///tmp/private.txt"));
+    }
+
+    @Test
     public void keepsConfiguredServerLinksInWebView() {
         assertFalse(ExternalLinkPolicy.shouldOpenInExternalBrowser(
             "http://100.67.212.112:6174/?token=abc",

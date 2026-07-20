@@ -7,6 +7,11 @@ final class ExternalLinkPolicy {
     private ExternalLinkPolicy() {
     }
 
+    static boolean isHttpWebLink(String requestedUrl) {
+        URI requested = parse(requestedUrl);
+        return requested != null && isHttpScheme(requested.getScheme());
+    }
+
     static boolean shouldOpenInExternalBrowser(String requestedUrl, String configuredServerUrl) {
         URI requested = parse(requestedUrl);
         if (requested == null) {

@@ -1,10 +1,14 @@
 package com.agenttmux.web;
 
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
 import android.webkit.JavascriptInterface;
+import android.widget.Toast;
 
 public final class AgentNotificationBridge {
     private final Activity activity;
@@ -62,6 +66,24 @@ public final class AgentNotificationBridge {
         } catch (RuntimeException error) {
             return false;
         }
+    }
+
+    @JavascriptInterface
+    public boolean openExternalLink(String url) {
+        String safeUrl = url == null ? "" : url.trim();
+        if (!ExternalLinkPolicy.isHttpWebLink(safeUrl)) {
+            return false;
+        }
+        activity.runOnUiThread(() -> {
+            try {
+                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(safeUrl));
+                intent.addCategory(Intent.CATEGORY_BROWSABLE);
+                activity.startActivity(intent);
+            } catch (ActivityNotFoundException error) {
+                Toast.makeText(activity, "No app can open this link", Toast.LENGTH_SHORT).show();
+            }
+        });
+        return true;
     }
 
     private void postNotification(String title, String body, String tag, String tmuxSession) {
