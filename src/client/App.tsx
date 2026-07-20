@@ -62,6 +62,7 @@ import { createRawTerminalSelectionHandler } from "./rawTerminalSelection.js";
 import { parseTmuxChatOutput, splitTmuxChatMessage, type TmuxChatMessage } from "./tmuxGui.js";
 import { cleanTmuxAssistantCopyText } from "./tmuxCopy.js";
 import { shouldAutoCaptureTmux, TMUX_CAPTURE_POLL_INTERVAL_MS, TMUX_SEND_FOLLOW_DELAYS_MS } from "./tmuxFollow.js";
+import { shouldApplyTmuxCapture, shouldApplyTmuxToolLaunch } from "./tmuxOperationGuards.js";
 import {
   createCustomTmuxTool,
   CUSTOM_TMUX_TOOLS_STORAGE_KEY,
@@ -261,9 +262,8 @@ export function App() {
   const [newCustomTmuxToolLabel, setNewCustomTmuxToolLabel] = useState("");
   const [newCustomTmuxToolCommand, setNewCustomTmuxToolCommand] = useState("");
   const [slashIndex, setSlashIndex] = useState(0);
-  const [terminalActive, setTerminalActive] = useState(true);
+  const [terminalActive, setTerminalActiveState] = useState(true);
   const [tmuxFocusActive, setTmuxFocusActive] = useState(false);
-  const [tmuxGuiActive, setTmuxGuiActive] = useState(false);
   const [rawTerminalConnectionId, setRawTerminalConnectionId] = useState(0);
   const [tmuxMenuOpen, setTmuxMenuOpen] = useState(false);
   const [tmuxWatchEvents, setTmuxWatchEvents] = useState<TmuxWatchEvent[]>(demoMode ? DEMO_TMUX_WATCH_EVENTS : []);
@@ -292,7 +292,9 @@ export function App() {
   const tmuxScrollSnapshotRef = useRef<TmuxScrollSnapshot | null>(null);
   const tmuxCopyNoticeTimerRef = useRef<number | null>(null);
   const selectedTmuxRef = useRef(selectedTmux);
+  const terminalActiveRef = useRef(terminalActive);
   const tmuxCaptureRequestIdRef = useRef(0);
+  const tmuxToolLaunchRequestIdRef = useRef(0);
 
   const modelEfforts = useMemo(() => {
     const found = models.find((entry) => entry.id === model || entry.model === model);
@@ -413,16 +415,24 @@ export function App() {
     setTmuxTools(result.data);
   }, []);
 
-  const captureTmux = useCallback(async (session = selectedTmux) => {
+  const captureTmux = useCallback(async (session = selectedTmux): Promise<boolean> => {
     if (!session) {
-      return;
+      return false;
     }
     const requestId = ++tmuxCaptureRequestIdRef.current;
     if (demoMode) {
-      if (tmuxCaptureRequestIdRef.current === requestId) {
-        setCapturedTmuxOutput(DEMO_TMUX_OUTPUT);
+      const applied = shouldApplyTmuxCapture({
+        requestId,
+        latestRequestId: tmuxCaptureRequestIdRef.current,
+        targetSession: session,
+        selectedSession: selectedTmuxRef.current,
+        terminalActive: terminalActiveRef.current
+      });
+      if (!applied) {
+        return false;
       }
-      return;
+      setCapturedTmuxOutput(DEMO_TMUX_OUTPUT);
+      return true;
     }
     const params = new URLSearchParams({
       session,
@@ -430,11 +440,19 @@ export function App() {
       clientWidth: String(resolveTmuxCaptureClientWidth())
     });
     const result = await api<TmuxCaptureDto>(`/api/tmux/capture?${params.toString()}`);
-    if (tmuxCaptureRequestIdRef.current !== requestId || selectedTmuxRef.current !== session) {
-      return;
+    const applied = shouldApplyTmuxCapture({
+      requestId,
+      latestRequestId: tmuxCaptureRequestIdRef.current,
+      targetSession: session,
+      selectedSession: selectedTmuxRef.current,
+      terminalActive: terminalActiveRef.current
+    });
+    if (!applied) {
+      return false;
     }
     setCapturedTmuxOutput(result.output);
-  }, [selectedTmux, tmuxGuiActive]);
+    return true;
+  }, [selectedTmux]);
 
   useEffect(() => {
     selectedTmuxRef.current = selectedTmux;
@@ -505,9 +523,9 @@ export function App() {
 
     clearTmuxFollowTimers(tmuxFollowTimersRef);
     setTmuxFocusActive(false);
-    setTmuxGuiActive(false);
     setTerminalActive(true);
     setTmuxMenuOpen(false);
+    selectedTmuxRef.current = requestedTmuxSession;
     setSelectedTmux(requestedTmuxSession);
     setTerminalStatus(`${requestedTmuxSession} is waiting for input`);
     queueTmuxOutputBottomScroll();
@@ -546,7 +564,7 @@ export function App() {
     }
     tmuxScrollSnapshotRef.current = null;
     updateTmuxBottomState(node);
-  }, [terminalActive, tmuxFocusActive, tmuxGuiActive, tmuxOutput]);
+  }, [terminalActive, tmuxFocusActive, tmuxOutput]);
 
   useLayoutEffect(() => {
     resizeTmuxInput(tmuxInputRef.current);
@@ -617,6 +635,7 @@ export function App() {
 
     const node = terminalHostRef.current;
     const session = selectedTmux;
+    let rawTerminalEffectActive = true;
     node.textContent = "";
 
     const terminal = new XtermTerminal({
@@ -642,8 +661,16 @@ export function App() {
     const selectionDisposable = terminal.onSelectionChange(createRawTerminalSelectionHandler({
       readSelection: () => terminal.getSelection(),
       writeClipboard: writeClipboardText,
-      onCopied: () => setTerminalStatus("Copied selection"),
-      onError: setTerminalStatus
+      onCopied: () => {
+        if (rawTerminalEffectActive) {
+          setTerminalStatus("Copied selection");
+        }
+      },
+      onError: (message) => {
+        if (rawTerminalEffectActive) {
+          setTerminalStatus(message);
+        }
+      }
     }));
 
     const focusTerminal = () => {
@@ -750,6 +777,7 @@ export function App() {
     const resizeTimer = window.setTimeout(resize, 50);
 
     return () => {
+      rawTerminalEffectActive = false;
       window.clearTimeout(resizeTimer);
       if (resizeFrame) {
         window.cancelAnimationFrame(resizeFrame);
@@ -1020,6 +1048,11 @@ export function App() {
     });
   }
 
+  function setTerminalActive(active: boolean) {
+    terminalActiveRef.current = active;
+    setTerminalActiveState(active);
+  }
+
   function openRawTerminal() {
     if (!selectedTmux) {
       return;
@@ -1027,14 +1060,12 @@ export function App() {
     if (demoMode) {
       clearTmuxFollowTimers(tmuxFollowTimersRef);
       setTmuxFocusActive(false);
-      setTmuxGuiActive(false);
       setTerminalStatus(`live terminal for ${selectedTmux}`);
       setTerminalActive(true);
       return;
     }
     clearTmuxFollowTimers(tmuxFollowTimersRef);
     setTmuxFocusActive(false);
-    setTmuxGuiActive(false);
     setTerminalStatus(`connecting to ${selectedTmux}`);
     setTerminalActive(true);
   }
@@ -1043,14 +1074,19 @@ export function App() {
     if (!selectedTmux) {
       return;
     }
+    const session = selectedTmux;
     if (terminalActive) {
-      setTerminalStatus(`reconnecting to ${selectedTmux}`);
+      setTerminalStatus(`reconnecting to ${session}`);
       setRawTerminalConnectionId((current) => current + 1);
       return;
     }
-    setTerminalStatus(`syncing ${selectedTmux}`);
-    void captureTmux(selectedTmux)
-      .then(() => setTerminalStatus(`synced ${selectedTmux}`))
+    setTerminalStatus(`syncing ${session}`);
+    void captureTmux(session)
+      .then((applied) => {
+        if (applied) {
+          setTerminalStatus(`synced ${session}`);
+        }
+      })
       .catch(reportError(setError));
   }
 
@@ -1101,7 +1137,6 @@ export function App() {
     clearTmuxFollowTimers(tmuxFollowTimersRef);
     setTerminalActive(false);
     setTmuxFocusActive(mode === "focus");
-    setTmuxGuiActive(mode === "gui");
     queueTmuxOutputBottomScroll();
     setTerminalStatus(`${TMUX_VIEW_MODE_LABELS[mode].toLowerCase()} view for ${selectedTmux}`);
     void captureTmux(selectedTmux).catch(reportError(setError));
@@ -1219,31 +1254,44 @@ export function App() {
   }
 
   async function destroySession() {
-    if (!selectedTmux || !window.confirm(`Destroy tmux session "${selectedTmux}"?`)) {
+    const targetSession = selectedTmux;
+    if (!targetSession || !window.confirm(`Destroy tmux session "${targetSession}"?`)) {
       return;
     }
 
     if (demoMode) {
-      const remaining = tmuxSessions.filter((session) => session.name !== selectedTmux);
+      const remaining = tmuxSessions.filter((session) => session.name !== targetSession);
       const nextSession = remaining[0] ?? null;
       setTmuxSessions(remaining);
-      setSelectedTmux(nextSession?.name ?? "");
-      setCapturedTmuxOutput(nextSession ? DEMO_TMUX_OUTPUT : "");
-      setTmuxMenuOpen(false);
-      setTerminalStatus(nextSession?.name ?? "no session selected");
+      applyDestroyedSessionReplacement(nextSession);
       return;
     }
 
     const result = await api<{ data: TmuxSessionDto[] }>("/api/tmux/destroy", {
       method: "POST",
-      body: JSON.stringify({ session: selectedTmux })
+      body: JSON.stringify({ session: targetSession })
     });
-    const nextSession = result.data.find((session) => session.attached) ?? result.data[0] ?? null;
     setTmuxSessions(result.data);
-    setSelectedTmux(nextSession?.name ?? "");
-    setCapturedTmuxOutput("");
+    if (selectedTmuxRef.current !== targetSession) {
+      return;
+    }
+    const nextSession = result.data.find((session) => session.attached) ?? result.data[0] ?? null;
+    applyDestroyedSessionReplacement(nextSession);
+  }
+
+  function applyDestroyedSessionReplacement(nextSession: TmuxSessionDto | null) {
+    setCapturedTmuxOutput(nextSession && demoMode ? DEMO_TMUX_OUTPUT : "");
+    if (nextSession) {
+      selectTmuxSession(nextSession.name);
+      return;
+    }
+
+    selectedTmuxRef.current = "";
+    setSelectedTmux("");
+    setTmuxFocusActive(false);
+    setTerminalActive(true);
     setTmuxMenuOpen(false);
-    setTerminalStatus(nextSession?.name ?? "no session selected");
+    setTerminalStatus("no session selected");
   }
 
   async function openSelectedTmuxTool() {
@@ -1257,35 +1305,44 @@ export function App() {
       setError("Enter a CLI command to launch.");
       return;
     }
+    const targetSession = selectedTmux;
+    const requestId = ++tmuxToolLaunchRequestIdRef.current;
+    const toolLabel = tool?.label ?? command;
 
     if (demoMode) {
       queueTmuxOutputBottomScroll();
-      setCapturedTmuxOutput(`${DEMO_TMUX_OUTPUT}\n\n› ${command}\n\n• Started ${tool?.label ?? command} in ${selectedTmux}.`);
+      setCapturedTmuxOutput(`${DEMO_TMUX_OUTPUT}\n\n› ${command}\n\n• Started ${toolLabel} in ${targetSession}.`);
       setTmuxFocusActive(false);
-      setTmuxGuiActive(false);
       setTerminalActive(true);
       setTmuxMenuOpen(false);
-      setTerminalStatus(`started ${tool?.label ?? command} in ${selectedTmux}`);
+      setTerminalStatus(`started ${toolLabel} in ${targetSession}`);
       return;
     }
 
-    await registerTmuxTaskWatch(selectedTmux, tool?.label ?? command);
+    await registerTmuxTaskWatch(targetSession, toolLabel);
     const result = await api<{ output: string }>("/api/tmux/open-tool", {
       method: "POST",
       body: JSON.stringify({
-        session: selectedTmux,
+        session: targetSession,
         toolId: currentTmuxToolIsCustom ? undefined : selectedTmuxTool,
         command,
         modeIds: currentTmuxToolIsCustom ? [] : currentTmuxToolModeIds
       })
     });
+    if (!shouldApplyTmuxToolLaunch({
+      requestId,
+      latestRequestId: tmuxToolLaunchRequestIdRef.current,
+      targetSession,
+      selectedSession: selectedTmuxRef.current
+    })) {
+      return;
+    }
     queueTmuxOutputBottomScroll();
     setCapturedTmuxOutput(result.output);
     setTmuxFocusActive(false);
-    setTmuxGuiActive(false);
     setTerminalActive(true);
     setTmuxMenuOpen(false);
-    setTerminalStatus(`started ${tool?.label ?? command} in ${selectedTmux}`);
+    setTerminalStatus(`started ${toolLabel} in ${targetSession}`);
   }
 
   function toggleSelectedTmuxToolMode(modeId: string) {
@@ -1361,9 +1418,9 @@ export function App() {
   }
 
   function selectTmuxSession(session: string) {
+    selectedTmuxRef.current = session;
     setSelectedTmux(session);
     setTmuxFocusActive(false);
-    setTmuxGuiActive(false);
     setTerminalActive(true);
     setTmuxMenuOpen(false);
     setTerminalStatus(session);
@@ -1478,7 +1535,6 @@ export function App() {
     if (command.name === "/exit" || command.name === "/quit") {
       setTerminalActive(false);
       setTmuxFocusActive(false);
-      setTmuxGuiActive(true);
       addLocalEntry(setTimeline, command.name, "Detached the browser terminal view.");
       return true;
     }

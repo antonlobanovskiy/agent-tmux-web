@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -47,6 +47,42 @@ describe("responsive mobile CSS", () => {
     expect(app).toContain("createRawTerminalSelectionHandler");
     expect(app).toContain('role="menuitemradio"');
     expect(css).not.toContain(".tmux-opencode-tabs");
+  });
+
+  it("routes destroy replacements through Raw without stale session updates", () => {
+    const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
+
+    expect(app).toContain("function applyDestroyedSessionReplacement");
+    expect(app.match(/applyDestroyedSessionReplacement\(nextSession\);/g)).toHaveLength(2);
+    expect(app).toContain("selectTmuxSession(nextSession.name)");
+    expect(app).toContain("selectedTmuxRef.current !== targetSession");
+  });
+
+  it("uses current-operation guards for capture and CLI launch responses", () => {
+    const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
+
+    expect(app).toContain("shouldApplyTmuxCapture({");
+    expect(app).toContain("shouldApplyTmuxToolLaunch({");
+    expect(app).toContain("Promise<boolean>");
+    expect(app).toMatch(/\.then\(\(applied\) => \{\s+if \(applied\) \{\s+setTerminalStatus\(`synced \$\{session\}`\)/);
+  });
+
+  it("guards queued Raw selection status callbacks after cleanup", () => {
+    const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
+
+    expect(app).toContain("let rawTerminalEffectActive = true;");
+    expect(app).toMatch(/onCopied: \(\) => \{\s+if \(rawTerminalEffectActive\) \{\s+setTerminalStatus\("Copied selection"\)/);
+    expect(app).toMatch(/onError: \(message\) => \{\s+if \(rawTerminalEffectActive\) \{\s+setTerminalStatus\(message\)/);
+    expect(app).toContain("rawTerminalEffectActive = false;");
+  });
+
+  it("removes redundant GUI state and orphaned TTY output sources", () => {
+    const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
+
+    expect(app).not.toContain("tmuxGuiActive");
+    expect(app).not.toContain("setTmuxGuiActive");
+    expect(existsSync(join(process.cwd(), "src/client/tmuxOutputLines.tsx"))).toBe(false);
+    expect(existsSync(join(process.cwd(), "src/client/__tests__/tmuxOutputLines.test.tsx"))).toBe(false);
   });
 
   it("does not reserve terminal height for the removed agent state viewer", () => {
