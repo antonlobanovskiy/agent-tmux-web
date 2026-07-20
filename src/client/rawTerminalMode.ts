@@ -1,5 +1,11 @@
-export function shouldShowTmuxSendForm({ terminalActive }: { terminalActive: boolean }): boolean {
-  return !terminalActive;
+export function shouldShowTmuxSendForm({
+  terminalActive,
+  sessionSelected
+}: {
+  terminalActive: boolean;
+  sessionSelected: boolean;
+}): boolean {
+  return sessionSelected && !terminalActive;
 }
 
 export function shouldShowRawTerminalShortcuts({
@@ -12,4 +18,16 @@ export function shouldShowRawTerminalShortcuts({
   sessionSelected: boolean;
 }): boolean {
   return terminalActive && mobileInput && sessionSelected;
+}
+
+export function shouldShowTmuxJumpToLatest({
+  terminalActive,
+  sessionSelected,
+  tmuxAtBottom
+}: {
+  terminalActive: boolean;
+  sessionSelected: boolean;
+  tmuxAtBottom: boolean;
+}): boolean {
+  return sessionSelected && !terminalActive && !tmuxAtBottom;
 }

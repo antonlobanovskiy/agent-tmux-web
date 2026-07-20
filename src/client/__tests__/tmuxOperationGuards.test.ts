@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { shouldApplyTmuxCapture, shouldApplyTmuxToolLaunch } from "../tmuxOperationGuards.js";
+import {
+  isCurrentTmuxCaptureOwner,
+  shouldAdmitTmuxCapture,
+  shouldApplyTmuxCapture,
+  shouldApplyTmuxToolLaunch
+} from "../tmuxOperationGuards.js";
 
 describe("tmux operation guards", () => {
   const currentOperation = {
@@ -56,5 +61,56 @@ describe("tmux operation guards", () => {
 
   it("accepts the current CLI launch response", () => {
     expect(shouldApplyTmuxToolLaunch(currentOperation)).toBe(true);
+  });
+
+  describe("capture admission", () => {
+    const ordinaryCapture = {
+      activeManualOwner: null,
+      session: "agent-a",
+      source: "poll" as const,
+      terminalActive: false
+    };
+
+    it("rejects capture while Raw is active", () => {
+      expect(shouldAdmitTmuxCapture({ ...ordinaryCapture, terminalActive: true })).toBe(false);
+    });
+
+    it("rejects capture without a session", () => {
+      expect(shouldAdmitTmuxCapture({ ...ordinaryCapture, session: "" })).toBe(false);
+    });
+
+    it("rejects non-manual capture while a manual owner is active", () => {
+      expect(shouldAdmitTmuxCapture({ ...ordinaryCapture, activeManualOwner: 4 })).toBe(false);
+    });
+
+    it("accepts capture from the matching manual owner", () => {
+      expect(shouldAdmitTmuxCapture({
+        ...ordinaryCapture,
+        activeManualOwner: 4,
+        owner: 4,
+        source: "manual"
+      })).toBe(true);
+    });
+
+    it("rejects capture from the wrong manual owner", () => {
+      expect(shouldAdmitTmuxCapture({
+        ...ordinaryCapture,
+        activeManualOwner: 4,
+        owner: 3,
+        source: "manual"
+      })).toBe(false);
+    });
+
+    it("accepts ordinary capture without a manual owner", () => {
+      expect(shouldAdmitTmuxCapture(ordinaryCapture)).toBe(true);
+    });
+  });
+
+  describe("manual capture owner", () => {
+    it("recognizes only the active owner", () => {
+      expect(isCurrentTmuxCaptureOwner({ activeManualOwner: 4, owner: 4 })).toBe(true);
+      expect(isCurrentTmuxCaptureOwner({ activeManualOwner: 4, owner: 3 })).toBe(false);
+      expect(isCurrentTmuxCaptureOwner({ activeManualOwner: null, owner: 4 })).toBe(false);
+    });
   });
 });

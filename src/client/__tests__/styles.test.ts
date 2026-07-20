@@ -64,22 +64,34 @@ describe("responsive mobile CSS", () => {
     expect(app).toContain("shouldApplyTmuxCapture({");
     expect(app).toContain("shouldApplyTmuxToolLaunch({");
     expect(app).toContain("Promise<boolean>");
-    expect(app).toMatch(/\.then\(\(applied\) => \{\s+if \(applied\) \{\s+setTerminalStatus\(`synced \$\{session\}`\)/);
+    expect(app).toMatch(/\.then\(\(applied\) => \{\s+if \(applied && isCurrentManualCaptureOwner\(owner\)\) \{\s+setTerminalStatus\(`synced \$\{session\}`\)/);
   });
 
-  it("serializes Force Sync and avoids capture work while Raw is active", () => {
+  it("centralizes capture ownership and cancels manual sync safely", () => {
     const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
-    const rawGuard = "if (!session || terminalActiveRef.current)";
+    const captureStart = app.indexOf("const captureTmux");
+    const captureEnd = app.indexOf("useEffect(() => {", captureStart);
+    const captureBlock = app.slice(captureStart, captureEnd);
+    const syncStart = app.indexOf("function syncOrReconnectTmux");
+    const syncEnd = app.indexOf("function showTmuxCopyNotice", syncStart);
+    const syncBlock = app.slice(syncStart, syncEnd);
     const requestAllocation = "const requestId = ++tmuxCaptureRequestIdRef.current";
 
-    expect(app).toContain(rawGuard);
-    expect(app.indexOf(rawGuard)).toBeLessThan(app.indexOf(requestAllocation));
-    expect(app).not.toContain("captureTmux(requestedTmuxSession)");
-    expect(app).toContain("const manualCaptureInFlightRef = useRef(false)");
-    expect(app).toContain("if (manualCaptureInFlightRef.current)");
-    expect(app).toContain("manualCaptureInFlightRef.current = true;");
-    expect(app).toContain("manualCaptureInFlight: manualCaptureInFlightRef.current");
-    expect(app).toMatch(/\.finally\(\(\) => \{\s+manualCaptureInFlightRef\.current = false;/);
+    expect(captureBlock).toContain("shouldAdmitTmuxCapture({");
+    expect(captureBlock.indexOf("shouldAdmitTmuxCapture({")).toBeLessThan(captureBlock.indexOf(requestAllocation));
+    expect(app).toContain('source: "session"');
+    expect(app).toContain('source: "poll"');
+    expect(app).toContain('source: "view"');
+    expect(app).toContain('source: "follow"');
+    expect(syncBlock).toContain('source: "manual"');
+    expect(syncBlock).toContain("new AbortController()");
+    expect(syncBlock).toContain("clearTmuxFollowTimers(tmuxFollowTimersRef)");
+    expect(syncBlock).toContain("TMUX_MANUAL_CAPTURE_TIMEOUT_MS");
+    expect(syncBlock).toContain("sync timed out");
+    expect(syncBlock).toMatch(/\.finally\(\(\) => \{\s+releaseManualCapture\(owner\);/);
+    expect(app).toContain("isCurrentManualCaptureOwner(owner)");
+    expect(app).toContain("cancelManualCapture(false)");
+    expect(app).toContain("aria-busy={manualCaptureActive}");
   });
 
   it("renders and gates controls for the no-session state", () => {
@@ -88,8 +100,10 @@ describe("responsive mobile CSS", () => {
     expect(app).toContain("!selectedTmux ? (");
     expect(app).toContain('className="tmux-empty-session"');
     expect(app).toContain("No tmux session selected");
-    expect(app).toContain("disabled={!selectedTmux}");
-    expect(app).toContain("sessionSelected: Boolean(selectedTmux)");
+    expect(app).toContain("disabled={!selectedTmux || manualCaptureActive}");
+    expect(app).toContain("const sessionSelected = Boolean(selectedTmux)");
+    expect(app).toContain("showTmuxJumpToLatest");
+    expect(app).toContain("{showTmuxJumpToLatest && (");
   });
 
   it("guards queued Raw selection status callbacks after cleanup", () => {

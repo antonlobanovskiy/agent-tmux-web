@@ -57,12 +57,18 @@ import { writeClipboardText } from "./clipboard.js";
 import { applyTextareaPaste, buildPastedPromptText, extractPastedImageFiles, isMobileInputDevice, readInputDeviceContext, shouldSubmitTextareaEnter } from "./inputBehavior.js";
 import { LinkifiedText } from "./LinkifiedText.js";
 import { openRawTerminalLink } from "./rawTerminalLinks.js";
-import { shouldShowRawTerminalShortcuts, shouldShowTmuxSendForm } from "./rawTerminalMode.js";
+import { shouldShowRawTerminalShortcuts, shouldShowTmuxJumpToLatest, shouldShowTmuxSendForm } from "./rawTerminalMode.js";
 import { createRawTerminalSelectionHandler } from "./rawTerminalSelection.js";
 import { parseTmuxChatOutput, splitTmuxChatMessage, type TmuxChatMessage } from "./tmuxGui.js";
 import { cleanTmuxAssistantCopyText } from "./tmuxCopy.js";
 import { shouldAutoCaptureTmux, TMUX_CAPTURE_POLL_INTERVAL_MS, TMUX_SEND_FOLLOW_DELAYS_MS } from "./tmuxFollow.js";
-import { shouldApplyTmuxCapture, shouldApplyTmuxToolLaunch } from "./tmuxOperationGuards.js";
+import {
+  isCurrentTmuxCaptureOwner,
+  shouldAdmitTmuxCapture,
+  shouldApplyTmuxCapture,
+  shouldApplyTmuxToolLaunch,
+  type TmuxCaptureSource
+} from "./tmuxOperationGuards.js";
 import {
   createCustomTmuxTool,
   CUSTOM_TMUX_TOOLS_STORAGE_KEY,
@@ -96,6 +102,12 @@ type ThreadSummary = {
 
 type TmuxViewMode = "gui" | "focus" | "raw";
 
+type TmuxCaptureOptions = {
+  owner?: number;
+  signal?: AbortSignal;
+  source: TmuxCaptureSource;
+};
+
 const TMUX_VIEW_MODE_LABELS: Record<TmuxViewMode, string> = {
   gui: "GUI",
   focus: "Focus",
@@ -122,6 +134,7 @@ type TmuxScrollSnapshot = {
 const defaultCwd = "";
 const TMUX_CAPTURE_HISTORY_LINES = 1000;
 const TMUX_TERMINAL_SUBMIT_DELAY_MS = 350;
+const TMUX_MANUAL_CAPTURE_TIMEOUT_MS = 15_000;
 const RAW_TERMINAL_INPUT_CHUNK_SIZE = 16_000;
 const TMUX_NOTIFICATION_STORAGE_KEY = "agent-tmux-web.notify";
 const TMUX_SCROLL_ANCHOR_SELECTOR = "[data-tmux-scroll-anchor]";
@@ -275,6 +288,7 @@ export function App() {
   const [uploadingTmuxFiles, setUploadingTmuxFiles] = useState(false);
   const [terminalStatus, setTerminalStatus] = useState(demoMode ? "live terminal for agent-demo" : "");
   const [tmuxCopyNotice, setTmuxCopyNotice] = useState("");
+  const [manualCaptureActive, setManualCaptureActive] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const terminalHostRef = useRef<HTMLDivElement | null>(null);
@@ -286,7 +300,10 @@ export function App() {
   const tmuxChatRef = useRef<HTMLDivElement | null>(null);
   const tmuxViewMenuRef = useRef<HTMLDetailsElement | null>(null);
   const tmuxFollowTimersRef = useRef<number[]>([]);
-  const manualCaptureInFlightRef = useRef(false);
+  const manualCaptureControllerRef = useRef<AbortController | null>(null);
+  const manualCaptureOwnerRef = useRef<number | null>(null);
+  const manualCaptureOwnerSequenceRef = useRef(0);
+  const manualCaptureTimeoutRef = useRef<number | null>(null);
   const tmuxNotificationsEnabledRef = useRef(tmuxNotificationsEnabled);
   const tmuxStickToBottomRef = useRef(true);
   const forceTmuxScrollBottomRef = useRef(false);
@@ -325,13 +342,15 @@ export function App() {
     [selectedTmuxSession?.activityAtMs, tmuxChatMessages, tmuxOutput]
   );
   const tmuxCompactMessages = useMemo(() => buildCompactTmuxMessages(tmuxChatMessages), [tmuxChatMessages]);
-  const showTmuxSendForm = shouldShowTmuxSendForm({ terminalActive });
+  const sessionSelected = Boolean(selectedTmux);
+  const showTmuxSendForm = shouldShowTmuxSendForm({ terminalActive, sessionSelected });
+  const showTmuxJumpToLatest = shouldShowTmuxJumpToLatest({ terminalActive, sessionSelected, tmuxAtBottom });
   const mobileRawInput = (typeof window !== "undefined" && Boolean(window.AgentTmuxAndroid))
     || isMobileInputDevice(readInputDeviceContext());
   const showRawTerminalShortcuts = shouldShowRawTerminalShortcuts({
     terminalActive,
     mobileInput: mobileRawInput,
-    sessionSelected: Boolean(selectedTmux)
+    sessionSelected
   });
   const tmuxViewMode: TmuxViewMode = terminalActive ? "raw" : tmuxFocusActive ? "focus" : "gui";
   const tmuxViewModeLabel = TMUX_VIEW_MODE_LABELS[tmuxViewMode];
@@ -417,13 +436,20 @@ export function App() {
     setTmuxTools(result.data);
   }, []);
 
-  const captureTmux = useCallback(async (session = selectedTmux): Promise<boolean> => {
-    if (!session || terminalActiveRef.current) {
+  const captureTmux = useCallback(async (session: string, options: TmuxCaptureOptions): Promise<boolean> => {
+    const captureIsAdmitted = () => shouldAdmitTmuxCapture({
+      activeManualOwner: manualCaptureOwnerRef.current,
+      owner: options.owner,
+      session,
+      source: options.source,
+      terminalActive: terminalActiveRef.current
+    });
+    if (!captureIsAdmitted()) {
       return false;
     }
     const requestId = ++tmuxCaptureRequestIdRef.current;
     if (demoMode) {
-      const applied = shouldApplyTmuxCapture({
+      const applied = captureIsAdmitted() && shouldApplyTmuxCapture({
         requestId,
         latestRequestId: tmuxCaptureRequestIdRef.current,
         targetSession: session,
@@ -441,8 +467,10 @@ export function App() {
       lines: String(TMUX_CAPTURE_HISTORY_LINES),
       clientWidth: String(resolveTmuxCaptureClientWidth())
     });
-    const result = await api<TmuxCaptureDto>(`/api/tmux/capture?${params.toString()}`);
-    const applied = shouldApplyTmuxCapture({
+    const result = await api<TmuxCaptureDto>(`/api/tmux/capture?${params.toString()}`, {
+      signal: options.signal
+    });
+    const applied = captureIsAdmitted() && shouldApplyTmuxCapture({
       requestId,
       latestRequestId: tmuxCaptureRequestIdRef.current,
       targetSession: session,
@@ -454,7 +482,7 @@ export function App() {
     }
     setCapturedTmuxOutput(result.output);
     return true;
-  }, [selectedTmux]);
+  }, []);
 
   useEffect(() => {
     selectedTmuxRef.current = selectedTmux;
@@ -533,12 +561,12 @@ export function App() {
     queueTmuxOutputBottomScroll();
     clearRequestedTmuxSessionFromAddressBar();
     setRequestedTmuxSession("");
-  }, [captureTmux, requestedTmuxSession]);
+  }, [requestedTmuxSession]);
 
   useEffect(() => {
     if (selectedTmux) {
       queueTmuxOutputBottomScroll();
-      captureTmux(selectedTmux).catch(reportError(setError));
+      captureTmux(selectedTmux, { source: "session" }).catch(reportError(setError));
     }
   }, [captureTmux, selectedTmux]);
 
@@ -580,10 +608,9 @@ export function App() {
       if (shouldAutoCaptureTmux({
         selectedTmux,
         terminalActive,
-        documentHidden: document.hidden,
-        manualCaptureInFlight: manualCaptureInFlightRef.current
+        documentHidden: document.hidden
       })) {
-        captureTmux(selectedTmux).catch(reportError(setError));
+        captureTmux(selectedTmux, { source: "poll" }).catch(reportError(setError));
       }
     }, TMUX_CAPTURE_POLL_INTERVAL_MS);
 
@@ -625,7 +652,10 @@ export function App() {
   }, [slashQuery?.query]);
 
   useEffect(() => {
-    return () => clearTmuxFollowTimers(tmuxFollowTimersRef);
+    return () => {
+      clearTmuxFollowTimers(tmuxFollowTimersRef);
+      cancelManualCapture(false);
+    };
   }, []);
 
   useEffect(() => () => {
@@ -1054,7 +1084,40 @@ export function App() {
     });
   }
 
+  function isCurrentManualCaptureOwner(owner: number): boolean {
+    return isCurrentTmuxCaptureOwner({
+      activeManualOwner: manualCaptureOwnerRef.current,
+      owner
+    });
+  }
+
+  function releaseManualCapture(owner: number, updateState = true): boolean {
+    if (!isCurrentManualCaptureOwner(owner)) {
+      return false;
+    }
+    if (manualCaptureTimeoutRef.current !== null) {
+      window.clearTimeout(manualCaptureTimeoutRef.current);
+    }
+    manualCaptureTimeoutRef.current = null;
+    manualCaptureControllerRef.current = null;
+    manualCaptureOwnerRef.current = null;
+    if (updateState) {
+      setManualCaptureActive(false);
+    }
+    return true;
+  }
+
+  function cancelManualCapture(updateState = true) {
+    const owner = manualCaptureOwnerRef.current;
+    if (owner === null) {
+      return;
+    }
+    manualCaptureControllerRef.current?.abort();
+    releaseManualCapture(owner, updateState);
+  }
+
   function setTerminalActive(active: boolean) {
+    cancelManualCapture();
     terminalActiveRef.current = active;
     setTerminalActiveState(active);
   }
@@ -1086,20 +1149,41 @@ export function App() {
       setRawTerminalConnectionId((current) => current + 1);
       return;
     }
-    if (manualCaptureInFlightRef.current) {
+    if (manualCaptureOwnerRef.current !== null) {
       return;
     }
-    manualCaptureInFlightRef.current = true;
+    clearTmuxFollowTimers(tmuxFollowTimersRef);
+    const owner = ++manualCaptureOwnerSequenceRef.current;
+    const controller = new AbortController();
+    manualCaptureOwnerRef.current = owner;
+    manualCaptureControllerRef.current = controller;
+    setManualCaptureActive(true);
+    manualCaptureTimeoutRef.current = window.setTimeout(() => {
+      if (!isCurrentManualCaptureOwner(owner)) {
+        return;
+      }
+      controller.abort();
+      setTerminalStatus(`sync timed out for ${session}`);
+      releaseManualCapture(owner);
+    }, TMUX_MANUAL_CAPTURE_TIMEOUT_MS);
     setTerminalStatus(`syncing ${session}`);
-    void captureTmux(session)
+    void captureTmux(session, {
+      source: "manual",
+      owner,
+      signal: controller.signal
+    })
       .then((applied) => {
-        if (applied) {
+        if (applied && isCurrentManualCaptureOwner(owner)) {
           setTerminalStatus(`synced ${session}`);
         }
       })
-      .catch(reportError(setError))
+      .catch(() => {
+        if (isCurrentManualCaptureOwner(owner) && !controller.signal.aborted) {
+          setTerminalStatus(`sync failed for ${session}`);
+        }
+      })
       .finally(() => {
-        manualCaptureInFlightRef.current = false;
+        releaseManualCapture(owner);
       });
   }
 
@@ -1152,7 +1236,7 @@ export function App() {
     setTmuxFocusActive(mode === "focus");
     queueTmuxOutputBottomScroll();
     setTerminalStatus(`${TMUX_VIEW_MODE_LABELS[mode].toLowerCase()} view for ${selectedTmux}`);
-    void captureTmux(selectedTmux).catch(reportError(setError));
+    void captureTmux(selectedTmux, { source: "view" }).catch(reportError(setError));
   }
 
   function selectColorTheme(theme: ColorTheme) {
@@ -1661,10 +1745,10 @@ export function App() {
   function scheduleTmuxFollow(session: string) {
     queueTmuxOutputBottomScroll();
     clearTmuxFollowTimers(tmuxFollowTimersRef);
-    void captureTmux(session).catch(reportError(setError));
+    void captureTmux(session, { source: "follow" }).catch(reportError(setError));
     for (const delay of TMUX_SEND_FOLLOW_DELAYS_MS) {
       const timer = window.setTimeout(() => {
-        void captureTmux(session).catch(reportError(setError));
+        void captureTmux(session, { source: "follow" }).catch(reportError(setError));
       }, delay);
       tmuxFollowTimersRef.current.push(timer);
     }
@@ -1921,7 +2005,8 @@ export function App() {
             </details>
             <button
               aria-label={terminalActive ? "Reconnect raw terminal" : "Force sync selected tmux output"}
-              disabled={!selectedTmux}
+              aria-busy={manualCaptureActive}
+              disabled={!selectedTmux || manualCaptureActive}
               title={terminalActive ? "Reconnect raw terminal" : "Force sync selected tmux output"}
               type="button"
               onClick={syncOrReconnectTmux}
@@ -2115,7 +2200,7 @@ export function App() {
                 onScroll={handleTmuxOutputScroll}
               />
             )}
-            {!terminalActive && !tmuxAtBottom && (
+            {showTmuxJumpToLatest && (
               <button className="tmux-jump-bottom" aria-label="Jump to latest tmux output" title="Jump to latest tmux output" type="button" onClick={jumpTmuxOutputToBottom}>
                 <ArrowDownToLine size={17} />
               </button>
