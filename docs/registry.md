@@ -19,7 +19,7 @@ ask to create `components.json` before it can calculate the install preview.
 
 Registry items:
 
-- `full-project`: composed project bundle for source inspection and adaptation.
+- `full-project`: self-contained, deduplicated project bundle for source inspection and adaptation.
 - `web-app`: Vite, React, Express, tmux, upload, and Codex bridge source.
 - `vps-deploy`: installer, systemd templates, environment example, and setup docs.
 - `android-wrapper`: sideload-only Android WebView wrapper source.
@@ -29,7 +29,10 @@ The registry intentionally focuses on editable source, docs, scripts, and config
 Clone the repository when you need binary media assets, launcher images, or the
 Gradle wrapper jar.
 
-Pin a branch, tag, or commit when you need reproducible installs:
+Only immutable tags and full commit SHAs are reproducible. Branch refs are
+mutable and intended for previews. The `full-project` item contains its complete
+source payload directly, so an exact ref does not resolve component items from
+the default branch:
 
 ```bash
 pnpm dlx shadcn@latest view antonlobanovskiy/agent-tmux-web/full-project#main

@@ -12,32 +12,6 @@ sessions. It is useful when SSH on a phone is too cramped, when mobile browsers
 disconnect, or when you want one place to switch between several terminal-agent
 tabs without killing the work.
 
-## Demo
-
-![Agent Tmux Web showcase](./docs/assets/agent-tmux-web-showcase.gif)
-
-[MP4 showcase](./docs/assets/agent-tmux-web-showcase.mp4)
-
-The generated showcase covers the mobile GUI, Focus overview, stable scrollback,
-TTY capture, raw tmux attach, launcher menu, light/dark mode, Android wrapper,
-and desktop layout.
-
-## Screenshots
-
-<p>
-  <img src="./docs/assets/desktop-overview.png" alt="Desktop Agent Tmux Web overview" width="780">
-</p>
-
-<p>
-  <img src="./docs/assets/mobile-chat.png" alt="Mobile GUI chat mode" width="240">
-  <img src="./docs/assets/mobile-focus.png" alt="Mobile focus overview" width="240">
-  <img src="./docs/assets/mobile-raw-terminal.png" alt="Mobile raw tmux terminal" width="240">
-</p>
-
-<p>
-  <img src="./docs/assets/modes-overview.png" alt="Focus, GUI, TTY, and raw tmux modes" width="780">
-</p>
-
 ## What You Get
 
 - Long-running tmux sessions that survive browser disconnects and phone sleep.
@@ -49,16 +23,15 @@ and desktop layout.
   control for saving named custom CLI commands.
 - Harness-specific Default, Plan, Auto, Auto Edit, Autopilot, and Yolo controls
   with incompatible permission modes kept mutually exclusive.
+- Raw mode by default for direct interactive tmux control, including shell and
+  TUI work.
 - GUI mode for readable chat-style agent output.
-- TTY mode for plain tmux pane capture, including a separately rendered
-  OpenCode context/details panel on wide sessions.
-- Raw mode for direct interactive tmux control, including shell and TUI work.
-- Focus mode for quick phone check-ins without defaulting away from the detailed
-  view.
+- Focus mode for quick phone check-ins with detailed status and recent-attention
+  summaries.
 - Green/yellow/red status dots for running, waiting/idle, and error sessions.
 - Stable scrollback while new tmux output continues arriving.
 - File uploads and pasted clipboard images from Android, iOS, or desktop
-  browsers to temporary server paths.
+  browsers, with safe `~/.agent-tmux/attachments/...` prompt references.
 - Browser and Android notifications when watched tasks return to a prompt.
 - Light and dark themes.
 - Generic public Android APK plus optional private APK builds for your own
@@ -160,14 +133,14 @@ mode, and notifications.
 2. Choose a launcher, pin favorites to the top, or use `+` to save a named
    custom command on that device.
 3. Press `Run`, or type directly into the tmux input.
-4. Open the clearly labeled `View` dropdown and use `GUI` for readable agent
-   output, `TTY` for plain pane text, or `Raw` when you need exact terminal
-   input. Wide OpenCode TTY sessions keep their context sidebar separate; on a
-   phone, use the `Terminal` and `Details` tabs when that sidebar is present.
+4. Raw opens by default for exact terminal input. Open the clearly labeled
+   `View` dropdown and use `GUI` for readable agent output or `Focus` for status
+   and recent-attention summaries.
 5. Use the bell button when you want task-done alerts.
 6. Use the paperclip button to upload files, or paste clipboard images directly
-   into the chat input. Uploaded files are inserted as temporary server paths in
-   prompts.
+   into the chat input. Uploads remain temporary on the server, while prompts
+   receive safe `~/.agent-tmux/attachments/...` references readable by local
+   CLIs.
 
 Status dots:
 
@@ -235,8 +208,9 @@ Common variables:
 - `AGENT_TMUX_WEB_JSON_LIMIT`: request body limit for large pasted prompts and
   tmux sends. Defaults to `25mb`.
 - `AGENT_TMUX_WEB_UPLOAD_DIR`: upload directory. Defaults to
-  `/tmp/agent-tmux-web/uploads`.
-- `AGENT_TMUX_WEB_UPLOAD_TTL_MS`: upload expiry. Defaults to 24 hours.
+  `/tmp/agent-tmux-web/uploads`. This internal path is not sent to clients.
+- `AGENT_TMUX_WEB_UPLOAD_TTL_MS`: upload and safe-reference expiry. Defaults to
+  24 hours.
 - `CODEX_APP_SERVER_PORT`: optional Codex app-server port.
 - `CODEX_APP_SERVER_AUTOSTART`: set to `1` to start Codex app-server on boot.
 
@@ -370,18 +344,19 @@ Open demo mode without touching real tmux sessions:
 http://127.0.0.1:6174/?demo=1
 ```
 
-Regenerate README screenshots and showcase media:
+Generate local marketing media for review:
 
 ```bash
 pnpm build
 pnpm capture:marketing
 ```
 
-The capture script uses Playwright Chromium and `ffmpeg`. If Chromium is missing
-on a fresh machine, run `pnpm exec playwright install chromium`.
+The opt-in capture script writes local output under `docs/assets/` and uses
+Playwright Chromium and `ffmpeg`. If Chromium is missing on a fresh machine, run
+`pnpm exec playwright install chromium`. Generated media is not part of the
+release; review it for privacy and accuracy before choosing to publish it.
 
-The generated media lives in [docs/assets](./docs/assets), and the marketing
-copy index is [docs/marketing.md](./docs/marketing.md).
+Marketing copy guidance is in [docs/marketing.md](./docs/marketing.md).
 
 ## Versioning And Releases
 

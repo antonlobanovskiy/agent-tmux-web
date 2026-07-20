@@ -21,3 +21,4 @@ android/app/*.jks
 android/app/*.keystore
 android/app/build/
 .DS_Store
+.worktrees/

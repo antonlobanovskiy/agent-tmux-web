@@ -67,7 +67,7 @@ export type TmuxToolDto = {
 
 export type UploadedFileDto = {
   name: string;
-  path: string;
+  reference: string;
   size: number;
   mimeType: string | null;
 };

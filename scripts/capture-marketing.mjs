@@ -45,15 +45,7 @@ const showcaseScenes = [
     layout: "phone"
   },
   {
-    eyebrow: "TTY mode",
-    title: "Keep plain pane capture one tap away",
-    body: "Switch back to text capture when you want raw pane output without attaching to the interactive terminal.",
-    bullets: ["exact pane text", "Force Sync", "easy copy context"],
-    media: "../mobile-tty.png",
-    layout: "phone"
-  },
-  {
-    eyebrow: "tmux mode",
+    eyebrow: "Raw mode",
     title: "Drop into exact tmux control when you need it",
     body: "Attach to the raw terminal from mobile or desktop and type directly into tmux when you need exact shell or TUI behavior.",
     bullets: ["native TUI behavior", "soft terminal keys on mobile", "detach without killing work"],
@@ -88,7 +80,7 @@ const showcaseScenes = [
     eyebrow: "Desktop too",
     title: "Same server, wider control surface on PC",
     body: "The desktop layout uses horizontal space for the active tmux session while keeping sessions, launchers, the compact view menu, and notifications nearby.",
-    bullets: ["phone-first", "desktop-aware", "GUI, TTY, raw, and Focus"],
+    bullets: ["phone-first", "desktop-aware", "Raw, GUI, and Focus"],
     media: "../desktop-overview.png",
     layout: "desktop"
   }
@@ -134,6 +126,7 @@ try {
   page = await context.newPage();
   await page.goto(demoUrl, { waitUntil: "domcontentloaded" });
   await delay(1200);
+  await chooseView(page, "GUI");
   await capture(page, path.join(assetsDir, "mobile-chat.png"));
 
   await chooseView(page, "Focus");
@@ -159,9 +152,6 @@ try {
   await evaluate(page, "document.querySelector('.tmux-jump-bottom')?.click()");
   await delay(350);
 
-  await chooseView(page, "TTY");
-  await delay(250);
-  await capture(page, path.join(assetsDir, "mobile-tty.png"));
   await chooseTheme(page, "Light");
   await delay(250);
   await capture(page, path.join(assetsDir, "mobile-light.png"));
@@ -192,8 +182,6 @@ try {
   await delay(350);
   await capture(page, path.join(assetsDir, "mobile-raw-terminal.png"));
 
-  await chooseView(page, "TTY");
-  await delay(250);
   await setViewport(page, 1440, 900);
   await delay(500);
   await capture(page, path.join(assetsDir, "desktop-overview.png"));
@@ -297,13 +285,8 @@ function buildModesOverviewHtml() {
       image: "../mobile-chat.png"
     },
     {
-      label: "TTY",
-      title: "Plain pane capture",
-      image: "../mobile-tty.png"
-    },
-    {
-      label: "tmux",
-      title: "Raw attached terminal",
+      label: "Raw",
+      title: "Direct tmux terminal",
       image: "../mobile-raw-terminal.png"
     }
   ];
@@ -372,7 +355,7 @@ function buildModesOverviewHtml() {
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 18px;
       min-height: 0;
     }
@@ -427,7 +410,7 @@ function buildModesOverviewHtml() {
   <main>
     <header>
       <h1>Pick the view that fits the moment.</h1>
-      <p>GUI for readable agent output, TTY for pane capture, raw tmux when you need exact terminal control.</p>
+      <p>Raw for exact terminal control, GUI for readable agent output, and Focus for status triage.</p>
     </header>
     <section class="grid">
       ${modes.map((mode) => `

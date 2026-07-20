@@ -1,7 +1,39 @@
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
+
+function extractBalancedCssBlock(css: string, marker: string) {
+  const start = css.indexOf(marker);
+  const openBrace = css.indexOf("{", start);
+  expect(start).toBeGreaterThanOrEqual(0);
+  expect(openBrace).toBeGreaterThan(start);
+
+  let depth = 0;
+  for (let index = openBrace; index < css.length; index += 1) {
+    if (css[index] === "{") {
+      depth += 1;
+    } else if (css[index] === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return { start, end: index + 1, text: css.slice(start, index + 1) };
+      }
+    }
+  }
+
+  throw new Error(`Unbalanced CSS block: ${marker}`);
+}
+
+function trackedExistingFiles(directory: string): string[] {
+  const gitLines = (args: string[]) => execFileSync("git", args, {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  }).trim().split("\n").filter(Boolean);
+  const tracked = gitLines(["ls-files", "--", directory]);
+  const deleted = new Set(gitLines(["ls-files", "--deleted", "--", directory]));
+  return tracked.filter((file) => !deleted.has(file));
+}
 
 describe("responsive mobile CSS", () => {
   it("uses a single-screen terminal layout on mobile", () => {
@@ -28,10 +60,100 @@ describe("responsive mobile CSS", () => {
     expect(css).toContain(".tmux-view-menu-caret");
     expect(css).toContain(".tmux-notify-button");
     expect(app).toContain("View:");
-    expect(app).toContain("regular: \"TTY\"");
+    expect(app).toContain('raw: "Raw"');
     expect(mobileBlock).toContain("max-width: 150px");
     expect(mobileBlock).toContain("grid-template-columns: minmax(0, auto) 36px 36px minmax(0, 1fr) 36px");
     expect(mobileBlock).not.toContain("grid-template-columns: 36px 36px 36px 36px 36px 36px 36px minmax(0, 1fr)");
+  });
+
+  it("makes Raw the default terminal view without TTY-only code", () => {
+    const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
+    const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");
+
+    expect(app).not.toContain('regular: "TTY"');
+    expect(app).not.toContain('selectTmuxViewMode("regular")');
+    expect(app).not.toContain("TmuxTtyView");
+    expect(app).toContain("Reconnect");
+    expect(app).toContain("shouldShowRawTerminalShortcuts");
+    expect(app).toContain("WebLinksAddon");
+    expect(app).toContain("createRawTerminalSelectionHandler");
+    expect(app).toContain('role="menuitemradio"');
+    expect(css).not.toContain(".tmux-opencode-tabs");
+  });
+
+  it("routes destroy replacements through Raw without stale session updates", () => {
+    const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
+
+    expect(app).toContain("function applyDestroyedSessionReplacement");
+    expect(app.match(/applyDestroyedSessionReplacement\(nextSession\);/g)).toHaveLength(2);
+    expect(app).toContain("selectTmuxSession(nextSession.name)");
+    expect(app).toContain("selectedTmuxRef.current !== targetSession");
+  });
+
+  it("uses current-operation guards for capture and CLI launch responses", () => {
+    const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
+
+    expect(app).toContain("shouldApplyTmuxCapture({");
+    expect(app).toContain("shouldApplyTmuxToolLaunch({");
+    expect(app).toContain("Promise<boolean>");
+    expect(app).toMatch(/\.then\(\(applied\) => \{\s+if \(applied && isCurrentManualCaptureOwner\(owner\)\) \{\s+setTerminalStatus\(`synced \$\{session\}`\)/);
+  });
+
+  it("centralizes capture ownership and cancels manual sync safely", () => {
+    const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
+    const captureStart = app.indexOf("const captureTmux");
+    const captureEnd = app.indexOf("useEffect(() => {", captureStart);
+    const captureBlock = app.slice(captureStart, captureEnd);
+    const syncStart = app.indexOf("function syncOrReconnectTmux");
+    const syncEnd = app.indexOf("function showTmuxCopyNotice", syncStart);
+    const syncBlock = app.slice(syncStart, syncEnd);
+    const requestAllocation = "const requestId = ++tmuxCaptureRequestIdRef.current";
+
+    expect(captureBlock).toContain("shouldAdmitTmuxCapture({");
+    expect(captureBlock.indexOf("shouldAdmitTmuxCapture({")).toBeLessThan(captureBlock.indexOf(requestAllocation));
+    expect(app).toContain('source: "session"');
+    expect(app).toContain('source: "poll"');
+    expect(app).toContain('source: "view"');
+    expect(app).toContain('source: "follow"');
+    expect(syncBlock).toContain('source: "manual"');
+    expect(syncBlock).toContain("new AbortController()");
+    expect(syncBlock).toContain("clearTmuxFollowTimers(tmuxFollowTimersRef)");
+    expect(syncBlock).toContain("TMUX_MANUAL_CAPTURE_TIMEOUT_MS");
+    expect(syncBlock).toContain("sync timed out");
+    expect(syncBlock).toMatch(/\.finally\(\(\) => \{\s+releaseManualCapture\(owner\);/);
+    expect(app).toContain("isCurrentManualCaptureOwner(owner)");
+    expect(app).toContain("cancelManualCapture(false)");
+    expect(app).toContain("aria-busy={manualCaptureActive}");
+  });
+
+  it("renders and gates controls for the no-session state", () => {
+    const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
+
+    expect(app).toContain("!selectedTmux ? (");
+    expect(app).toContain('className="tmux-empty-session"');
+    expect(app).toContain("No tmux session selected");
+    expect(app).toContain("disabled={!selectedTmux || manualCaptureActive}");
+    expect(app).toContain("const sessionSelected = Boolean(selectedTmux)");
+    expect(app).toContain("showTmuxJumpToLatest");
+    expect(app).toContain("{showTmuxJumpToLatest && (");
+  });
+
+  it("guards queued Raw selection status callbacks after cleanup", () => {
+    const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
+
+    expect(app).toContain("let rawTerminalEffectActive = true;");
+    expect(app).toMatch(/onCopied: \(\) => \{\s+if \(rawTerminalEffectActive\) \{\s+setTerminalStatus\("Copied selection"\)/);
+    expect(app).toMatch(/onError: \(message\) => \{\s+if \(rawTerminalEffectActive\) \{\s+setTerminalStatus\(message\)/);
+    expect(app).toContain("rawTerminalEffectActive = false;");
+  });
+
+  it("removes redundant GUI state and orphaned TTY output sources", () => {
+    const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
+
+    expect(app).not.toContain("tmuxGuiActive");
+    expect(app).not.toContain("setTmuxGuiActive");
+    expect(existsSync(join(process.cwd(), "src/client/tmuxOutputLines.tsx"))).toBe(false);
+    expect(existsSync(join(process.cwd(), "src/client/__tests__/tmuxOutputLines.test.tsx"))).toBe(false);
   });
 
   it("does not reserve terminal height for the removed agent state viewer", () => {
@@ -50,15 +172,105 @@ describe("responsive mobile CSS", () => {
     expect(css).toContain(".tmux-session-status-dot.red");
   });
 
-  it("separates OpenCode's sidebar and uses tabs on mobile", () => {
+  it("builds a dense desktop workbench while retaining the mobile terminal layout", () => {
     const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");
+    const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
     const mobileBlock = css.slice(css.indexOf("@media (max-width: 760px)"));
 
-    expect(css).toContain(".tmux-output.tmux-opencode-layout");
-    expect(css).toContain("grid-template-columns: minmax(0, 1fr) minmax(280px, 336px)");
-    expect(css).toContain(".tmux-opencode-sidebar");
-    expect(mobileBlock).toContain(".tmux-opencode-tabs");
-    expect(mobileBlock).toContain(".tmux-opencode-terminal.mobile-active");
+    expect(app).toContain('className="tmux-app-toolbar"');
+    expect(app).toContain('className="tmux-rail-section-title">Sessions');
+    expect(app).toContain('className="tmux-rail-section-title">New Session');
+    expect(app).toContain('className="tmux-rail-section-title">CLI Launcher');
+    expect(app).toContain('className="tmux-connection-status"');
+    expect(css).toContain(".tmux-app-toolbar");
+    expect(css).toContain("grid-template-columns: 260px minmax(0, 1fr)");
+    expect(css).toContain("border-radius: 2px");
+    expect(mobileBlock).toContain(".tmux-app-toolbar");
+    expect(mobileBlock).toContain("grid-template-columns: minmax(0, auto) 36px 36px minmax(0, 1fr) 36px");
+    expect(mobileBlock).toContain(".tmux-menu.open");
+  });
+
+  it("keeps the desktop grid through the intermediate breakpoint", () => {
+    const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");
+    const intermediateBlock = css.slice(
+      css.indexOf("@media (max-width: 1120px)"),
+      css.indexOf("@media (max-width: 760px)")
+    );
+
+    expect(intermediateBlock).not.toContain(".tmux-panel");
+    expect(intermediateBlock).not.toContain(".tmux-control-rail");
+    expect(intermediateBlock).not.toContain(".tmux-workspace");
+  });
+
+  it("lets only the mobile workspace fill the remaining viewport height", () => {
+    const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");
+    const mobileBlock = extractBalancedCssBlock(css, "@media (max-width: 760px)");
+    const workspaceFlexRule = /\.tmux-workspace\s*\{[^}]*flex:\s*1 1 auto;/;
+    const outsideMobileBlock = css.slice(0, mobileBlock.start) + css.slice(mobileBlock.end);
+
+    expect(mobileBlock.text).toMatch(workspaceFlexRule);
+    expect(outsideMobileBlock).not.toMatch(workspaceFlexRule);
+    expect(css.match(new RegExp(workspaceFlexRule.source, "g"))).toHaveLength(1);
+  });
+
+  it("labels and groups launcher modes by interface permissions and options", () => {
+    const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
+
+    expect(app).toContain('label: "UI Mode"');
+    expect(app).toContain('label: "Permission Mode"');
+    expect(app).toContain('label: "Options"');
+    expect(app).toContain('role="group"');
+    expect(app).toContain("aria-labelledby");
+    expect(app).not.toContain("Output Mode");
+  });
+});
+
+describe("current user guidance", () => {
+  it("selects GUI before capturing mobile chat marketing media", () => {
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+    const navigation = marketingCapture.indexOf("await page.goto(demoUrl");
+    const guiSelection = marketingCapture.indexOf('await chooseView(page, "GUI");', navigation);
+    const mobileChatCapture = marketingCapture.indexOf('await capture(page, path.join(assetsDir, "mobile-chat.png"));');
+
+    expect(navigation).toBeGreaterThanOrEqual(0);
+    expect(guiSelection).toBeGreaterThan(navigation);
+    expect(mobileChatCapture).toBeGreaterThan(guiSelection);
+  });
+
+  it("does not ship or publish generated marketing media", () => {
+    const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
+    const marketing = readFileSync(join(process.cwd(), "docs/marketing.md"), "utf8");
+    const generatedMediaReference = /docs\/assets\/[^\s)`"]+\.(?:png|gif|mp4)\b/i;
+    const shippedMedia = trackedExistingFiles("docs/assets")
+      .filter((file) => /\.(?:png|gif|mp4)$/i.test(file));
+
+    expect(readme).not.toMatch(generatedMediaReference);
+    expect(marketing).not.toMatch(generatedMediaReference);
+    expect(shippedMedia).toEqual([]);
+  });
+
+  it("describes only the current Agent Tmux views while retaining OpenCode's Linear TTY mode", () => {
+    const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
+    const marketing = readFileSync(join(process.cwd(), "docs/marketing.md"), "utf8");
+    const aiSetup = readFileSync(join(process.cwd(), "AI_SETUP.md"), "utf8");
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+    const tmuxTools = readFileSync(join(process.cwd(), "src/shared/tmuxTools.ts"), "utf8");
+    const fullUiMode = tmuxTools.slice(
+      tmuxTools.indexOf('id: "full-tui"'),
+      tmuxTools.indexOf('id: "mini-ui"')
+    );
+
+    expect(readme.replaceAll("Linear TTY", "")).not.toMatch(/\bTTY\b/);
+    expect(readme).not.toContain("`Terminal` and `Details` tabs");
+    expect(readme).not.toContain("modes-overview.png");
+    expect(marketing).not.toMatch(/\bTTY\b|GUI\/TTY/);
+    expect(marketing).not.toContain("mobile-tty.png");
+    expect(marketing).not.toContain("modes-overview.png");
+    expect(aiSetup).not.toMatch(/\bTTY\b/);
+    expect(marketingCapture).not.toMatch(/\bTTY\b|mobile-tty\.png/);
+    expect(fullUiMode).not.toMatch(/\bTTY\b|details panel/i);
+    expect(readme).toContain("Linear TTY");
+    expect(tmuxTools).toContain('label: "Linear TTY"');
   });
 });
 
@@ -72,5 +284,16 @@ describe("color theme CSS", () => {
     expect(css).toContain("--surface-base");
     expect(css).toContain("background: var(--surface-base)");
     expect(css).toContain("color: var(--text-primary)");
+  });
+
+  it("uses dark workbench surfaces for tmux utility controls", () => {
+    const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");
+    const utilityRule = css.match(
+      /\.tmux-compact-bar button,\n\.tmux-terminal-toolbar button,\n\.tmux-view-menu summary,\n\.tmux-actions button,\n\.tmux-tool-actions button,\n\.tmux-send button,\n\.tmux-soft-keys button \{([^}]*)\}/
+    )?.[1] ?? "";
+
+    expect(utilityRule).toContain("background: var(--surface-control)");
+    expect(utilityRule).toContain("color: var(--text-control)");
+    expect(utilityRule).toContain("border: 1px solid var(--border-strong)");
   });
 });

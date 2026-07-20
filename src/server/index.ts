@@ -44,10 +44,11 @@ import {
   type TmuxSubmitKey
 } from "./tmux.js";
 import {
-  cleanupExpiredUploads,
+  cleanupUploadRoots,
   resolveLegacyUploadRoot,
+  resolveUploadAliasRoot,
   resolveUploadRoot,
-  saveUploadedFile
+  saveUploadedFileForClient
 } from "./uploads.js";
 import { TmuxWatchStore } from "./tmuxWatch.js";
 
@@ -389,7 +390,7 @@ async function listTmuxSessionsWithStatus(): Promise<TmuxSessionDto[]> {
 
 app.post("/api/uploads", asyncHandler(async (req, res) => {
   const originalName = requireString(req.query.filename, "filename");
-  const file = await saveUploadedFile(req, {
+  const file = await saveUploadedFileForClient(req, {
     originalName,
     mimeType: stringOrNull(req.header("content-type"))
   });
@@ -685,8 +686,10 @@ function rawToString(raw: RawData): string {
 
 function startUploadCleanup(): void {
   const clean = () => {
-    const roots = [...new Set([resolveUploadRoot(), resolveLegacyUploadRoot()])];
-    void Promise.all(roots.map((root) => cleanupExpiredUploads(root))).catch((error: unknown) => {
+    void cleanupUploadRoots(
+      [resolveUploadRoot(), resolveLegacyUploadRoot()],
+      resolveUploadAliasRoot()
+    ).catch((error: unknown) => {
       console.error("Failed to clean expired uploads", error);
     });
   };
@@ -732,6 +735,9 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   const message = error instanceof Error ? error.message : String(error);
   const record = error && typeof error === "object" ? error as Record<string, unknown> : {};
   const statusCode = typeof record.statusCode === "number" ? record.statusCode : 500;
+  if (statusCode >= 500) {
+    console.error("Request failed", error);
+  }
   res.status(statusCode).json({ error: message });
 });
 

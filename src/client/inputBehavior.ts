@@ -1,3 +1,5 @@
+import type { UploadedFileDto } from "../shared/api.js";
+
 export type InputDeviceContext = {
   coarsePointer?: boolean;
   maxTouchPoints?: number;
@@ -74,6 +76,11 @@ export function buildPastedPromptText(pastedText: string, attachmentText: string
     return pastedText;
   }
   return `${pastedText.trimEnd()}\n\n${cleanAttachmentText}`;
+}
+
+export function formatUploadedFilesForPrompt(files: UploadedFileDto[]): string {
+  const label = files.length === 1 ? "Attached file" : "Attached files";
+  return `${label}: ${files.map((file) => file.reference).join(" ")}`;
 }
 
 export function readInputDeviceContext(): InputDeviceContext {
