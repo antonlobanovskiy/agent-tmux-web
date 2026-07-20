@@ -23,8 +23,22 @@ describe("raw terminal links", () => {
     expect(openWindow).not.toHaveBeenCalled();
   });
 
-  it("opens browser links in a protected new tab", () => {
-    const openWindow = vi.fn(() => ({}) as WindowProxy);
+  it("reports Android bridge rejection and failure without browser fallback", () => {
+    const openWindow = vi.fn(() => null);
+
+    expect(openRawTerminalLink("https://example.com", {
+      androidBridge: { openExternalLink: () => false },
+      openWindow
+    })).toBe(false);
+    expect(openRawTerminalLink("https://example.com", {
+      androidBridge: { openExternalLink: () => { throw new Error("failed"); } },
+      openWindow
+    })).toBe(false);
+    expect(openWindow).not.toHaveBeenCalled();
+  });
+
+  it("reports protected browser dispatch when the opener returns null", () => {
+    const openWindow = vi.fn(() => null);
 
     expect(openRawTerminalLink("www.example.com", { openWindow })).toBe(true);
     expect(openWindow).toHaveBeenCalledWith(
@@ -34,8 +48,17 @@ describe("raw terminal links", () => {
     );
   });
 
-  it("reports blocked and unsafe links without navigating", () => {
-    expect(openRawTerminalLink("https://example.com", { openWindow: () => null })).toBe(false);
-    expect(openRawTerminalLink("data:text/plain,secret", { openWindow: vi.fn() })).toBe(false);
+  it("rejects unsafe links without invoking the browser opener", () => {
+    const openWindow = vi.fn(() => null);
+
+    expect(openRawTerminalLink("data:text/plain,blocked", { openWindow })).toBe(false);
+    expect(openWindow).not.toHaveBeenCalled();
+  });
+
+  it("reports unavailable and throwing browser openers", () => {
+    expect(openRawTerminalLink("https://example.com")).toBe(false);
+    expect(openRawTerminalLink("https://example.com", {
+      openWindow: () => { throw new Error("failed"); }
+    })).toBe(false);
   });
 });

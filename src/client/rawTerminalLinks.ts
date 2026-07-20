@@ -34,8 +34,12 @@ export function openRawTerminalLink(value: string, environment: RawTerminalLinkE
 
   const openWindow = environment.openWindow
     ?? (typeof window === "undefined" ? undefined : window.open.bind(window));
+  if (!openWindow) {
+    return false;
+  }
   try {
-    return openWindow?.(url, "_blank", "noopener,noreferrer") != null;
+    openWindow(url, "_blank", "noopener,noreferrer");
+    return true;
   } catch {
     return false;
   }

@@ -7,6 +7,7 @@ export type RawTerminalSelectionOptions = {
 
 export function createRawTerminalSelectionHandler(options: RawTerminalSelectionOptions): () => void {
   let previousSelection = "";
+  let writeQueue = Promise.resolve();
   return () => {
     const selection = options.readSelection();
     if (!selection) {
@@ -17,7 +18,8 @@ export function createRawTerminalSelectionHandler(options: RawTerminalSelectionO
       return;
     }
     previousSelection = selection;
-    void options.writeClipboard(selection)
+    writeQueue = writeQueue
+      .then(() => options.writeClipboard(selection))
       .then(() => options.onCopied?.())
       .catch(() => options.onError?.("Clipboard copy failed"));
   };
