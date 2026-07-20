@@ -34,7 +34,7 @@ A shared client helper normalizes and opens approved links:
 
 - In the Android wrapper, it calls a new `AgentTmuxAndroid.openExternalLink(url)` bridge method.
 - In desktop and mobile browsers, it opens a new tab with `noopener` and `noreferrer` behavior.
-- If a browser client cannot open the link, the terminal status reports the failure and the Agent Tmux page remains active.
+- If browser link dispatch throws, the terminal status reports the failure and the Agent Tmux page remains active. A protected `noopener` tab intentionally returns no window reference, so popup-policy suppression cannot be distinguished from successful dispatch.
 
 The Android bridge validates the scheme again before starting an `ACTION_VIEW` browser intent. This direct bridge is required because xterm renders links on a canvas, so WebView hit testing cannot reliably recover the clicked URL.
 
@@ -89,7 +89,7 @@ If alias creation fails, the upload request fails and removes the newly stored f
 ## Error Handling
 
 - Invalid or unsafe URLs are inert terminal text.
-- Browser popup failure reports `Unable to open link` without navigating away from Agent Tmux.
+- Browser validation or dispatch failure reports `Unable to open link` without navigating away from Agent Tmux.
 - Android intent failure shows the existing native error toast and leaves the WebView active.
 - Clipboard failure reports `Clipboard copy failed`; terminal input and selection remain intact.
 - Upload or alias failure returns an error, removes partial output, and never exposes the internal path as a fallback.
