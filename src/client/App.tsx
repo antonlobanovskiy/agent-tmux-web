@@ -1952,11 +1952,12 @@ export function App() {
             {currentTmuxTool?.modes?.length ? (
               <div className="tmux-tool-modes" aria-label="CLI tool modes">
                 {[
-                  { label: "UI Mode", modes: currentTmuxTool.modes.filter((mode) => mode.exclusiveGroup === "interface") },
-                  { label: "Output Mode", modes: currentTmuxTool.modes.filter((mode) => mode.exclusiveGroup !== "interface") }
+                  { id: "tmux-ui-mode-label", label: "UI Mode", modes: currentTmuxTool.modes.filter((mode) => mode.exclusiveGroup === "interface") },
+                  { id: "tmux-permission-mode-label", label: "Permission Mode", modes: currentTmuxTool.modes.filter((mode) => mode.exclusiveGroup === "permissions") },
+                  { id: "tmux-options-label", label: "Options", modes: currentTmuxTool.modes.filter((mode) => mode.exclusiveGroup !== "interface" && mode.exclusiveGroup !== "permissions") }
                 ].map((section) => section.modes.length > 0 && (
-                  <div className="tmux-mode-section" key={section.label}>
-                    <div className="tmux-rail-section-title">{section.label}</div>
+                  <div className="tmux-mode-section" key={section.id} role="group" aria-labelledby={section.id}>
+                    <div className="tmux-rail-section-title" id={section.id}>{section.label}</div>
                     {section.modes.map((mode) => (
                       <label className={mode.dangerous ? "dangerous" : ""} key={mode.id} title={mode.description}>
                         <input

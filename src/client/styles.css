@@ -1621,24 +1621,6 @@ textarea:focus {
     min-height: 0;
   }
 
-  .tmux-panel {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    min-height: 0;
-    border-left: 0;
-    border-top: 0;
-    overflow: hidden;
-  }
-
-  .tmux-control-rail {
-    flex: none;
-  }
-
-  .tmux-workspace {
-    flex: 1 1 auto;
-  }
-
   .main {
     border-left: 0;
   }

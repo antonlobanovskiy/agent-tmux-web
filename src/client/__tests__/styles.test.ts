@@ -78,6 +78,29 @@ describe("responsive mobile CSS", () => {
     expect(mobileBlock).toContain("grid-template-columns: minmax(0, auto) 36px 36px minmax(0, 1fr) 36px");
     expect(mobileBlock).toContain(".tmux-menu.open");
   });
+
+  it("keeps the desktop grid through the intermediate breakpoint", () => {
+    const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");
+    const intermediateBlock = css.slice(
+      css.indexOf("@media (max-width: 1120px)"),
+      css.indexOf("@media (max-width: 760px)")
+    );
+
+    expect(intermediateBlock).not.toContain(".tmux-panel");
+    expect(intermediateBlock).not.toContain(".tmux-control-rail");
+    expect(intermediateBlock).not.toContain(".tmux-workspace");
+  });
+
+  it("labels and groups launcher modes by interface permissions and options", () => {
+    const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
+
+    expect(app).toContain('label: "UI Mode"');
+    expect(app).toContain('label: "Permission Mode"');
+    expect(app).toContain('label: "Options"');
+    expect(app).toContain('role="group"');
+    expect(app).toContain("aria-labelledby");
+    expect(app).not.toContain("Output Mode");
+  });
 });
 
 describe("color theme CSS", () => {
