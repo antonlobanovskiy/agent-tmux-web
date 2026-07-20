@@ -1,4 +1,4 @@
-import { access, mkdir, mkdtemp, readFile, readdir, readlink, rm, utimes, writeFile } from "node:fs/promises";
+import { access, chmod, lstat, lutimes, mkdir, mkdtemp, readFile, readdir, readlink, rm, stat, symlink, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -7,13 +7,16 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   buildUploadTarget,
+  cleanupExpiredUploadAliases,
   cleanupExpiredUploads,
+  cleanupUploadRoots,
   DEFAULT_UPLOAD_TTL_MS,
   resolveUploadAliasRoot,
   resolveUploadRoot,
   sanitizeUploadName,
   saveUploadedFile,
   saveUploadedFileForClient,
+  UploadStorageError,
   UploadTooLargeError
 } from "../uploads.js";
 
@@ -47,6 +50,94 @@ describe("upload helpers", () => {
 
   it("resolves upload aliases below the user's home directory", () => {
     expect(resolveUploadAliasRoot()).toBe(path.join(os.homedir(), ".agent-tmux", "attachments"));
+  });
+
+  it("canonicalizes configured and option upload roots", async () => {
+    const previous = process.env.AGENT_TMUX_WEB_UPLOAD_DIR;
+    process.env.AGENT_TMUX_WEB_UPLOAD_DIR = "relative-upload-root";
+    try {
+      expect(resolveUploadRoot()).toBe(path.resolve("relative-upload-root"));
+    } finally {
+      if (previous === undefined) {
+        delete process.env.AGENT_TMUX_WEB_UPLOAD_DIR;
+      } else {
+        process.env.AGENT_TMUX_WEB_UPLOAD_DIR = previous;
+      }
+    }
+
+    const parent = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-relative-test-"));
+    const storageRoot = path.join(parent, "storage");
+    const aliasRoot = path.join(parent, "aliases");
+    tempRoots.push(parent);
+    await mkdir(storageRoot);
+    await mkdir(aliasRoot);
+    const relativeStorageRoot = path.relative(process.cwd(), storageRoot);
+    const relativeAliasRoot = path.relative(process.cwd(), aliasRoot);
+
+    const file = await saveUploadedFileForClient(Readable.from(["image"]), {
+      originalName: "photo.png",
+      root: relativeStorageRoot,
+      aliasRoot: relativeAliasRoot,
+      now: new Date("2026-07-20T02:38:49.000Z"),
+      id: "relative"
+    });
+
+    const aliasPath = path.join(aliasRoot, "2026-07-20", path.basename(file.reference));
+    const targetPath = await readlink(aliasPath);
+    expect(path.isAbsolute(targetPath)).toBe(true);
+    expect(path.relative(storageRoot, targetPath).startsWith("..")).toBe(false);
+    await expect(readFile(aliasPath, "utf8")).resolves.toBe("image");
+  });
+
+  it("rejects equal or nested storage and alias roots before writing", async () => {
+    const cases = [
+      { name: "equal", roots: (parent: string) => [parent, parent] },
+      { name: "alias inside storage", roots: (parent: string) => [parent, path.join(parent, "aliases")] },
+      { name: "storage inside alias", roots: (parent: string) => [path.join(parent, "storage"), parent] }
+    ] as const;
+
+    for (const testCase of cases) {
+      const parent = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-overlap-test-"));
+      tempRoots.push(parent);
+      const [storageRoot, aliasRoot] = testCase.roots(parent);
+
+      const error = await saveUploadedFileForClient(Readable.from(["image"]), {
+        originalName: "photo.png",
+        root: storageRoot,
+        aliasRoot
+      }).catch((caught: unknown) => caught);
+
+      expect(error, testCase.name).toBeInstanceOf(UploadStorageError);
+      expect(((error as UploadStorageError).cause as Error).message, testCase.name)
+        .toBe("Upload storage and alias roots must not overlap");
+      expect((error as UploadStorageError).message, testCase.name).not.toContain(storageRoot);
+      expect((error as UploadStorageError).message, testCase.name).not.toContain(aliasRoot);
+      await expect(readdir(parent, { recursive: true }), testCase.name).resolves.toHaveLength(0);
+    }
+  });
+
+  it("rejects unsafe or overlong deterministic upload IDs before writing", async () => {
+    const invalidIds = ["bad/id", "bad\nid", "a".repeat(65)];
+
+    for (const id of invalidIds) {
+      const storageRoot = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-id-test-"));
+      const aliasRoot = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-alias-test-"));
+      tempRoots.push(storageRoot, aliasRoot);
+
+      const error = await saveUploadedFileForClient(Readable.from(["image"]), {
+        originalName: "photo.png",
+        root: storageRoot,
+        aliasRoot,
+        id
+      }).catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(UploadStorageError);
+      expect(((error as UploadStorageError).cause as Error).message)
+        .toBe("Upload ID must use 1-64 letters, numbers, underscores, or hyphens");
+      expect((error as UploadStorageError).message).toBe("Unable to store uploaded file");
+      await expect(readdir(storageRoot, { recursive: true })).resolves.toHaveLength(0);
+      await expect(readdir(aliasRoot, { recursive: true })).resolves.toHaveLength(0);
+    }
   });
 
   it("sanitizes remote browser filenames before storing them on the server", () => {
@@ -143,6 +234,57 @@ describe("upload helpers", () => {
     await expect(readFile(secondAlias, "utf8")).resolves.toBe("second");
   });
 
+  it("enforces private modes on dated directories and stored files", async () => {
+    const storageRoot = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-storage-test-"));
+    const aliasRoot = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-alias-test-"));
+    const date = "2026-07-20";
+    const storageDirectory = path.join(storageRoot, date);
+    const aliasDirectory = path.join(aliasRoot, date);
+    tempRoots.push(storageRoot, aliasRoot);
+    await mkdir(storageDirectory);
+    await mkdir(aliasDirectory);
+    await chmod(storageDirectory, 0o777);
+    await chmod(aliasDirectory, 0o777);
+
+    const file = await saveUploadedFileForClient(Readable.from(["image"]), {
+      originalName: "photo.png",
+      root: storageRoot,
+      aliasRoot,
+      now: new Date("2026-07-20T02:38:49.000Z"),
+      id: "private"
+    });
+
+    const aliasPath = path.join(aliasDirectory, path.basename(file.reference));
+    const targetPath = await readlink(aliasPath);
+    expect((await stat(storageDirectory)).mode & 0o777).toBe(0o700);
+    expect((await stat(aliasDirectory)).mode & 0o777).toBe(0o700);
+    expect((await stat(targetPath)).mode & 0o777).toBe(0o600);
+  });
+
+  it("returns a fixed public error when storage directory creation fails", async () => {
+    const storageParent = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-storage-test-"));
+    const storageRoot = path.join(storageParent, "not-a-directory");
+    const aliasRoot = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-alias-test-"));
+    tempRoots.push(storageParent, aliasRoot);
+    await writeFile(storageRoot, "blocked");
+
+    const error = await saveUploadedFileForClient(Readable.from(["image"]), {
+      originalName: "photo.png",
+      root: storageRoot,
+      aliasRoot,
+      maxBytes: 1024
+    }).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(UploadStorageError);
+    expect((error as UploadStorageError).message).toBe("Unable to store uploaded file");
+    expect((error as UploadStorageError).statusCode).toBe(500);
+    expect((error as UploadStorageError).cause).toBeInstanceOf(Error);
+    expect(((error as UploadStorageError).cause as Error).message).toContain(storageRoot);
+    const responseBody = JSON.stringify({ error: (error as UploadStorageError).message });
+    expect(responseBody).not.toContain(storageRoot);
+    expect(responseBody).not.toContain(aliasRoot);
+  });
+
   it("removes the stored file when alias creation fails", async () => {
     const storageRoot = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-storage-test-"));
     const aliasParent = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-alias-test-"));
@@ -150,24 +292,36 @@ describe("upload helpers", () => {
     tempRoots.push(storageRoot, aliasParent);
     await writeFile(aliasRoot, "blocked");
 
-    await expect(saveUploadedFileForClient(Readable.from(["image"]), {
+    const error = await saveUploadedFileForClient(Readable.from(["image"]), {
       originalName: "photo.png",
       root: storageRoot,
       aliasRoot,
       maxBytes: 1024
-    })).rejects.toThrow();
+    }).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(UploadStorageError);
+    expect((error as UploadStorageError).message).toBe("Unable to store uploaded file");
+    expect((error as UploadStorageError).cause).toBeInstanceOf(Error);
+    expect(((error as UploadStorageError).cause as Error).message).toContain(aliasRoot);
+    const responseBody = JSON.stringify({ error: (error as UploadStorageError).message });
+    expect(responseBody).not.toContain(storageRoot);
+    expect(responseBody).not.toContain(aliasRoot);
     await expect(readdir(storageRoot, { recursive: true })).resolves.toHaveLength(1);
   });
 
   it("rejects oversized uploads and removes partial files", async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-web-upload-test-"));
-    tempRoots.push(root);
+    const storageRoot = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-web-upload-test-"));
+    const aliasRoot = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-alias-test-"));
+    tempRoots.push(storageRoot, aliasRoot);
 
-    await expect(saveUploadedFile(Readable.from(["too large"]), {
+    await expect(saveUploadedFileForClient(Readable.from(["too large"]), {
       originalName: "large.txt",
-      root,
+      root: storageRoot,
+      aliasRoot,
       maxBytes: 3
     })).rejects.toBeInstanceOf(UploadTooLargeError);
+    await expect(readdir(storageRoot, { recursive: true })).resolves.toHaveLength(1);
+    await expect(readdir(aliasRoot, { recursive: true })).resolves.toHaveLength(0);
   });
 
   it("cleans expired uploaded files and leaves fresh files available", async () => {
@@ -190,6 +344,83 @@ describe("upload helpers", () => {
     await expect(access(oldFile)).rejects.toThrow();
     await expect(access(oldDirectory)).rejects.toThrow();
     await expect(readFile(freshFile, "utf8")).resolves.toBe("fresh");
+  });
+
+  it("removes broken and expired aliases while preserving fresh valid aliases", async () => {
+    const targetRoot = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-target-test-"));
+    const aliasRoot = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-alias-test-"));
+    const aliasDirectory = path.join(aliasRoot, "2026-05-14");
+    tempRoots.push(targetRoot, aliasRoot);
+    await mkdir(aliasDirectory);
+
+    const freshTarget = path.join(targetRoot, "fresh.txt");
+    const expiredTarget = path.join(targetRoot, "expired.txt");
+    const boundaryTarget = path.join(targetRoot, "boundary.txt");
+    await writeFile(freshTarget, "fresh");
+    await writeFile(expiredTarget, "expired");
+    await writeFile(boundaryTarget, "boundary");
+
+    const brokenAlias = path.join(aliasDirectory, "broken.txt");
+    const freshAlias = path.join(aliasDirectory, "fresh.txt");
+    const expiredAlias = path.join(aliasDirectory, "expired.txt");
+    const boundaryAlias = path.join(aliasDirectory, "boundary.txt");
+    await symlink(path.join(targetRoot, "missing.txt"), brokenAlias, "file");
+    await symlink(freshTarget, freshAlias, "file");
+    await symlink(expiredTarget, expiredAlias, "file");
+    await symlink(boundaryTarget, boundaryAlias, "file");
+
+    const now = new Date("2026-05-14T12:00:00.000Z");
+    const freshTime = new Date("2026-05-14T11:00:00.000Z");
+    const expiredTime = new Date("2026-05-13T11:59:59.999Z");
+    const boundaryTime = new Date("2026-05-13T12:00:00.000Z");
+    await lutimes(brokenAlias, freshTime, freshTime);
+    await lutimes(freshAlias, freshTime, freshTime);
+    await lutimes(expiredAlias, expiredTime, expiredTime);
+    await lutimes(boundaryAlias, boundaryTime, boundaryTime);
+
+    await cleanupExpiredUploadAliases(aliasRoot, { now, ttlMs: DEFAULT_UPLOAD_TTL_MS });
+
+    await expect(lstat(brokenAlias)).rejects.toThrow();
+    await expect(readFile(freshAlias, "utf8")).resolves.toBe("fresh");
+    await expect(lstat(expiredAlias)).rejects.toThrow();
+    await expect(lstat(boundaryAlias)).rejects.toThrow();
+    await expect(readFile(expiredTarget, "utf8")).resolves.toBe("expired");
+    await expect(readFile(boundaryTarget, "utf8")).resolves.toBe("boundary");
+  });
+
+  it("cleans targets before aliases and preserves legacy cleanup", async () => {
+    const storageRoot = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-storage-test-"));
+    const legacyRoot = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-legacy-test-"));
+    const aliasRoot = await mkdtemp(path.join(os.tmpdir(), "agent-tmux-alias-test-"));
+    const date = "2026-05-13";
+    const storageDirectory = path.join(storageRoot, date);
+    const legacyDirectory = path.join(legacyRoot, date);
+    const aliasDirectory = path.join(aliasRoot, date);
+    tempRoots.push(storageRoot, legacyRoot, aliasRoot);
+    await mkdir(storageDirectory);
+    await mkdir(legacyDirectory);
+    await mkdir(aliasDirectory);
+
+    const targetPath = path.join(storageDirectory, "target.txt");
+    const legacyPath = path.join(legacyDirectory, "legacy.txt");
+    const aliasPath = path.join(aliasDirectory, "target.txt");
+    await writeFile(targetPath, "target");
+    await writeFile(legacyPath, "legacy");
+    await symlink(targetPath, aliasPath, "file");
+    const expiredTime = new Date("2026-05-13T11:00:00.000Z");
+    const freshTime = new Date("2026-05-14T11:00:00.000Z");
+    await utimes(targetPath, expiredTime, expiredTime);
+    await utimes(legacyPath, expiredTime, expiredTime);
+    await lutimes(aliasPath, freshTime, freshTime);
+
+    await cleanupUploadRoots([storageRoot, legacyRoot], aliasRoot, {
+      now: new Date("2026-05-14T12:00:00.000Z"),
+      ttlMs: DEFAULT_UPLOAD_TTL_MS
+    });
+
+    await expect(access(targetPath)).rejects.toThrow();
+    await expect(access(legacyPath)).rejects.toThrow();
+    await expect(lstat(aliasPath)).rejects.toThrow();
   });
 
   it("only cleans dated upload directories below the upload root", async () => {

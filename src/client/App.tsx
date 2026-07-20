@@ -193,7 +193,7 @@ const DEMO_TMUX_OUTPUT = [
   "",
   "› Attach docs/release-plan.md and summarize next steps.",
   "",
-  "• Uploaded files are stored as temporary server paths.",
+  "• Uploaded files use safe ~/.agent-tmux/attachments/... references; temporary storage stays internal.",
   "• Auto-capture can read a deeper tmux history so older context stays reachable.",
   "• When you scroll up, new output waits quietly until you jump back to latest.",
   "",
@@ -1000,7 +1000,7 @@ export function App() {
     try {
       const uploads = await uploadFilesForPrompt(selectedFiles);
       appendTmuxPromptText(formatUploadedFilesForPrompt(uploads));
-      setTerminalStatus(`uploaded ${uploads.length} file${uploads.length === 1 ? "" : "s"} to server`);
+      setTerminalStatus(`uploaded ${uploads.length} file${uploads.length === 1 ? "" : "s"}; inserted safe attachment reference${uploads.length === 1 ? "" : "s"}`);
     } finally {
       setUploadingTmuxFiles(false);
     }
@@ -1023,7 +1023,7 @@ export function App() {
     try {
       const uploads = await uploadFilesForPrompt(files);
       insertTmuxPromptText(buildPastedPromptText(pastedText, formatUploadedFilesForPrompt(uploads)), sourceInput);
-      setTerminalStatus(`uploaded ${uploads.length} pasted image${uploads.length === 1 ? "" : "s"} to server`);
+      setTerminalStatus(`uploaded ${uploads.length} pasted image${uploads.length === 1 ? "" : "s"}; inserted safe attachment reference${uploads.length === 1 ? "" : "s"}`);
     } finally {
       setUploadingTmuxFiles(false);
     }
@@ -2228,7 +2228,7 @@ export function App() {
               <button
                 aria-label="Attach files"
                 disabled={uploadingTmuxFiles}
-                title="Upload files to the server and insert their paths"
+                title="Upload files and insert safe attachment references"
                 type="button"
                 onClick={() => tmuxFileInputRef.current?.click()}
               >

@@ -28,7 +28,8 @@ attach, and temporary file uploads over a private network path.
 - Scroll back through active sessions without losing your place, then jump back
   to latest output when ready.
 - Force Sync manually refreshes the captured pane without attaching to tmux.
-- Upload files from Android or desktop browsers to temporary server paths.
+- Upload files from Android or desktop browsers while local CLIs receive safe
+  `~/.agent-tmux/attachments/...` references and temporary storage stays internal.
 - Use the clearly labeled view dropdown for TTY, GUI, Focus, Raw, Light, and
   Dark controls without crowding the tmux toolbar.
 - Android sideload APK wraps the private server UI with native file picking and
