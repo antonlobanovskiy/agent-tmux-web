@@ -12,28 +12,6 @@ sessions. It is useful when SSH on a phone is too cramped, when mobile browsers
 disconnect, or when you want one place to switch between several terminal-agent
 tabs without killing the work.
 
-## Demo
-
-![Agent Tmux Web showcase](./docs/assets/agent-tmux-web-showcase.gif)
-
-[MP4 showcase](./docs/assets/agent-tmux-web-showcase.mp4)
-
-The generated showcase covers the mobile GUI, Focus overview, stable scrollback,
-Raw tmux control, launcher menu, light/dark mode, Android wrapper, and desktop
-layout.
-
-## Screenshots
-
-<p>
-  <img src="./docs/assets/desktop-overview.png" alt="Desktop Agent Tmux Web overview" width="780">
-</p>
-
-<p>
-  <img src="./docs/assets/mobile-chat.png" alt="Mobile GUI chat mode" width="240">
-  <img src="./docs/assets/mobile-focus.png" alt="Mobile focus overview" width="240">
-  <img src="./docs/assets/mobile-raw-terminal.png" alt="Mobile raw tmux terminal" width="240">
-</p>
-
 ## What You Get
 
 - Long-running tmux sessions that survive browser disconnects and phone sleep.
@@ -366,18 +344,19 @@ Open demo mode without touching real tmux sessions:
 http://127.0.0.1:6174/?demo=1
 ```
 
-Regenerate README screenshots and showcase media:
+Generate local marketing media for review:
 
 ```bash
 pnpm build
 pnpm capture:marketing
 ```
 
-The capture script uses Playwright Chromium and `ffmpeg`. If Chromium is missing
-on a fresh machine, run `pnpm exec playwright install chromium`.
+The opt-in capture script writes local output under `docs/assets/` and uses
+Playwright Chromium and `ffmpeg`. If Chromium is missing on a fresh machine, run
+`pnpm exec playwright install chromium`. Generated media is not part of the
+release; review it for privacy and accuracy before choosing to publish it.
 
-The generated media lives in [docs/assets](./docs/assets), and the marketing
-copy index is [docs/marketing.md](./docs/marketing.md).
+Marketing copy guidance is in [docs/marketing.md](./docs/marketing.md).
 
 ## Versioning And Releases
 

@@ -48,20 +48,6 @@ attach, and temporary file uploads over a private network path.
   `https://github.com/antonlobanovskiy/agent-tmux-web/releases`
 - Full install guide: `INSTALL.md`
 
-## Assets
-
-- Showcase GIF: `docs/assets/agent-tmux-web-showcase.gif`
-- Showcase MP4: `docs/assets/agent-tmux-web-showcase.mp4`
-- Showcase poster: `docs/assets/agent-tmux-web-showcase-poster.png`
-- Mobile GUI screenshot: `docs/assets/mobile-chat.png`
-- Mobile focus overview: `docs/assets/mobile-focus.png`
-- Mobile Raw terminal screenshot: `docs/assets/mobile-raw-terminal.png`
-- Mobile light-mode screenshot: `docs/assets/mobile-light.png`
-- Mobile scroll control screenshot: `docs/assets/mobile-scroll.png`
-- Mobile launcher menu: `docs/assets/mobile-launchers.png`
-- Mobile Claude launcher: `docs/assets/mobile-claude.png`
-- Desktop overview: `docs/assets/desktop-overview.png`
-
 ## Android Demo Note
 
 The Android APK is sideload-only and generic in public builds. It should show a
@@ -70,13 +56,19 @@ same Raw, GUI, and Focus views shown in the browser demo. Turn on `Notify` in
 the tmux toolbar to start the native foreground watcher for task-complete
 alerts.
 
-Regenerate assets with:
+## Local Asset Generation
+
+Generated screenshots and videos do not ship with the release. If reviewed
+public demo assets would be useful, generate local candidates with:
 
 ```bash
 pnpm build
 pnpm capture:marketing
 ```
 
-The capture script uses Playwright Chromium and `ffmpeg`. On a fresh machine,
-run `pnpm exec playwright install chromium` if Playwright reports a missing
-browser.
+The opt-in capture script writes candidates under `docs/assets/` using
+Playwright Chromium and `ffmpeg`. On a fresh machine, run
+`pnpm exec playwright install chromium` if Playwright reports a missing browser.
+Review every output for private data, current UI accuracy, and supportable
+product claims before selecting any file for publication. Do not publish or
+commit generated output by default.

@@ -126,6 +126,7 @@ try {
   page = await context.newPage();
   await page.goto(demoUrl, { waitUntil: "domcontentloaded" });
   await delay(1200);
+  await chooseView(page, "GUI");
   await capture(page, path.join(assetsDir, "mobile-chat.png"));
 
   await chooseView(page, "Focus");

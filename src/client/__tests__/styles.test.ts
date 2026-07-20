@@ -1,7 +1,39 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
+
+function extractBalancedCssBlock(css: string, marker: string) {
+  const start = css.indexOf(marker);
+  const openBrace = css.indexOf("{", start);
+  expect(start).toBeGreaterThanOrEqual(0);
+  expect(openBrace).toBeGreaterThan(start);
+
+  let depth = 0;
+  for (let index = openBrace; index < css.length; index += 1) {
+    if (css[index] === "{") {
+      depth += 1;
+    } else if (css[index] === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return { start, end: index + 1, text: css.slice(start, index + 1) };
+      }
+    }
+  }
+
+  throw new Error(`Unbalanced CSS block: ${marker}`);
+}
+
+function trackedExistingFiles(directory: string): string[] {
+  const gitLines = (args: string[]) => execFileSync("git", args, {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  }).trim().split("\n").filter(Boolean);
+  const tracked = gitLines(["ls-files", "--", directory]);
+  const deleted = new Set(gitLines(["ls-files", "--deleted", "--", directory]));
+  return tracked.filter((file) => !deleted.has(file));
+}
 
 describe("responsive mobile CSS", () => {
   it("uses a single-screen terminal layout on mobile", () => {
@@ -172,12 +204,13 @@ describe("responsive mobile CSS", () => {
 
   it("lets only the mobile workspace fill the remaining viewport height", () => {
     const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");
-    const mobileStart = css.indexOf("@media (max-width: 760px)");
-    const workspaceFlexRule = /\.tmux-workspace\s*\{[^}]*flex:\s*1 1 auto;/g;
+    const mobileBlock = extractBalancedCssBlock(css, "@media (max-width: 760px)");
+    const workspaceFlexRule = /\.tmux-workspace\s*\{[^}]*flex:\s*1 1 auto;/;
+    const outsideMobileBlock = css.slice(0, mobileBlock.start) + css.slice(mobileBlock.end);
 
-    expect(css.slice(mobileStart)).toMatch(workspaceFlexRule);
-    expect(css.slice(0, mobileStart)).not.toMatch(workspaceFlexRule);
-    expect(css.match(workspaceFlexRule)).toHaveLength(1);
+    expect(mobileBlock.text).toMatch(workspaceFlexRule);
+    expect(outsideMobileBlock).not.toMatch(workspaceFlexRule);
+    expect(css.match(new RegExp(workspaceFlexRule.source, "g"))).toHaveLength(1);
   });
 
   it("labels and groups launcher modes by interface permissions and options", () => {
@@ -193,6 +226,29 @@ describe("responsive mobile CSS", () => {
 });
 
 describe("current user guidance", () => {
+  it("selects GUI before capturing mobile chat marketing media", () => {
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+    const navigation = marketingCapture.indexOf("await page.goto(demoUrl");
+    const guiSelection = marketingCapture.indexOf('await chooseView(page, "GUI");', navigation);
+    const mobileChatCapture = marketingCapture.indexOf('await capture(page, path.join(assetsDir, "mobile-chat.png"));');
+
+    expect(navigation).toBeGreaterThanOrEqual(0);
+    expect(guiSelection).toBeGreaterThan(navigation);
+    expect(mobileChatCapture).toBeGreaterThan(guiSelection);
+  });
+
+  it("does not ship or publish generated marketing media", () => {
+    const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
+    const marketing = readFileSync(join(process.cwd(), "docs/marketing.md"), "utf8");
+    const generatedMediaReference = /docs\/assets\/[^\s)`"]+\.(?:png|gif|mp4)\b/i;
+    const shippedMedia = trackedExistingFiles("docs/assets")
+      .filter((file) => /\.(?:png|gif|mp4)$/i.test(file));
+
+    expect(readme).not.toMatch(generatedMediaReference);
+    expect(marketing).not.toMatch(generatedMediaReference);
+    expect(shippedMedia).toEqual([]);
+  });
+
   it("describes only the current Agent Tmux views while retaining OpenCode's Linear TTY mode", () => {
     const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
     const marketing = readFileSync(join(process.cwd(), "docs/marketing.md"), "utf8");
