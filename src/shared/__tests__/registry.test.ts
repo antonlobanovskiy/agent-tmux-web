@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 type RegistryFile = { path: string; target?: string };
 type RegistryItem = {
   dependencies?: string[];
+  devDependencies?: string[];
   files: RegistryFile[];
   name: string;
   registryDependencies?: string[];
@@ -21,7 +22,8 @@ const registry = JSON.parse(readFileSync(path.join(root, "registry.json"), "utf8
 const packageJson = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")) as {
   dependencies: Record<string, string>;
 };
-const sourceExtensions = new Set([".js", ".jsx", ".ts", ".tsx"]);
+const rootDirectory = path.resolve(root);
+const sourceExtensions = new Set([".css", ".js", ".jsx", ".ts", ".tsx"]);
 
 function projectPath(absolutePath: string): string {
   return path.relative(root, absolutePath).split(path.sep).join("/");
@@ -34,26 +36,93 @@ function walkFiles(directory: string): string[] {
   });
 }
 
+function typescriptImports(sourceText: string, filePath = "fixture.ts"): string[] {
+  const source = ts.createSourceFile(
+    filePath,
+    sourceText,
+    ts.ScriptTarget.Latest,
+    true
+  );
+  const imports: string[] = [];
+  const visit = (node: ts.Node) => {
+    if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node))
+      && node.moduleSpecifier
+      && ts.isStringLiteralLike(node.moduleSpecifier)) {
+      imports.push(node.moduleSpecifier.text);
+    }
+    if (ts.isImportEqualsDeclaration(node)
+      && ts.isExternalModuleReference(node.moduleReference)
+      && node.moduleReference.expression
+      && ts.isStringLiteralLike(node.moduleReference.expression)) {
+      imports.push(node.moduleReference.expression.text);
+    }
+    if (ts.isImportTypeNode(node)
+      && ts.isLiteralTypeNode(node.argument)
+      && ts.isStringLiteralLike(node.argument.literal)) {
+      imports.push(node.argument.literal.text);
+    }
+    if (ts.isCallExpression(node)
+      && (node.expression.kind === ts.SyntaxKind.ImportKeyword
+        || (ts.isIdentifier(node.expression) && node.expression.text === "require"))
+      && node.arguments[0]
+      && ts.isStringLiteralLike(node.arguments[0])) {
+      imports.push(node.arguments[0].text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return imports;
+}
+
+function cssImports(source: string): string[] {
+  return [...source.matchAll(/@import\s+(?:["']([^"']+)["']|url\(\s*(?:["']([^"']+)["']|([^)"'\s]+))\s*\))/g)]
+    .map((match) => match[1] ?? match[2] ?? match[3])
+    .filter((specifier) => specifier.startsWith("."));
+}
+
 function staticImports(filePath: string): string[] {
+  const source = readFileSync(path.join(root, filePath), "utf8");
+  return path.extname(filePath) === ".css" ? cssImports(source) : typescriptImports(source, filePath);
+}
+
+function staticProjectReads(filePath: string): string[] {
   const source = ts.createSourceFile(
     filePath,
     readFileSync(path.join(root, filePath), "utf8"),
     ts.ScriptTarget.Latest,
     true
   );
-  const imports: string[] = [];
-  source.forEachChild((node) => {
-    if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node))
-      && node.moduleSpecifier
-      && ts.isStringLiteralLike(node.moduleSpecifier)) {
-      imports.push(node.moduleSpecifier.text);
+  const reads: string[] = [];
+  const visit = (node: ts.Node) => {
+    if (ts.isCallExpression(node)
+      && ts.isIdentifier(node.expression)
+      && ["existsSync", "readFileSync"].includes(node.expression.text)) {
+      const argument = node.arguments[0];
+      if (argument && ts.isCallExpression(argument)
+        && ts.isIdentifier(argument.expression)
+        && ["join", "resolve"].includes(argument.expression.text)
+        && argument.arguments[0]
+        && ts.isCallExpression(argument.arguments[0])
+        && ts.isPropertyAccessExpression(argument.arguments[0].expression)
+        && argument.arguments[0].expression.expression.getText(source) === "process"
+        && argument.arguments[0].expression.name.text === "cwd") {
+        const segments = argument.arguments.slice(1);
+        if (segments.every(ts.isStringLiteralLike)) {
+          reads.push(path.posix.join(...segments.map((segment) => segment.text)));
+        }
+      }
     }
-  });
-  return imports;
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return reads;
 }
 
 function resolveRelativeImport(importer: string, specifier: string): string | null {
-  const unresolved = path.resolve(root, path.dirname(importer), specifier);
+  const unresolved = path.resolve(rootDirectory, path.dirname(importer), specifier);
+  if (unresolved === rootDirectory || !unresolved.startsWith(`${rootDirectory}${path.sep}`)) {
+    throw new Error("Relative import resolves outside registry root");
+  }
   const extension = path.extname(unresolved);
   const candidates = extension === ".js" || extension === ".jsx"
     ? [unresolved.slice(0, -extension.length) + ".ts", unresolved.slice(0, -extension.length) + ".tsx", unresolved]
@@ -73,17 +142,156 @@ function packageName(specifier: string): string {
 }
 
 describe("source registry", () => {
-  it("contains existing, unique file paths and targets", () => {
+  it("contains normalized, unique, contained paths and exact targets", () => {
+    expect(new Set(registry.items.map((item) => item.name)).size).toBe(registry.items.length);
     for (const item of registry.items) {
       const paths = item.files.map((file) => file.path);
       const targets = item.files.map((file) => file.target).filter((target): target is string => Boolean(target));
+      expect(paths.filter((filePath) => path.isAbsolute(filePath)
+        || path.posix.isAbsolute(filePath)
+        || /^[A-Za-z]:[\\/]/.test(filePath)
+        || filePath.includes("\\")
+        || path.posix.normalize(filePath) !== filePath
+        || filePath.startsWith("../")), item.name).toEqual([]);
+      expect(paths.filter((filePath) => {
+        const resolved = path.resolve(root, filePath);
+        return resolved === rootDirectory || !resolved.startsWith(`${rootDirectory}${path.sep}`);
+      }), item.name).toEqual([]);
       expect(paths.filter((filePath) => !existsSync(path.join(root, filePath))), item.name).toEqual([]);
       expect(new Set(paths).size, `${item.name} paths`).toBe(paths.length);
       expect(new Set(targets).size, `${item.name} targets`).toBe(targets.length);
+      expect(item.files.filter((file) => file.target !== `~/${file.path}`).map((file) => file.path), item.name)
+        .toEqual([]);
     }
   });
 
-  it("includes the web runtime closure, related tests, and external dependencies", () => {
+  it("walks nested literal TypeScript module references", () => {
+    const fixture = `
+      import "./side-effect.js";
+      import type { TypeOnly } from "./type-only.js";
+      export { value } from "./exported.js";
+      import equal = require("./import-equals.js");
+      type Imported = import("./import-type.js").Imported;
+      function nested() {
+        void import("./dynamic.js");
+        return require("./required.js");
+      }
+    `;
+    expect(typescriptImports(fixture).sort()).toEqual([
+      "./dynamic.js",
+      "./exported.js",
+      "./import-equals.js",
+      "./import-type.js",
+      "./required.js",
+      "./side-effect.js",
+      "./type-only.js"
+    ]);
+  });
+
+  it("walks literal local CSS imports", () => {
+    expect(cssImports(`
+      @import "./base.css";
+      @import url('./theme.css');
+      @import url(./print.css);
+      @import url("https://example.com/external.css");
+    `)).toEqual(["./base.css", "./theme.css", "./print.css"]);
+  });
+
+  it("rejects relative imports outside the registry root", () => {
+    expect(() => resolveRelativeImport("src/client/App.tsx", "../../../../outside.js"))
+      .toThrow("outside registry root");
+  });
+
+  it("publishes a flattened, deduplicated full project", () => {
+    const fullProject = registry.items.find((item) => item.name === "full-project");
+    const sourceItems = registry.items.filter((item) => ["web-app", "vps-deploy", "android-wrapper"].includes(item.name));
+    expect(fullProject).toBeDefined();
+    expect(fullProject?.registryDependencies ?? []).toEqual([]);
+
+    const ownPaths = fullProject?.files.map((file) => file.path) ?? [];
+    const expectedPaths = new Set([
+      "README.md",
+      "LICENSE",
+      "CHANGELOG.md",
+      "docs/registry.md",
+      "docs/marketing.md",
+      "scripts/capture-marketing.mjs",
+      ...sourceItems.flatMap((item) => item.files.map((file) => file.path))
+    ]);
+    expect([...new Set(ownPaths)].sort()).toEqual([...expectedPaths].sort());
+    expect(ownPaths).toHaveLength(expectedPaths.size);
+
+    for (const key of ["dependencies", "devDependencies"] as const) {
+      const expected = new Set(sourceItems.flatMap((item) => item[key] ?? []));
+      expect([...(fullProject?.[key] ?? [])].sort(), key).toEqual([...expected].sort());
+    }
+  });
+
+  it("has no target collisions across registry dependency composition", () => {
+    const itemByName = new Map(registry.items.map((item) => [item.name, item]));
+    for (const item of registry.items) {
+      const composed: RegistryItem[] = [];
+      const collect = (current: RegistryItem) => {
+        composed.push(current);
+        for (const dependency of current.registryDependencies ?? []) {
+          const name = dependency.split("#")[0].split("/").at(-1) ?? "";
+          const localDependency = itemByName.get(name);
+          if (localDependency && !composed.includes(localDependency)) {
+            collect(localDependency);
+          }
+        }
+      };
+      collect(item);
+      const targets = composed.flatMap((entry) => entry.files.map((file) => file.target));
+      expect(targets.filter((target, index) => targets.indexOf(target) !== index), item.name).toEqual([]);
+    }
+  });
+
+  it("publishes only payload-contained web tests", () => {
+    const item = registry.items.find((entry) => entry.name === "web-app");
+    const listed = new Set(item?.files.map((file) => file.path));
+    const tests = item?.files.map((file) => file.path).filter((filePath) => filePath.match(/\.test\.[^.]+$/)) ?? [];
+    const unavailableImports = tests.flatMap((testPath) => staticImports(testPath)
+      .filter((specifier) => specifier.startsWith("."))
+      .map((specifier) => resolveRelativeImport(testPath, specifier))
+      .filter((resolved): resolved is string => resolved !== null && !listed.has(resolved))
+      .map((resolved) => `${testPath} -> ${resolved}`));
+    const unavailableReads = tests.flatMap((testPath) => staticProjectReads(testPath)
+      .filter((readPath) => existsSync(path.join(root, readPath)) && !listed.has(readPath))
+      .map((readPath) => `${testPath} -> ${readPath}`));
+    expect({ unavailableImports, unavailableReads }).toEqual({
+      unavailableImports: [],
+      unavailableReads: []
+    });
+    expect(tests.filter((testPath) => [
+      "src/shared/__tests__/registry.test.ts",
+      "src/client/__tests__/styles.test.ts"
+    ].includes(testPath))).toEqual([]);
+    expect(tests).toEqual(expect.arrayContaining([
+      "src/client/__tests__/clipboard.test.ts",
+      "src/client/__tests__/rawTerminalLinks.test.ts",
+      "src/client/__tests__/rawTerminalSelection.test.ts",
+      "src/client/__tests__/tmuxCopy.test.ts",
+      "src/client/__tests__/tmuxOperationGuards.test.ts"
+    ]));
+  });
+
+  it("publishes no private-network address literals", () => {
+    const publishedFiles = new Set(registry.items.flatMap((item) => item.files.map((file) => file.path)));
+    const violations = [...publishedFiles].filter((filePath) => {
+      const content = readFileSync(path.join(root, filePath), "utf8");
+      return [...content.matchAll(/\b(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\b/g)].some((match) => {
+        const [first, second] = match.slice(1, 3).map(Number);
+        return first === 10
+          || (first === 172 && second >= 16 && second <= 31)
+          || (first === 192 && second === 168)
+          || (first === 100 && second >= 64 && second <= 127);
+      });
+    });
+    expect(violations).toEqual([]);
+  });
+
+  it("includes the web runtime closure and external dependencies", () => {
     const item = registry.items.find((entry) => entry.name === "web-app");
     expect(item).toBeDefined();
     const listed = new Set(item?.files.map((file) => file.path));
@@ -119,21 +327,11 @@ describe("source registry", () => {
       }
     }
 
-    const allTests = walkFiles(path.join(root, "src"))
-      .map(projectPath)
-      .filter((filePath) => filePath.match(/\/__tests__\/[^/]+\.test\.[^.]+$/));
-    const relatedTests = [...required].flatMap((filePath) => {
-      const extension = path.extname(filePath);
-      const expectedPrefix = `${path.dirname(filePath)}/__tests__/${path.basename(filePath, extension)}.test.`;
-      return allTests.filter((testPath) => testPath.startsWith(expectedPrefix));
-    });
-    relatedTests.push(projectPath(fileURLToPath(import.meta.url)));
-
     const missingPackageDeclarations = [...external].filter((dependency) => !packageJson.dependencies[dependency]);
     const missingRegistryDependencies = [...external].filter((dependency) =>
       !item?.dependencies?.includes(`${dependency}@${packageJson.dependencies[dependency]}`));
     expect({
-      missingFiles: [...new Set([...required, ...relatedTests])]
+      missingFiles: [...required]
         .filter((filePath) => !listed.has(filePath))
         .sort(),
       missingPackageDeclarations,
