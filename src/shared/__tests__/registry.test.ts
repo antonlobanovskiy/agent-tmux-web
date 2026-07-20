@@ -202,11 +202,25 @@ describe("source registry", () => {
       .toThrow("outside registry root");
   });
 
+  it("documents immutable reproducible refs and mutable preview branches", () => {
+    const docs = readFileSync(path.join(root, "docs", "registry.md"), "utf8");
+    expect(docs).toMatch(
+      /Only immutable tags and full commit SHAs are reproducible\.\s+Branch refs are\s+mutable and intended for previews\./
+    );
+  });
+
   it("publishes a flattened, deduplicated full project", () => {
     const fullProject = registry.items.find((item) => item.name === "full-project");
-    const sourceItems = registry.items.filter((item) => ["web-app", "vps-deploy", "android-wrapper"].includes(item.name));
+    const webApp = registry.items.find((item) => item.name === "web-app");
+    const vpsDeploy = registry.items.find((item) => item.name === "vps-deploy");
+    const androidWrapper = registry.items.find((item) => item.name === "android-wrapper");
     expect(fullProject).toBeDefined();
+    expect(webApp).toBeDefined();
+    expect(vpsDeploy).toBeDefined();
+    expect(androidWrapper).toBeDefined();
     expect(fullProject?.registryDependencies ?? []).toEqual([]);
+    const sourceItems = [webApp, vpsDeploy, androidWrapper]
+      .filter((item): item is RegistryItem => Boolean(item));
 
     const ownPaths = fullProject?.files.map((file) => file.path) ?? [];
     const expectedPaths = new Set([
