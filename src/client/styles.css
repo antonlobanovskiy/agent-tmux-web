@@ -1684,6 +1684,10 @@ textarea:focus {
     border-right: 0;
   }
 
+  .tmux-workspace {
+    flex: 1 1 auto;
+  }
+
   .tmux-app-toolbar {
     display: contents;
   }

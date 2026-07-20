@@ -31,7 +31,7 @@ export const DEFAULT_TMUX_TOOLS: TmuxToolDto[] = [
         args: "",
         defaultEnabled: true,
         exclusiveGroup: INTERFACE_MODE_GROUP,
-        description: "Keep OpenCode's full terminal UI with a separate details panel in TTY view."
+        description: "Keep OpenCode's full terminal UI available for direct interaction in Raw view."
       },
       {
         id: "mini-ui",

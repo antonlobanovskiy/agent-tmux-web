@@ -19,8 +19,8 @@ tabs without killing the work.
 [MP4 showcase](./docs/assets/agent-tmux-web-showcase.mp4)
 
 The generated showcase covers the mobile GUI, Focus overview, stable scrollback,
-TTY capture, raw tmux attach, launcher menu, light/dark mode, Android wrapper,
-and desktop layout.
+Raw tmux control, launcher menu, light/dark mode, Android wrapper, and desktop
+layout.
 
 ## Screenshots
 
@@ -34,10 +34,6 @@ and desktop layout.
   <img src="./docs/assets/mobile-raw-terminal.png" alt="Mobile raw tmux terminal" width="240">
 </p>
 
-<p>
-  <img src="./docs/assets/modes-overview.png" alt="Focus, GUI, TTY, and raw tmux modes" width="780">
-</p>
-
 ## What You Get
 
 - Long-running tmux sessions that survive browser disconnects and phone sleep.
@@ -49,12 +45,11 @@ and desktop layout.
   control for saving named custom CLI commands.
 - Harness-specific Default, Plan, Auto, Auto Edit, Autopilot, and Yolo controls
   with incompatible permission modes kept mutually exclusive.
+- Raw mode by default for direct interactive tmux control, including shell and
+  TUI work.
 - GUI mode for readable chat-style agent output.
-- TTY mode for plain tmux pane capture, including a separately rendered
-  OpenCode context/details panel on wide sessions.
-- Raw mode for direct interactive tmux control, including shell and TUI work.
-- Focus mode for quick phone check-ins without defaulting away from the detailed
-  view.
+- Focus mode for quick phone check-ins with detailed status and recent-attention
+  summaries.
 - Green/yellow/red status dots for running, waiting/idle, and error sessions.
 - Stable scrollback while new tmux output continues arriving.
 - File uploads and pasted clipboard images from Android, iOS, or desktop
@@ -160,10 +155,9 @@ mode, and notifications.
 2. Choose a launcher, pin favorites to the top, or use `+` to save a named
    custom command on that device.
 3. Press `Run`, or type directly into the tmux input.
-4. Open the clearly labeled `View` dropdown and use `GUI` for readable agent
-   output, `TTY` for plain pane text, or `Raw` when you need exact terminal
-   input. Wide OpenCode TTY sessions keep their context sidebar separate; on a
-   phone, use the `Terminal` and `Details` tabs when that sidebar is present.
+4. Raw opens by default for exact terminal input. Open the clearly labeled
+   `View` dropdown and use `GUI` for readable agent output or `Focus` for status
+   and recent-attention summaries.
 5. Use the bell button when you want task-done alerts.
 6. Use the paperclip button to upload files, or paste clipboard images directly
    into the chat input. Uploads remain temporary on the server, while prompts

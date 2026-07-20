@@ -170,6 +170,16 @@ describe("responsive mobile CSS", () => {
     expect(intermediateBlock).not.toContain(".tmux-workspace");
   });
 
+  it("lets only the mobile workspace fill the remaining viewport height", () => {
+    const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");
+    const mobileStart = css.indexOf("@media (max-width: 760px)");
+    const workspaceFlexRule = /\.tmux-workspace\s*\{[^}]*flex:\s*1 1 auto;/g;
+
+    expect(css.slice(mobileStart)).toMatch(workspaceFlexRule);
+    expect(css.slice(0, mobileStart)).not.toMatch(workspaceFlexRule);
+    expect(css.match(workspaceFlexRule)).toHaveLength(1);
+  });
+
   it("labels and groups launcher modes by interface permissions and options", () => {
     const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
 
@@ -179,6 +189,32 @@ describe("responsive mobile CSS", () => {
     expect(app).toContain('role="group"');
     expect(app).toContain("aria-labelledby");
     expect(app).not.toContain("Output Mode");
+  });
+});
+
+describe("current user guidance", () => {
+  it("describes only the current Agent Tmux views while retaining OpenCode's Linear TTY mode", () => {
+    const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
+    const marketing = readFileSync(join(process.cwd(), "docs/marketing.md"), "utf8");
+    const aiSetup = readFileSync(join(process.cwd(), "AI_SETUP.md"), "utf8");
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+    const tmuxTools = readFileSync(join(process.cwd(), "src/shared/tmuxTools.ts"), "utf8");
+    const fullUiMode = tmuxTools.slice(
+      tmuxTools.indexOf('id: "full-tui"'),
+      tmuxTools.indexOf('id: "mini-ui"')
+    );
+
+    expect(readme.replaceAll("Linear TTY", "")).not.toMatch(/\bTTY\b/);
+    expect(readme).not.toContain("`Terminal` and `Details` tabs");
+    expect(readme).not.toContain("modes-overview.png");
+    expect(marketing).not.toMatch(/\bTTY\b|GUI\/TTY/);
+    expect(marketing).not.toContain("mobile-tty.png");
+    expect(marketing).not.toContain("modes-overview.png");
+    expect(aiSetup).not.toMatch(/\bTTY\b/);
+    expect(marketingCapture).not.toMatch(/\bTTY\b|mobile-tty\.png/);
+    expect(fullUiMode).not.toMatch(/\bTTY\b|details panel/i);
+    expect(readme).toContain("Linear TTY");
+    expect(tmuxTools).toContain('label: "Linear TTY"');
   });
 });
 

@@ -101,7 +101,7 @@ deployment is separate. Keep user-specific runtime config out of git.
    - Tmux sessions list without crashing.
    - Creating a test session works.
    - Launching a configured CLI tool inserts/runs the expected command.
-   - GUI, TTY, and Raw modes can be switched.
+   - Raw, GUI, and Focus views can be switched.
 
 7. Expose privately.
    - Prefer Tailscale, a VPN, an SSH tunnel, LAN-only access, or an
