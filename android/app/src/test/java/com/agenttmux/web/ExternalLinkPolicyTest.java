@@ -72,13 +72,26 @@ public final class ExternalLinkPolicyTest {
     }
 
     @Test
-    public void preservesMixedCaseHttpLinksWithQueryAndFragment() {
+    public void lowercasesOnlyMixedCaseHttpSchemes() {
         assertEquals(
-            "HtTpS://Example.COM/docs?tab=raw#output",
+            "https://Example.COM/Docs?Tab=Raw#Output",
             ExternalLinkPolicy.normalizeHttpWebLink(
-                "HtTpS://Example.COM/docs?tab=raw#output"
+                "HtTpS://Example.COM/Docs?Tab=Raw#Output"
             )
         );
+    }
+
+    @Test
+    public void acceptsPunycodeHostsFromJavascriptUrlSerialization() {
+        assertEquals(
+            "https://xn--mnich-kva.example/",
+            ExternalLinkPolicy.normalizeHttpWebLink("https://xn--mnich-kva.example/")
+        );
+    }
+
+    @Test
+    public void rejectsDirectUnicodeIdnHosts() {
+        assertNull(ExternalLinkPolicy.normalizeHttpWebLink("https://m\u00fcnich.example/"));
     }
 
     @Test

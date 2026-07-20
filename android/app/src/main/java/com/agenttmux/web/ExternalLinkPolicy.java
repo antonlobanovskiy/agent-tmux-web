@@ -2,6 +2,7 @@ package com.agenttmux.web;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Locale;
 
 final class ExternalLinkPolicy {
     private ExternalLinkPolicy() {
@@ -25,12 +26,15 @@ final class ExternalLinkPolicy {
             return null;
         }
 
+        // JavaScript URL serialization supplies IDNs as punycode, so raw Unicode hosts stay invalid.
         String host = requested.getHost();
         if (host == null || host.isEmpty() || !hasValidPort(requested, host)) {
             return null;
         }
 
-        return requested.toASCIIString();
+        String asciiUrl = requested.toASCIIString();
+        return requested.getScheme().toLowerCase(Locale.ROOT)
+            + asciiUrl.substring(requested.getScheme().length());
     }
 
     static boolean shouldOpenInExternalBrowser(String requestedUrl, String configuredServerUrl) {
