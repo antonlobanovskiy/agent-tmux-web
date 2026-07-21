@@ -5,89 +5,74 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { chromium } from "playwright";
 
+const SHOWCASE_WIDTH = 1920;
+const SHOWCASE_HEIGHT = 1080;
+const SHOWCASE_FPS = 30;
+const FRAMES_PER_SCENE = 64;
+const IMAGE_SEED = 241024;
+const BACKDROP_PROMPT = [
+  "restrained abstract dark technical infrastructure background",
+  "charcoal graphite and muted teal",
+  "subtle layered network topology and soft volumetric depth",
+  "low contrast premium editorial lighting",
+  "large quiet negative space",
+  "no text no letters no logo no terminal no code no screen no device no person"
+].join(", ");
+const IMAGE_ENDPOINT = process.env.MARKETING_IMAGE_ENDPOINT
+  ?? `https://image.pollinations.ai/prompt/${encodeURIComponent(BACKDROP_PROMPT)}?width=${SHOWCASE_WIDTH}&height=${SHOWCASE_HEIGHT}&seed=${IMAGE_SEED}&model=flux&nologo=true`;
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const assetsDir = path.join(root, "docs", "assets");
 const framesDir = path.join(assetsDir, "frames");
 const appPort = Number(process.env.MARKETING_APP_PORT ?? 6180);
-const appUrl = process.env.MARKETING_URL ?? `http://127.0.0.1:${appPort}`;
+const appUrl = `http://127.0.0.1:${appPort}`;
 const demoUrl = `${appUrl}/?demo=1`;
 const showcaseScenes = [
   {
-    eyebrow: "Private server control",
-    title: "Terminal agents keep running when your phone disconnects",
-    body: "Run OpenCode, Codex, Claude Code, Gemini CLI, GitHub Copilot, Cursor Agent, Qwen Code, Cline, Aider, goose, Amp, and custom CLIs inside tmux on your own server. The browser or Android app is only the control surface.",
-    bullets: ["tmux owns the process", "phone and laptop can reconnect", "private network friendly"],
-    media: "../mobile-chat.png",
+    eyebrow: "Agent Tmux Web",
+    title: "Keep terminal agents running.",
+    body: "Run terminal agents inside tmux on your server, then reconnect from desktop or Android.",
+    media: "../desktop-raw.png",
+    layout: "desktop"
+  },
+  {
+    eyebrow: "Desktop Raw",
+    title: "Exact tmux control on a wider canvas.",
+    body: "Work directly in the terminal without giving up session persistence.",
+    media: "../desktop-raw.png",
+    layout: "desktop"
+  },
+  {
+    eyebrow: "Mobile Raw",
+    title: "Direct terminal control from your phone.",
+    body: "Use the authentic terminal surface and soft keys when exact CLI behavior matters.",
+    media: "../mobile-raw.png",
     layout: "phone"
   },
   {
-    eyebrow: "GUI mode",
-    title: "Read agent output like a chat thread",
-    body: "Use the normalized GUI when the CLI is planning, summarizing, or showing command output you want to scan quickly.",
-    bullets: ["readable prompts", "code and terminal blocks", "clickable links"],
-    media: "../mobile-chat.png",
+    eyebrow: "Mobile GUI",
+    title: "Scan agent output as a readable thread.",
+    body: "Switch to the normalized view for prompts, command output, and summaries.",
+    media: "../mobile-gui.png",
     layout: "phone"
   },
   {
-    eyebrow: "Session overview",
-    title: "See which tmux tab needs attention",
-    body: "Green, yellow, and red dots show running, waiting, and error states. The overview keeps attention targets unique so the same session is not repeated.",
-    bullets: ["per-session status dots", "waiting tabs surfaced", "no duplicate session pills"],
+    eyebrow: "Mobile Focus",
+    title: "See which session needs attention.",
+    body: "Triage running, waiting, and error states without leaving the current workspace.",
     media: "../mobile-focus.png",
     layout: "phone"
   },
   {
-    eyebrow: "Stable scrolling",
-    title: "Scroll back without losing your place",
-    body: "Auto-capture keeps updating tmux output, but it will not yank you to the bottom while you are reading earlier history.",
-    bullets: ["position stays put", "jump-to-latest button", "deeper 1000-line capture"],
-    media: "../mobile-scroll.png",
-    layout: "phone"
-  },
-  {
-    eyebrow: "Raw mode",
-    title: "Drop into exact tmux control when you need it",
-    body: "Attach to the raw terminal from mobile or desktop and type directly into tmux when you need exact shell or TUI behavior.",
-    bullets: ["native TUI behavior", "soft terminal keys on mobile", "detach without killing work"],
-    media: "../mobile-raw-terminal.png",
-    layout: "phone"
-  },
-  {
-    eyebrow: "Session control",
-    title: "See live tmux sessions and launch the right tool",
-    body: "Switch sessions, browse launchers alphabetically, pin favorites, or save a named custom command from the same panel.",
-    bullets: ["alphabetical launchers", "pinned favorites", "custom commands"],
-    media: "../mobile-launchers.png",
-    layout: "phone"
-  },
-  {
-    eyebrow: "Light and dark",
-    title: "Use the theme that fits where you are",
-    body: "Toggle between dark mode and a bright light mode when you are outside or working from a laptop in direct light.",
-    bullets: ["one-tap theme switch", "mobile and desktop", "preference saved locally"],
-    media: "../mobile-light.png",
-    layout: "phone"
-  },
-  {
-    eyebrow: "Android app",
-    title: "Sideload the wrapper for native phone workflows",
-    body: "The public APK is a generic setup wrapper. Enter your private server URL, upload files with Android's picker, and let the native watcher notify when tmux is waiting.",
-    bullets: ["generic public APK", "no embedded public secrets", "native completion alerts"],
-    media: "../mobile-chat.png",
-    layout: "phone"
-  },
-  {
-    eyebrow: "Desktop too",
-    title: "Same server, wider control surface on PC",
-    body: "The desktop layout uses horizontal space for the active tmux session while keeping sessions, launchers, the compact view menu, and notifications nearby.",
-    bullets: ["phone-first", "desktop-aware", "Raw, GUI, and Focus"],
-    media: "../desktop-overview.png",
-    layout: "desktop"
+    eyebrow: "Public Android Release",
+    title: "Bring your own private connection.",
+    body: "The public Android wrapper ships without an embedded server URL or token.",
+    media: "",
+    layout: "close"
   }
 ];
 
-await mkdir(assetsDir, { recursive: true });
-await rm(framesDir, { recursive: true, force: true });
+await rm(assetsDir, { recursive: true, force: true });
 await mkdir(framesDir, { recursive: true });
 
 const server = spawn("node", ["dist/server/server/index.js"], {
@@ -106,7 +91,7 @@ server.stdout.on("data", (chunk) => process.stdout.write(chunk));
 server.stderr.on("data", (chunk) => process.stderr.write(chunk));
 
 let browser;
-let page;
+let completed = false;
 
 try {
   console.log(`Waiting for app health at ${appUrl}`);
@@ -118,177 +103,210 @@ try {
     executablePath: process.env.CHROMIUM_BIN || undefined,
     args: ["--no-sandbox"]
   });
-  const context = await browser.newContext({
+
+  const captureContext = await browser.newContext({
     deviceScaleFactor: 2,
     isMobile: true,
     viewport: { width: 390, height: 844 }
   });
-  page = await context.newPage();
+  const page = await captureContext.newPage();
+
   await page.goto(demoUrl, { waitUntil: "domcontentloaded" });
   await delay(1200);
-  await chooseView(page, "GUI");
-  await capture(page, path.join(assetsDir, "mobile-chat.png"));
-
-  await chooseView(page, "Focus");
-  await delay(300);
-  await evaluate(page, "document.querySelector('.tmux-focus')?.scrollTo({ top: 0 })");
-  await delay(100);
-  await capture(page, path.join(assetsDir, "mobile-focus.png"));
-  await chooseView(page, "GUI");
-  await delay(250);
-
-  await evaluate(page, `
-    (() => {
-      const chat = document.querySelector('.tmux-chat');
-      if (!chat) {
-        return;
-      }
-      chat.scrollTop = 0;
-      chat.dispatchEvent(new Event('scroll', { bubbles: true }));
-    })()
-  `);
-  await delay(300);
-  await capture(page, path.join(assetsDir, "mobile-scroll.png"));
-  await evaluate(page, "document.querySelector('.tmux-jump-bottom')?.click()");
-  await delay(350);
-
-  await chooseTheme(page, "Light");
-  await delay(250);
-  await capture(page, path.join(assetsDir, "mobile-light.png"));
-  await chooseTheme(page, "Dark");
-  await delay(250);
-
-  await chooseView(page, "GUI");
-  await delay(250);
-  await evaluate(page, "document.querySelector('.tmux-session-menu-button')?.click()");
-  await delay(250);
-  await capture(page, path.join(assetsDir, "mobile-launchers.png"));
-
-  await evaluate(page, `
-    (() => {
-      const select = document.querySelector('.tmux-tool-actions select');
-      if (select) {
-        select.value = 'claude';
-        select.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-    })()
-  `);
-  await delay(250);
-  await capture(page, path.join(assetsDir, "mobile-claude.png"));
-
-  await evaluate(page, "document.querySelector('.tmux-session-menu-button')?.click()");
-  await delay(250);
   await chooseView(page, "Raw");
-  await delay(350);
-  await capture(page, path.join(assetsDir, "mobile-raw-terminal.png"));
-
+  await capture(page, path.join(assetsDir, "mobile-raw.png"));
+  await chooseView(page, "GUI");
+  await capture(page, path.join(assetsDir, "mobile-gui.png"));
+  await chooseView(page, "Focus");
+  await capture(page, path.join(assetsDir, "mobile-focus.png"));
+  await chooseView(page, "Raw");
   await setViewport(page, 1440, 900);
   await delay(500);
-  await capture(page, path.join(assetsDir, "desktop-overview.png"));
+  await capture(page, path.join(assetsDir, "desktop-raw.png"));
+  await captureContext.close();
 
-  await renderModesOverview(page);
-  await renderShowcaseAssets(page);
+  await generateBackdrop();
 
-  await rm(framesDir, { recursive: true, force: true });
+  const compositionContext = await browser.newContext({
+    deviceScaleFactor: 1,
+    viewport: { width: SHOWCASE_WIDTH, height: SHOWCASE_HEIGHT }
+  });
+  const compositionPage = await compositionContext.newPage();
+  await renderHero(compositionPage);
+  await renderModesOverview(compositionPage);
+  await renderShowcaseAssets(compositionPage);
+  await compositionContext.close();
+
+  completed = true;
   console.log(`Marketing assets written to ${path.relative(root, assetsDir)}`);
 } finally {
   await browser?.close().catch(() => {});
   if (server.exitCode === null) {
     server.kill("SIGTERM");
   }
+  if (completed) {
+    await rm(framesDir, { recursive: true, force: true });
+  } else {
+    await rm(assetsDir, { recursive: true, force: true });
+  }
+}
+
+async function generateBackdrop() {
+  const source = path.join(framesDir, "generated-backdrop-source");
+  const output = path.join(framesDir, "generated-backdrop.png");
+  const response = await fetch(IMAGE_ENDPOINT, { signal: AbortSignal.timeout(120_000) });
+  if (!response.ok || !(response.headers.get("content-type") ?? "").startsWith("image/")) {
+    throw new Error(`Image generation failed with HTTP ${response.status}`);
+  }
+  await writeFile(source, Buffer.from(await response.arrayBuffer()));
+  await run("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-i", source, "-vf", `scale=${SHOWCASE_WIDTH}:${SHOWCASE_HEIGHT}:force_original_aspect_ratio=increase,crop=${SHOWCASE_WIDTH}:${SHOWCASE_HEIGHT}`, output]);
+  return output;
 }
 
 async function capture(page, file) {
   if (!file.includes(`${path.sep}frames${path.sep}`)) {
     console.log(`Capturing ${path.relative(root, file)}`);
   }
-  await page.screenshot({ path: file });
+  await page.screenshot({ path: file, animations: "disabled" });
+}
+
+async function renderHero(page) {
+  const htmlFile = path.join(framesDir, "hero.html");
+  await writeFile(htmlFile, buildHeroHtml());
+  await page.goto(pathToFileURL(htmlFile).href, { waitUntil: "load" });
+  await capture(page, path.join(assetsDir, "agent-tmux-web-hero.png"));
 }
 
 async function renderModesOverview(page) {
-  const modesHtmlFile = path.join(framesDir, "modes-overview.html");
-  await writeFile(modesHtmlFile, buildModesOverviewHtml());
-  await setViewport(page, 1280, 720);
-  await page.goto(pathToFileURL(modesHtmlFile).href, { waitUntil: "domcontentloaded" });
-  await delay(500);
+  const htmlFile = path.join(framesDir, "modes-overview.html");
+  await writeFile(htmlFile, buildModesOverviewHtml());
+  await page.goto(pathToFileURL(htmlFile).href, { waitUntil: "load" });
   await capture(page, path.join(assetsDir, "modes-overview.png"));
 }
 
 async function renderShowcaseAssets(page) {
   const showcaseFramesDir = path.join(framesDir, "showcase");
-  await rm(showcaseFramesDir, { recursive: true, force: true });
   await mkdir(showcaseFramesDir, { recursive: true });
+  const htmlFile = path.join(framesDir, "showcase.html");
+  await writeFile(htmlFile, buildShowcaseHtml());
+  await page.goto(pathToFileURL(htmlFile).href, { waitUntil: "load" });
+  await page.waitForFunction(() => window.assetsReady === true);
 
-  const showcaseHtmlFile = path.join(framesDir, "showcase.html");
-  await writeFile(showcaseHtmlFile, buildShowcaseHtml());
-  await setViewport(page, 1280, 720);
-  await page.goto(pathToFileURL(showcaseHtmlFile).href, { waitUntil: "domcontentloaded" });
-  await delay(500);
+  await evaluate(page, "window.renderScene(0, 0.5)");
+  await capture(page, path.join(assetsDir, "agent-tmux-web-showcase-poster.png"));
 
-  const framesPerScene = 32;
   let frameIndex = 0;
   for (let sceneIndex = 0; sceneIndex < showcaseScenes.length; sceneIndex += 1) {
-    for (let sceneFrame = 0; sceneFrame < framesPerScene; sceneFrame += 1) {
-      const progress = sceneFrame / (framesPerScene - 1);
+    for (let sceneFrame = 0; sceneFrame < FRAMES_PER_SCENE; sceneFrame += 1) {
+      const progress = sceneFrame / (FRAMES_PER_SCENE - 1);
       await evaluate(page, `window.renderScene(${sceneIndex}, ${progress})`);
-      await delay(20);
-      await capture(page, path.join(showcaseFramesDir, `frame-${String(frameIndex).padStart(3, "0")}.png`));
+      await capture(page, path.join(showcaseFramesDir, `frame-${String(frameIndex).padStart(4, "0")}.png`));
       frameIndex += 1;
     }
   }
 
-  await evaluate(page, "window.renderScene(0, 0.45)");
-  await delay(60);
-  await capture(page, path.join(assetsDir, "agent-tmux-web-showcase-poster.png"));
-
   await run("ffmpeg", [
-    "-y",
-    "-hide_banner",
-    "-loglevel",
-    "error",
-    "-framerate",
-    "8",
-    "-i",
-    path.join(showcaseFramesDir, "frame-%03d.png"),
-    "-vf",
-    "format=yuv420p",
-    "-movflags",
-    "+faststart",
+    "-y", "-hide_banner", "-loglevel", "error",
+    "-framerate", String(SHOWCASE_FPS),
+    "-i", path.join(showcaseFramesDir, "frame-%04d.png"),
+    "-c:v", "libx264", "-preset", "slow", "-crf", "18",
+    "-pix_fmt", "yuv420p", "-movflags", "+faststart",
     path.join(assetsDir, "agent-tmux-web-showcase.mp4")
   ]);
+}
 
-  await run("ffmpeg", [
-    "-y",
-    "-hide_banner",
-    "-loglevel",
-    "error",
-    "-framerate",
-    "8",
-    "-i",
-    path.join(showcaseFramesDir, "frame-%03d.png"),
-    "-filter_complex",
-    "fps=8,scale=960:-1:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=4",
-    path.join(assetsDir, "agent-tmux-web-showcase.gif")
-  ]);
+function buildHeroHtml() {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    ${baseCompositionCss()}
+    .hero {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      padding: 82px 88px;
+      overflow: hidden;
+    }
+    .brand {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      color: #f3f6f5;
+      font-size: 27px;
+      font-weight: 730;
+      letter-spacing: -0.02em;
+    }
+    .brand img { width: 54px; height: 54px; border-radius: 11px; }
+    .copy {
+      position: relative;
+      z-index: 2;
+      width: 650px;
+      margin-top: 150px;
+    }
+    h1 {
+      margin: 0;
+      color: #f5f7f6;
+      font-size: 84px;
+      line-height: 0.99;
+      letter-spacing: -0.055em;
+    }
+    p {
+      width: 590px;
+      margin: 34px 0 0;
+      color: #b7c3c0;
+      font-size: 27px;
+      line-height: 1.45;
+    }
+    .desktop {
+      position: absolute;
+      z-index: 2;
+      right: -112px;
+      bottom: 64px;
+      width: 1200px;
+      padding: 12px;
+      border: 1px solid rgba(230, 243, 239, 0.22);
+      border-radius: 18px;
+      background: #171c1e;
+      box-shadow: 0 42px 100px rgba(0, 0, 0, 0.52);
+      transform: rotate(-1.25deg);
+    }
+    .desktop img { display: block; width: 100%; border-radius: 10px; }
+    .rule {
+      position: absolute;
+      z-index: 2;
+      left: 88px;
+      bottom: 76px;
+      width: 390px;
+      height: 1px;
+      background: linear-gradient(90deg, #61bda5, rgba(97, 189, 165, 0));
+    }
+  </style>
+</head>
+<body>
+  <main class="hero">
+    ${backdropMarkup()}
+    <div class="brand"><img alt="" src="../../../public/agent-tmux-logo.png"><span>Agent Tmux Web</span></div>
+    <section class="copy">
+      <h1>Keep terminal agents running.</h1>
+      <p>Run terminal agents inside tmux on your server, then reconnect from desktop or Android.</p>
+    </section>
+    <div class="desktop"><img alt="Agent Tmux Web Raw view on desktop" src="../desktop-raw.png"></div>
+    <div class="rule"></div>
+  </main>
+</body>
+</html>`;
 }
 
 function buildModesOverviewHtml() {
   const modes = [
-    {
-      label: "Focus",
-      title: "Attention overview",
-      image: "../mobile-focus.png"
-    },
-    {
-      label: "GUI",
-      title: "Readable agent transcript",
-      image: "../mobile-chat.png"
-    },
-    {
-      label: "Raw",
-      title: "Direct tmux terminal",
-      image: "../mobile-raw-terminal.png"
-    }
+    { label: "Raw", description: "Direct terminal", image: "../mobile-raw.png" },
+    { label: "GUI", description: "Readable transcript", image: "../mobile-gui.png" },
+    { label: "Focus", description: "Attention triage", image: "../mobile-focus.png" }
   ];
 
   return `<!doctype html>
@@ -297,128 +315,100 @@ function buildModesOverviewHtml() {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    :root {
-      color-scheme: dark;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #0e1113;
-      color: #f2f5f4;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      width: 1280px;
-      height: 720px;
-      margin: 0;
-      overflow: hidden;
-      background:
-        linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px),
-        linear-gradient(0deg, rgba(255,255,255,0.035) 1px, transparent 1px),
-        #0e1113;
-      background-size: 44px 44px, 44px 44px, auto;
-    }
-
+    ${baseCompositionCss()}
     main {
-      display: grid;
-      grid-template-rows: auto minmax(0, 1fr);
-      gap: 24px;
-      width: 1280px;
-      height: 720px;
-      padding: 42px 58px;
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      padding: 66px 86px 58px;
+      overflow: hidden;
     }
-
     header {
+      position: relative;
+      z-index: 2;
       display: flex;
       align-items: end;
       justify-content: space-between;
-      gap: 28px;
+      gap: 80px;
     }
-
     h1 {
-      max-width: 760px;
+      max-width: 930px;
       margin: 0;
-      color: #f4f7f6;
-      font-size: 48px;
-      line-height: 1.04;
-      letter-spacing: 0;
+      color: #f5f7f6;
+      font-size: 62px;
+      line-height: 1.02;
+      letter-spacing: -0.045em;
     }
-
-    p {
-      max-width: 330px;
-      margin: 0 0 5px;
-      color: #b8c3c1;
-      font-size: 18px;
-      line-height: 1.35;
+    header p {
+      max-width: 530px;
+      margin: 0 0 7px;
+      color: #afbdba;
+      font-size: 22px;
+      line-height: 1.42;
     }
-
-    .grid {
+    .modes {
+      position: relative;
+      z-index: 2;
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 18px;
-      min-height: 0;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 38px;
+      margin-top: 40px;
     }
-
     article {
       display: grid;
-      grid-template-rows: auto minmax(0, 1fr);
-      gap: 12px;
+      grid-template-columns: 180px 1fr;
+      align-items: start;
       min-width: 0;
-      min-height: 0;
+      height: 800px;
+      padding: 24px 24px 0;
+      overflow: hidden;
+      border: 1px solid rgba(230, 243, 239, 0.14);
+      border-radius: 8px;
+      background: rgba(13, 17, 18, 0.72);
+      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.36);
     }
-
-    .label {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      min-height: 38px;
-      padding: 0 2px;
-      color: #dce5e2;
-      font-size: 15px;
-      font-weight: 800;
-    }
-
-    .label span:first-child {
-      color: #67d2b5;
-      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    .label { padding-top: 8px; }
+    .label strong {
+      display: block;
+      color: #6bc4ad;
+      font: 750 17px/1.2 "SFMono-Regular", Consolas, monospace;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
     }
-
-    .phone {
-      min-height: 0;
-      padding: 10px;
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 28px;
-      background: #20262a;
-      filter: drop-shadow(0 26px 42px rgba(0,0,0,0.38));
+    .label span {
+      display: block;
+      margin-top: 13px;
+      color: #c1cbc8;
+      font-size: 17px;
+      line-height: 1.35;
     }
-
-    img {
+    .phone {
+      width: 340px;
+      padding: 10px;
+      border: 1px solid rgba(230, 243, 239, 0.2);
+      border-radius: 32px 32px 0 0;
+      background: #171c1e;
+      box-shadow: 0 26px 64px rgba(0, 0, 0, 0.44);
+    }
+    .phone img {
       display: block;
       width: 100%;
-      height: 100%;
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 21px;
-      object-fit: cover;
-      object-position: top;
-      background: #0f1214;
+      border-radius: 23px 23px 0 0;
     }
   </style>
 </head>
 <body>
   <main>
+    ${backdropMarkup()}
     <header>
-      <h1>Pick the view that fits the moment.</h1>
-      <p>Raw for exact terminal control, GUI for readable agent output, and Focus for status triage.</p>
+      <h1>Three views. One persistent tmux session.</h1>
+      <p>Move between exact terminal control, a readable agent transcript, and status-focused triage.</p>
     </header>
-    <section class="grid">
-      ${modes.map((mode) => `
-        <article>
-          <div class="label"><span>${mode.label}</span><span>${mode.title}</span></div>
-          <div class="phone"><img alt="${mode.title}" src="${mode.image}"></div>
-        </article>
-      `).join("")}
+    <section class="modes">
+      ${modes.map((mode) => `<article>
+        <div class="label"><strong>${mode.label}</strong><span>${mode.description}</span></div>
+        <div class="phone"><img alt="Agent Tmux Web ${mode.label} view" src="${mode.image}"></div>
+      </article>`).join("")}
     </section>
   </main>
 </body>
@@ -432,226 +422,170 @@ function buildShowcaseHtml() {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    :root {
-      color-scheme: dark;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #0e1113;
-      color: #f2f5f4;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      width: 1280px;
-      height: 720px;
-      margin: 0;
-      overflow: hidden;
-      background:
-        linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px),
-        linear-gradient(0deg, rgba(255,255,255,0.035) 1px, transparent 1px),
-        #0e1113;
-      background-size: 44px 44px, 44px 44px, auto;
-    }
-
+    ${baseCompositionCss()}
     .stage {
       position: relative;
       display: grid;
-      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-      gap: 52px;
-      width: 1280px;
-      height: 720px;
-      padding: 52px 64px 44px;
+      grid-template-columns: 770px minmax(0, 1fr);
+      gap: 74px;
+      width: 1920px;
+      height: 1080px;
+      padding: 78px 86px 72px;
+      overflow: hidden;
     }
-
-    .stage::before {
-      position: absolute;
-      inset: 0;
-      content: "";
-      background: linear-gradient(135deg, rgba(84,179,153,0.16), transparent 38%, rgba(93,146,202,0.14));
-      pointer-events: none;
-    }
-
-    .copy,
-    .visual-wrap,
-    .progress {
-      position: relative;
-      z-index: 1;
-    }
-
-    .copy {
-      align-self: center;
-      max-width: 550px;
-    }
-
     .brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 36px;
-      color: #dce5e2;
-      font-size: 18px;
-      font-weight: 800;
-    }
-
-    .brand-mark {
-      width: 38px;
-      height: 38px;
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 8px;
-      background: #101315;
-      object-fit: cover;
-    }
-
-    .eyebrow {
-      margin: 0 0 14px;
-      color: #67d2b5;
-      font-size: 13px;
-      font-weight: 900;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-
-    h1 {
-      margin: 0;
-      color: #f4f7f6;
-      font-size: 52px;
-      line-height: 1.02;
-      letter-spacing: 0;
-    }
-
-    .body {
-      max-width: 520px;
-      margin: 22px 0 0;
-      color: #b8c3c1;
-      font-size: 21px;
-      line-height: 1.38;
-    }
-
-    .bullets {
-      display: grid;
-      gap: 10px;
-      margin: 30px 0 0;
-      padding: 0;
-      list-style: none;
-    }
-
-    .bullets li {
+      position: absolute;
+      z-index: 3;
+      top: 62px;
+      left: 86px;
       display: flex;
       align-items: center;
-      gap: 10px;
-      color: #e4ebe8;
-      font-size: 17px;
-      font-weight: 700;
+      gap: 14px;
+      color: #edf2f0;
+      font-size: 22px;
+      font-weight: 720;
     }
-
-    .bullets li::before {
-      width: 9px;
-      height: 9px;
-      border-radius: 999px;
-      background: #67d2b5;
-      content: "";
-      box-shadow: 0 0 0 5px rgba(103,210,181,0.12);
+    .brand img { width: 42px; height: 42px; border-radius: 9px; }
+    .copy,
+    .visual {
+      position: relative;
+      z-index: 2;
+      opacity: var(--visibility, 1);
     }
-
-    .visual-wrap {
+    .copy {
+      align-self: center;
+      transform: translateY(var(--copy-y, 0px));
+    }
+    .eyebrow {
+      margin: 0 0 19px;
+      color: #67c2aa;
+      font: 760 16px/1.2 "SFMono-Regular", Consolas, monospace;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 0;
+      color: #f5f7f6;
+      font-size: 72px;
+      line-height: 1.01;
+      letter-spacing: -0.052em;
+    }
+    .body {
+      max-width: 660px;
+      margin: 30px 0 0;
+      color: #b5c1be;
+      font-size: 26px;
+      line-height: 1.44;
+    }
+    .visual {
       display: grid;
-      align-items: center;
-      justify-items: center;
+      place-items: center;
       min-width: 0;
+      transform: translateY(var(--visual-y, 0px)) scale(var(--visual-scale, 1));
     }
-
     .media-shell {
-      transform: translateY(var(--lift, 0px)) scale(var(--scale, 1));
-      transition: none;
-      filter: drop-shadow(0 28px 52px rgba(0,0,0,0.45));
+      padding: 11px;
+      border: 1px solid rgba(230, 243, 239, 0.2);
+      background: #171c1e;
+      box-shadow: 0 40px 96px rgba(0, 0, 0, 0.5);
     }
-
-    .media-shell.phone {
-      width: 354px;
-      height: 674px;
-      padding: 12px;
-      border: 1px solid rgba(255,255,255,0.22);
-      border-radius: 44px;
-      background: #20262a;
-    }
-
-    .media-shell.desktop {
-      width: 680px;
-      height: 430px;
-      padding: 10px;
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 14px;
-      background: #20262a;
-    }
-
-    .media-shell img {
-      display: block;
-      width: 100%;
-      height: 100%;
-      border: 1px solid rgba(255,255,255,0.08);
-      background: #0f1214;
-      object-fit: cover;
-    }
-
-    .media-shell.phone img {
-      border-radius: 34px;
-    }
-
-    .media-shell.desktop img {
+    .media-shell.desktop { width: 930px; border-radius: 17px; }
+    .media-shell.phone { width: 376px; border-radius: 38px; }
+    .media-shell img { display: block; width: 100%; }
+    .media-shell.desktop img { border-radius: 9px; }
+    .media-shell.phone img { border-radius: 28px; }
+    .media-shell.close {
+      width: 620px;
+      min-height: 560px;
+      display: grid;
+      place-items: center;
+      padding: 70px;
       border-radius: 8px;
+      background: rgba(14, 18, 19, 0.76);
     }
-
+    .media-shell.close > img { display: none; }
+    .release-card { display: none; text-align: center; }
+    .media-shell.close .release-card { display: block; }
+    .release-card img {
+      display: block !important;
+      width: 138px;
+      height: 138px;
+      margin: 0 auto 38px;
+      border-radius: 27px;
+    }
+    .release-card strong {
+      display: block;
+      color: #f2f5f4;
+      font-size: 31px;
+      letter-spacing: -0.025em;
+    }
+    .release-card span {
+      display: block;
+      margin-top: 16px;
+      color: #8fa09c;
+      font: 650 17px/1.5 "SFMono-Regular", Consolas, monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
     .progress {
       position: absolute;
-      left: 64px;
-      right: 64px;
-      bottom: 28px;
-      height: 5px;
-      overflow: hidden;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.12);
+      z-index: 3;
+      right: 86px;
+      bottom: 42px;
+      left: 86px;
+      height: 2px;
+      background: rgba(230, 243, 239, 0.12);
     }
-
     .progress span {
       display: block;
       width: var(--progress, 0%);
       height: 100%;
-      border-radius: inherit;
-      background: linear-gradient(90deg, #67d2b5, #8ca9ff);
+      background: #67c2aa;
     }
   </style>
 </head>
 <body>
   <main class="stage">
+    ${backdropMarkup()}
+    <div class="brand"><img alt="" src="../../../public/agent-tmux-logo.png"><span>Agent Tmux Web</span></div>
     <section class="copy">
-      <div class="brand"><img class="brand-mark" alt="" src="../../../public/agent-tmux-logo.png"><span>Agent Tmux Web</span></div>
       <p class="eyebrow"></p>
       <h1></h1>
       <p class="body"></p>
-      <ul class="bullets"></ul>
     </section>
-    <section class="visual-wrap">
-      <div class="media-shell phone">
-        <img alt="">
+    <section class="visual">
+      <div class="media-shell desktop">
+        <img class="product-image" alt="">
+        <div class="release-card">
+          <img alt="" src="../../../public/agent-tmux-logo.png">
+          <strong>Agent Tmux for Android</strong>
+          <span>No embedded URL<br>No embedded token</span>
+        </div>
       </div>
     </section>
     <div class="progress"><span></span></div>
   </main>
   <script>
     const scenes = ${JSON.stringify(showcaseScenes)};
+    const copy = document.querySelector(".copy");
+    const visual = document.querySelector(".visual");
     const eyebrow = document.querySelector(".eyebrow");
     const title = document.querySelector("h1");
     const body = document.querySelector(".body");
-    const bullets = document.querySelector(".bullets");
     const shell = document.querySelector(".media-shell");
-    const image = document.querySelector(".media-shell img");
+    const image = document.querySelector(".product-image");
     const progressBar = document.querySelector(".progress span");
+    const ease = (value) => value < 0.5
+      ? 4 * value * value * value
+      : 1 - Math.pow(-2 * value + 2, 3) / 2;
 
-    function ease(progress) {
-      return 1 - Math.pow(1 - progress, 3);
-    }
+    window.assetsReady = false;
+    Promise.all(scenes.filter((scene) => scene.media).map((scene) => new Promise((resolve, reject) => {
+      const preload = new Image();
+      preload.onload = resolve;
+      preload.onerror = reject;
+      preload.src = scene.media;
+    }))).then(() => { window.assetsReady = true; });
 
     window.renderScene = (index, progress) => {
       const scene = scenes[index];
@@ -660,22 +594,56 @@ function buildShowcaseHtml() {
       title.textContent = scene.title;
       body.textContent = scene.body;
       shell.className = "media-shell " + scene.layout;
-      shell.style.setProperty("--lift", String(-8 + eased * 16) + "px");
-      shell.style.setProperty("--scale", String(0.985 + eased * 0.018));
       image.src = scene.media;
-      image.alt = scene.title;
-      bullets.replaceChildren(...scene.bullets.map((bullet) => {
-        const item = document.createElement("li");
-        item.textContent = bullet;
-        return item;
-      }));
-      progressBar.style.setProperty("--progress", String(((index + progress) / scenes.length) * 100) + "%");
+      image.alt = scene.layout === "close" ? "" : scene.title;
+      copy.style.setProperty("--visibility", "1");
+      copy.style.setProperty("--copy-y", String(12 - 18 * eased) + "px");
+      visual.style.setProperty("--visibility", "1");
+      visual.style.setProperty("--visual-y", String(18 - 30 * eased) + "px");
+      visual.style.setProperty("--visual-scale", String(0.99 + 0.01 * eased));
+      progressBar.style.setProperty("--progress", String(((index + eased) / scenes.length) * 100) + "%");
     };
 
     window.renderScene(0, 0);
   </script>
 </body>
 </html>`;
+}
+
+function baseCompositionCss() {
+  return `
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0b0e0f;
+      color: #f2f5f4;
+    }
+    * { box-sizing: border-box; }
+    html, body { width: 1920px; height: 1080px; margin: 0; overflow: hidden; }
+    body { background: #0b0e0f; }
+    .backdrop {
+      position: absolute;
+      z-index: 0;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.42;
+      filter: saturate(0.68) contrast(1.04) brightness(0.68);
+    }
+    .backdrop-shade {
+      position: absolute;
+      z-index: 1;
+      inset: 0;
+      background:
+        linear-gradient(90deg, rgba(8, 11, 12, 0.96) 0%, rgba(8, 11, 12, 0.72) 44%, rgba(8, 11, 12, 0.22) 100%),
+        linear-gradient(0deg, rgba(8, 11, 12, 0.7), transparent 54%);
+    }
+  `;
+}
+
+function backdropMarkup() {
+  return `<img class="backdrop" alt="" src="generated-backdrop.png"><div class="backdrop-shade"></div>`;
 }
 
 async function setViewport(page, width, height) {
@@ -689,13 +657,7 @@ async function evaluate(page, expression) {
 async function chooseView(page, label) {
   await page.locator(".tmux-view-menu summary").click();
   await page.getByRole("menuitemradio", { name: label }).click();
-  await delay(250);
-}
-
-async function chooseTheme(page, label) {
-  await page.locator(".tmux-view-menu summary").click();
-  await page.getByRole("menuitemradio", { name: label }).click();
-  await delay(250);
+  await delay(350);
 }
 
 async function waitForHttp(url) {

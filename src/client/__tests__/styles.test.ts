@@ -1,5 +1,4 @@
-import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -23,16 +22,6 @@ function extractBalancedCssBlock(css: string, marker: string) {
   }
 
   throw new Error(`Unbalanced CSS block: ${marker}`);
-}
-
-function trackedExistingFiles(directory: string): string[] {
-  const gitLines = (args: string[]) => execFileSync("git", args, {
-    cwd: process.cwd(),
-    encoding: "utf8"
-  }).trim().split("\n").filter(Boolean);
-  const tracked = gitLines(["ls-files", "--", directory]);
-  const deleted = new Set(gitLines(["ls-files", "--deleted", "--", directory]));
-  return tracked.filter((file) => !deleted.has(file));
 }
 
 describe("responsive mobile CSS", () => {
@@ -239,27 +228,38 @@ describe("responsive mobile CSS", () => {
 });
 
 describe("current user guidance", () => {
-  it("selects GUI before capturing mobile chat marketing media", () => {
+  it("selects GUI before capturing mobile GUI marketing media", () => {
     const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
     const navigation = marketingCapture.indexOf("await page.goto(demoUrl");
     const guiSelection = marketingCapture.indexOf('await chooseView(page, "GUI");', navigation);
-    const mobileChatCapture = marketingCapture.indexOf('await capture(page, path.join(assetsDir, "mobile-chat.png"));');
+    const mobileGuiCapture = marketingCapture.indexOf('await capture(page, path.join(assetsDir, "mobile-gui.png"));');
 
     expect(navigation).toBeGreaterThanOrEqual(0);
     expect(guiSelection).toBeGreaterThan(navigation);
-    expect(mobileChatCapture).toBeGreaterThan(guiSelection);
+    expect(mobileGuiCapture).toBeGreaterThan(guiSelection);
   });
 
-  it("does not ship or publish generated marketing media", () => {
-    const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
-    const marketing = readFileSync(join(process.cwd(), "docs/marketing.md"), "utf8");
-    const generatedMediaReference = /docs\/assets\/[^\s)`"]+\.(?:png|gif|mp4)\b/i;
-    const shippedMedia = trackedExistingFiles("docs/assets")
-      .filter((file) => /\.(?:png|gif|mp4)$/i.test(file));
+  it("ships only the approved current marketing assets", () => {
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+    const approved = [
+      "agent-tmux-web-hero.png",
+      "desktop-raw.png",
+      "mobile-raw.png",
+      "mobile-gui.png",
+      "mobile-focus.png",
+      "modes-overview.png",
+      "agent-tmux-web-showcase-poster.png",
+      "agent-tmux-web-showcase.mp4"
+    ];
+    const shipped = readdirSync(join(process.cwd(), "docs/assets"))
+      .filter((file) => /\.(?:png|mp4)$/i.test(file))
+      .sort();
 
-    expect(readme).not.toMatch(generatedMediaReference);
-    expect(marketing).not.toMatch(generatedMediaReference);
-    expect(shippedMedia).toEqual([]);
+    expect(shipped).toEqual([...approved].sort());
+    expect(marketingCapture).toContain("const SHOWCASE_FPS = 30;");
+    expect(marketingCapture).toContain('\"-crf\", \"18\"');
+    expect(marketingCapture).toContain('\"yuv420p\"');
+    expect(marketingCapture).not.toContain("agent-tmux-web-showcase.gif");
   });
 
   it("describes only the current Agent Tmux views while retaining OpenCode's Linear TTY mode", () => {
