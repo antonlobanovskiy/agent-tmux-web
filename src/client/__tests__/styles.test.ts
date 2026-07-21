@@ -262,6 +262,45 @@ describe("current user guidance", () => {
     expect(marketingCapture).not.toContain("agent-tmux-web-showcase.gif");
   });
 
+  it("captures marketing PNGs at their approved native dimensions", () => {
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+    const captureContext = marketingCapture.slice(
+      marketingCapture.indexOf("const captureContext"),
+      marketingCapture.indexOf("const page", marketingCapture.indexOf("const captureContext"))
+    );
+    const heroRenderer = marketingCapture.slice(
+      marketingCapture.indexOf("async function renderHero"),
+      marketingCapture.indexOf("async function renderModesOverview")
+    );
+
+    expect(marketingCapture).toMatch(/const\s+HERO_WIDTH\s*=\s*1600\s*;/);
+    expect(marketingCapture).toMatch(/const\s+HERO_HEIGHT\s*=\s*900\s*;/);
+    expect(marketingCapture).toMatch(/const\s+DESKTOP_WIDTH\s*=\s*1440\s*;/);
+    expect(marketingCapture).toMatch(/const\s+DESKTOP_HEIGHT\s*=\s*900\s*;/);
+    expect(marketingCapture).toMatch(/const\s+MOBILE_WIDTH\s*=\s*390\s*;/);
+    expect(marketingCapture).toMatch(/const\s+MOBILE_HEIGHT\s*=\s*844\s*;/);
+    expect(captureContext).toMatch(/deviceScaleFactor\s*:\s*1\b/);
+    expect(captureContext).not.toMatch(/deviceScaleFactor\s*:\s*2\b/);
+    expect(heroRenderer).toMatch(/setViewport\(\s*page\s*,\s*HERO_WIDTH\s*,\s*HERO_HEIGHT\s*\)/);
+  });
+
+  it("crossfades overlapping showcase scenes with cubic eased restrained motion", () => {
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+
+    expect(marketingCapture).toMatch(/const\s+TRANSITION_FRAMES\s*=\s*\d+\s*;/);
+    expect(marketingCapture).toMatch(/querySelectorAll\(\s*["']\.scene-layer["']\s*\)/);
+    expect(marketingCapture).toMatch(/incomingOpacity\s*=\s*ease\s*\(/);
+    expect(marketingCapture).toMatch(/outgoingOpacity\s*=\s*1\s*-\s*incomingOpacity/);
+    expect(marketingCapture).toMatch(/--scene-opacity["']\s*,\s*String\(\s*outgoingOpacity\s*\)/);
+    expect(marketingCapture).toMatch(/--scene-opacity["']\s*,\s*String\(\s*incomingOpacity\s*\)/);
+    expect(marketingCapture).toMatch(/outgoingCopyOpacity\s*=\s*1\s*-\s*ease\s*\(/);
+    expect(marketingCapture).toMatch(/incomingCopyOpacity\s*=\s*ease\s*\(/);
+    expect(marketingCapture).toMatch(/--copy-opacity["']\s*,\s*String\(\s*outgoingCopyOpacity\s*\)/);
+    expect(marketingCapture).toMatch(/--copy-opacity["']\s*,\s*String\(\s*incomingCopyOpacity\s*\)/);
+    expect(marketingCapture).toMatch(/0\.99\s*\+\s*0\.02\s*\*\s*eased/);
+    expect(marketingCapture).not.toMatch(/--visibility["']\s*,\s*["']1["']/);
+  });
+
   it("describes only the current Agent Tmux views while retaining OpenCode's Linear TTY mode", () => {
     const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
     const marketing = readFileSync(join(process.cwd(), "docs/marketing.md"), "utf8");

@@ -9,6 +9,13 @@ const SHOWCASE_WIDTH = 1920;
 const SHOWCASE_HEIGHT = 1080;
 const SHOWCASE_FPS = 30;
 const FRAMES_PER_SCENE = 64;
+const TRANSITION_FRAMES = 14;
+const HERO_WIDTH = 1600;
+const HERO_HEIGHT = 900;
+const DESKTOP_WIDTH = 1440;
+const DESKTOP_HEIGHT = 900;
+const MOBILE_WIDTH = 390;
+const MOBILE_HEIGHT = 844;
 const IMAGE_SEED = 241024;
 const BACKDROP_PROMPT = [
   "restrained abstract dark technical infrastructure background",
@@ -105,9 +112,9 @@ try {
   });
 
   const captureContext = await browser.newContext({
-    deviceScaleFactor: 2,
+    deviceScaleFactor: 1,
     isMobile: true,
-    viewport: { width: 390, height: 844 }
+    viewport: { width: MOBILE_WIDTH, height: MOBILE_HEIGHT }
   });
   const page = await captureContext.newPage();
 
@@ -120,7 +127,7 @@ try {
   await chooseView(page, "Focus");
   await capture(page, path.join(assetsDir, "mobile-focus.png"));
   await chooseView(page, "Raw");
-  await setViewport(page, 1440, 900);
+  await setViewport(page, DESKTOP_WIDTH, DESKTOP_HEIGHT);
   await delay(500);
   await capture(page, path.join(assetsDir, "desktop-raw.png"));
   await captureContext.close();
@@ -173,6 +180,7 @@ async function capture(page, file) {
 async function renderHero(page) {
   const htmlFile = path.join(framesDir, "hero.html");
   await writeFile(htmlFile, buildHeroHtml());
+  await setViewport(page, HERO_WIDTH, HERO_HEIGHT);
   await page.goto(pathToFileURL(htmlFile).href, { waitUntil: "load" });
   await capture(page, path.join(assetsDir, "agent-tmux-web-hero.png"));
 }
@@ -180,6 +188,7 @@ async function renderHero(page) {
 async function renderModesOverview(page) {
   const htmlFile = path.join(framesDir, "modes-overview.html");
   await writeFile(htmlFile, buildModesOverviewHtml());
+  await setViewport(page, SHOWCASE_WIDTH, SHOWCASE_HEIGHT);
   await page.goto(pathToFileURL(htmlFile).href, { waitUntil: "load" });
   await capture(page, path.join(assetsDir, "modes-overview.png"));
 }
@@ -189,20 +198,17 @@ async function renderShowcaseAssets(page) {
   await mkdir(showcaseFramesDir, { recursive: true });
   const htmlFile = path.join(framesDir, "showcase.html");
   await writeFile(htmlFile, buildShowcaseHtml());
+  await setViewport(page, SHOWCASE_WIDTH, SHOWCASE_HEIGHT);
   await page.goto(pathToFileURL(htmlFile).href, { waitUntil: "load" });
   await page.waitForFunction(() => window.assetsReady === true);
 
-  await evaluate(page, "window.renderScene(0, 0.5)");
+  await evaluate(page, `window.renderFrame(${Math.floor(FRAMES_PER_SCENE / 2)})`);
   await capture(page, path.join(assetsDir, "agent-tmux-web-showcase-poster.png"));
 
-  let frameIndex = 0;
-  for (let sceneIndex = 0; sceneIndex < showcaseScenes.length; sceneIndex += 1) {
-    for (let sceneFrame = 0; sceneFrame < FRAMES_PER_SCENE; sceneFrame += 1) {
-      const progress = sceneFrame / (FRAMES_PER_SCENE - 1);
-      await evaluate(page, `window.renderScene(${sceneIndex}, ${progress})`);
-      await capture(page, path.join(showcaseFramesDir, `frame-${String(frameIndex).padStart(4, "0")}.png`));
-      frameIndex += 1;
-    }
+  const totalFrames = FRAMES_PER_SCENE * showcaseScenes.length;
+  for (let frameIndex = 0; frameIndex < totalFrames; frameIndex += 1) {
+    await evaluate(page, `window.renderFrame(${frameIndex})`);
+    await capture(page, path.join(showcaseFramesDir, `frame-${String(frameIndex).padStart(4, "0")}.png`));
   }
 
   await run("ffmpeg", [
@@ -222,12 +228,12 @@ function buildHeroHtml() {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    ${baseCompositionCss()}
+    ${baseCompositionCss(HERO_WIDTH, HERO_HEIGHT)}
     .hero {
       position: relative;
-      width: 1920px;
-      height: 1080px;
-      padding: 82px 88px;
+      width: ${HERO_WIDTH}px;
+      height: ${HERO_HEIGHT}px;
+      padding: 68px 74px;
       overflow: hidden;
     }
     .brand {
@@ -235,53 +241,53 @@ function buildHeroHtml() {
       z-index: 2;
       display: flex;
       align-items: center;
-      gap: 18px;
+      gap: 15px;
       color: #f3f6f5;
-      font-size: 27px;
+      font-size: 23px;
       font-weight: 730;
       letter-spacing: -0.02em;
     }
-    .brand img { width: 54px; height: 54px; border-radius: 11px; }
+    .brand img { width: 45px; height: 45px; border-radius: 9px; }
     .copy {
       position: relative;
       z-index: 2;
-      width: 650px;
-      margin-top: 150px;
+      width: 542px;
+      margin-top: 125px;
     }
     h1 {
       margin: 0;
       color: #f5f7f6;
-      font-size: 84px;
+      font-size: 70px;
       line-height: 0.99;
       letter-spacing: -0.055em;
     }
     p {
-      width: 590px;
-      margin: 34px 0 0;
+      width: 492px;
+      margin: 28px 0 0;
       color: #b7c3c0;
-      font-size: 27px;
+      font-size: 23px;
       line-height: 1.45;
     }
     .desktop {
       position: absolute;
       z-index: 2;
-      right: -112px;
-      bottom: 64px;
-      width: 1200px;
-      padding: 12px;
+      right: -94px;
+      bottom: 53px;
+      width: 1000px;
+      padding: 10px;
       border: 1px solid rgba(230, 243, 239, 0.22);
-      border-radius: 18px;
+      border-radius: 15px;
       background: #171c1e;
-      box-shadow: 0 42px 100px rgba(0, 0, 0, 0.52);
+      box-shadow: 0 35px 84px rgba(0, 0, 0, 0.52);
       transform: rotate(-1.25deg);
     }
     .desktop img { display: block; width: 100%; border-radius: 10px; }
     .rule {
       position: absolute;
       z-index: 2;
-      left: 88px;
-      bottom: 76px;
-      width: 390px;
+      left: 74px;
+      bottom: 63px;
+      width: 325px;
       height: 1px;
       background: linear-gradient(90deg, #61bda5, rgba(97, 189, 165, 0));
     }
@@ -425,17 +431,13 @@ function buildShowcaseHtml() {
     ${baseCompositionCss()}
     .stage {
       position: relative;
-      display: grid;
-      grid-template-columns: 770px minmax(0, 1fr);
-      gap: 74px;
       width: 1920px;
       height: 1080px;
-      padding: 78px 86px 72px;
       overflow: hidden;
     }
     .brand {
       position: absolute;
-      z-index: 3;
+      z-index: 4;
       top: 62px;
       left: 86px;
       display: flex;
@@ -446,15 +448,24 @@ function buildShowcaseHtml() {
       font-weight: 720;
     }
     .brand img { width: 42px; height: 42px; border-radius: 9px; }
+    .scene-layer {
+      position: absolute;
+      z-index: 2;
+      inset: 78px 86px 72px;
+      display: grid;
+      grid-template-columns: 770px minmax(0, 1fr);
+      gap: 74px;
+      transform: translateY(var(--scene-y, 0%)) scale(var(--scene-scale, 1));
+      transform-origin: center;
+    }
     .copy,
     .visual {
       position: relative;
-      z-index: 2;
-      opacity: var(--visibility, 1);
+      z-index: 1;
     }
     .copy {
       align-self: center;
-      transform: translateY(var(--copy-y, 0px));
+      opacity: var(--copy-opacity, 0);
     }
     .eyebrow {
       margin: 0 0 19px;
@@ -481,7 +492,7 @@ function buildShowcaseHtml() {
       display: grid;
       place-items: center;
       min-width: 0;
-      transform: translateY(var(--visual-y, 0px)) scale(var(--visual-scale, 1));
+      opacity: var(--scene-opacity, 0);
     }
     .media-shell {
       padding: 11px;
@@ -529,7 +540,7 @@ function buildShowcaseHtml() {
     }
     .progress {
       position: absolute;
-      z-index: 3;
+      z-index: 4;
       right: 86px;
       bottom: 42px;
       left: 86px;
@@ -548,32 +559,15 @@ function buildShowcaseHtml() {
   <main class="stage">
     ${backdropMarkup()}
     <div class="brand"><img alt="" src="../../../public/agent-tmux-logo.png"><span>Agent Tmux Web</span></div>
-    <section class="copy">
-      <p class="eyebrow"></p>
-      <h1></h1>
-      <p class="body"></p>
-    </section>
-    <section class="visual">
-      <div class="media-shell desktop">
-        <img class="product-image" alt="">
-        <div class="release-card">
-          <img alt="" src="../../../public/agent-tmux-logo.png">
-          <strong>Agent Tmux for Android</strong>
-          <span>No embedded URL<br>No embedded token</span>
-        </div>
-      </div>
-    </section>
+    ${showcaseLayerMarkup()}
+    ${showcaseLayerMarkup()}
     <div class="progress"><span></span></div>
   </main>
   <script>
     const scenes = ${JSON.stringify(showcaseScenes)};
-    const copy = document.querySelector(".copy");
-    const visual = document.querySelector(".visual");
-    const eyebrow = document.querySelector(".eyebrow");
-    const title = document.querySelector("h1");
-    const body = document.querySelector(".body");
-    const shell = document.querySelector(".media-shell");
-    const image = document.querySelector(".product-image");
+    const framesPerScene = ${FRAMES_PER_SCENE};
+    const transitionFrames = ${TRANSITION_FRAMES};
+    const layers = [...document.querySelectorAll(".scene-layer")];
     const progressBar = document.querySelector(".progress span");
     const ease = (value) => value < 0.5
       ? 4 * value * value * value
@@ -587,30 +581,84 @@ function buildShowcaseHtml() {
       preload.src = scene.media;
     }))).then(() => { window.assetsReady = true; });
 
-    window.renderScene = (index, progress) => {
+    function setLayerScene(layer, index) {
+      if (layer.dataset.sceneIndex === String(index)) {
+        return;
+      }
       const scene = scenes[index];
-      const eased = ease(progress);
+      const eyebrow = layer.querySelector(".eyebrow");
+      const title = layer.querySelector("h1");
+      const body = layer.querySelector(".body");
+      const shell = layer.querySelector(".media-shell");
+      const image = layer.querySelector(".product-image");
       eyebrow.textContent = scene.eyebrow;
       title.textContent = scene.title;
       body.textContent = scene.body;
       shell.className = "media-shell " + scene.layout;
       image.src = scene.media;
       image.alt = scene.layout === "close" ? "" : scene.title;
-      copy.style.setProperty("--visibility", "1");
-      copy.style.setProperty("--copy-y", String(12 - 18 * eased) + "px");
-      visual.style.setProperty("--visibility", "1");
-      visual.style.setProperty("--visual-y", String(18 - 30 * eased) + "px");
-      visual.style.setProperty("--visual-scale", String(0.99 + 0.01 * eased));
-      progressBar.style.setProperty("--progress", String(((index + eased) / scenes.length) * 100) + "%");
+      layer.dataset.sceneIndex = String(index);
+    }
+
+    function setLayerMotion(layer, progress) {
+      const eased = ease(progress);
+      layer.style.setProperty("--scene-y", String(1 - 2 * eased) + "%");
+      layer.style.setProperty("--scene-scale", String(0.99 + 0.02 * eased));
+    }
+
+    window.renderFrame = (frameIndex) => {
+      const sceneIndex = Math.min(Math.floor(frameIndex / framesPerScene), scenes.length - 1);
+      const nextSceneIndex = Math.min(sceneIndex + 1, scenes.length - 1);
+      const sceneFrame = frameIndex % framesPerScene;
+      const sceneProgress = sceneFrame / (framesPerScene - 1);
+      const transitionStart = framesPerScene - transitionFrames;
+      const hasNextScene = sceneIndex < scenes.length - 1;
+      const overlapProgress = hasNextScene && sceneFrame >= transitionStart
+        ? (sceneFrame - transitionStart) / (transitionFrames - 1)
+        : 0;
+      const incomingOpacity = ease(overlapProgress);
+      const outgoingOpacity = 1 - incomingOpacity;
+      const outgoingCopyOpacity = 1 - ease(Math.min(overlapProgress * 2, 1));
+      const incomingCopyOpacity = ease(Math.max(overlapProgress * 2 - 1, 0));
+
+      setLayerScene(layers[0], sceneIndex);
+      setLayerScene(layers[1], nextSceneIndex);
+      layers[0].style.setProperty("--scene-opacity", String(outgoingOpacity));
+      layers[1].style.setProperty("--scene-opacity", String(incomingOpacity));
+      layers[0].style.setProperty("--copy-opacity", String(outgoingCopyOpacity));
+      layers[1].style.setProperty("--copy-opacity", String(incomingCopyOpacity));
+      setLayerMotion(layers[0], sceneProgress);
+      setLayerMotion(layers[1], 0);
+      progressBar.style.setProperty("--progress", String(((sceneIndex + ease(sceneProgress)) / scenes.length) * 100) + "%");
     };
 
-    window.renderScene(0, 0);
+    window.renderFrame(0);
   </script>
 </body>
 </html>`;
 }
 
-function baseCompositionCss() {
+function showcaseLayerMarkup() {
+  return `<section class="scene-layer">
+    <div class="copy">
+      <p class="eyebrow"></p>
+      <h1></h1>
+      <p class="body"></p>
+    </div>
+    <div class="visual">
+      <div class="media-shell desktop">
+        <img class="product-image" alt="">
+        <div class="release-card">
+          <img alt="" src="../../../public/agent-tmux-logo.png">
+          <strong>Agent Tmux for Android</strong>
+          <span>No embedded URL<br>No embedded token</span>
+        </div>
+      </div>
+    </div>
+  </section>`;
+}
+
+function baseCompositionCss(width = SHOWCASE_WIDTH, height = SHOWCASE_HEIGHT) {
   return `
     :root {
       color-scheme: dark;
@@ -619,7 +667,7 @@ function baseCompositionCss() {
       color: #f2f5f4;
     }
     * { box-sizing: border-box; }
-    html, body { width: 1920px; height: 1080px; margin: 0; overflow: hidden; }
+    html, body { width: ${width}px; height: ${height}px; margin: 0; overflow: hidden; }
     body { background: #0b0e0f; }
     .backdrop {
       position: absolute;
