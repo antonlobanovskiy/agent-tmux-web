@@ -12,23 +12,23 @@ sessions. It is useful when SSH on a phone is too cramped, when mobile browsers
 disconnect, or when you want one place to switch between several terminal-agent
 tabs without killing the work.
 
-[![Agent Tmux Web Raw-first workbench](./docs/assets/agent-tmux-web-hero.png)](./docs/assets/agent-tmux-web-showcase.mp4)
+[![Agent Tmux Web hero with desktop Raw terminal session](./docs/assets/agent-tmux-web-hero.png)](./docs/assets/agent-tmux-web-showcase.mp4)
 
 *Raw-first control on desktop, with the same persistent tmux sessions available from mobile.*
 
 ## Product Views
 
-![Desktop Raw workbench](./docs/assets/desktop-raw.png)
+![Desktop Raw terminal session](./docs/assets/desktop-raw.png)
 
 <p>
-  <img src="./docs/assets/mobile-raw.png" alt="Mobile Raw terminal with touch terminal keys" width="31%">
+  <img src="./docs/assets/mobile-raw.png" alt="Mobile Raw terminal session" width="31%">
   <img src="./docs/assets/mobile-gui.png" alt="Mobile GUI transcript view" width="31%">
-  <img src="./docs/assets/mobile-focus.png" alt="Mobile Focus status overview" width="31%">
+  <img src="./docs/assets/mobile-focus.png" alt="Mobile Focus conversation view" width="31%">
 </p>
 
 ### Professional showcase
 
-[![Agent Tmux Web showcase poster](./docs/assets/agent-tmux-web-showcase-poster.png)](./docs/assets/agent-tmux-web-showcase.mp4)
+[![Agent Tmux Web showcase poster with desktop Raw terminal session](./docs/assets/agent-tmux-web-showcase-poster.png)](./docs/assets/agent-tmux-web-showcase.mp4)
 
 ## What You Get
 

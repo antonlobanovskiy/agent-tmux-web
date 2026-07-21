@@ -254,23 +254,58 @@ describe("current user guidance", () => {
     const shipped = readdirSync(join(process.cwd(), "docs/assets"))
       .filter((file) => /\.(?:png|mp4)$/i.test(file))
       .sort();
-    const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
     const marketing = readFileSync(join(process.cwd(), "docs/marketing.md"), "utf8");
 
     expect(shipped).toEqual([...approved].sort());
     for (const asset of approved) {
       expect(marketing).toContain(`docs/assets/${asset}`);
     }
-    expect(readme).toContain("Professional showcase");
-    expect(readme).toContain("desktop-raw.png");
-    expect(readme).toContain("mobile-raw.png");
-    expect(readme).toContain("mobile-gui.png");
-    expect(readme).toContain("mobile-focus.png");
-    expect(readme).not.toMatch(/mobile-tty|View: TTY|Terminal.*Details/);
     expect(marketingCapture).toContain("const SHOWCASE_FPS = 30;");
     expect(marketingCapture).toContain('\"-crf\", \"18\"');
     expect(marketingCapture).toContain('\"yuv420p\"');
     expect(marketingCapture).not.toContain("agent-tmux-web-showcase.gif");
+  });
+
+  it("presents the reviewed README visual hierarchy with accurate alt text", () => {
+    const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
+    const introductionClosing = "tabs without killing the work.";
+    const introductionEnd = readme.indexOf(introductionClosing);
+
+    expect(introductionEnd).toBeGreaterThanOrEqual(0);
+    expect(readme.slice(introductionEnd + introductionClosing.length)).toMatch(
+      /^\s*\[!\[Agent Tmux Web hero with desktop Raw terminal session\]\(\.\/docs\/assets\/agent-tmux-web-hero\.png\)\]\(\.\/docs\/assets\/agent-tmux-web-showcase\.mp4\)/
+    );
+    expect(readme).toMatch(
+      /!\[Desktop Raw terminal session\]\(\.\/docs\/assets\/desktop-raw\.png\)/
+    );
+    expect(readme).toMatch(
+      /\[!\[Agent Tmux Web showcase poster with desktop Raw terminal session\]\(\.\/docs\/assets\/agent-tmux-web-showcase-poster\.png\)\]\(\.\/docs\/assets\/agent-tmux-web-showcase\.mp4\)/
+    );
+
+    const productViewsStart = readme.indexOf("## Product Views");
+    const showcaseStart = readme.indexOf("### Professional showcase", productViewsStart);
+    expect(productViewsStart).toBeGreaterThan(introductionEnd);
+    expect(showcaseStart).toBeGreaterThan(productViewsStart);
+
+    const productViews = readme.slice(productViewsStart, showcaseStart);
+    const mobileRow = productViews.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i)?.[1] ?? "";
+    const mobileImages = [...mobileRow.matchAll(/<img\b[^>]*>/gi)].map((match) => match[0]);
+    const readAttribute = (image: string, name: string) =>
+      image.match(new RegExp(`\\b${name}\\s*=\\s*["']([^"']+)["']`, "i"))?.[1];
+
+    expect(mobileImages).toHaveLength(3);
+    expect(
+      mobileImages.map((image) => ({
+        src: readAttribute(image, "src"),
+        alt: readAttribute(image, "alt")
+      }))
+    ).toEqual([
+      { src: "./docs/assets/mobile-raw.png", alt: "Mobile Raw terminal session" },
+      { src: "./docs/assets/mobile-gui.png", alt: "Mobile GUI transcript view" },
+      { src: "./docs/assets/mobile-focus.png", alt: "Mobile Focus conversation view" }
+    ]);
+    expect(readme).not.toMatch(/<video\b[^>]*\bautoplay(?:\s|=|>)/i);
+    expect(readme).not.toMatch(/mobile-tty|View: TTY|Terminal.*Details/);
   });
 
   it("captures marketing PNGs at their approved native dimensions", () => {
