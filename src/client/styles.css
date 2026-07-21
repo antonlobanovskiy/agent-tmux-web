@@ -205,7 +205,7 @@ button:disabled {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 0 12px 8px;
+  padding: 0;
   background: var(--surface-output);
 }
 
@@ -1250,14 +1250,15 @@ textarea:focus {
   font-size: 12px;
 }
 
+.tmux-empty-session,
 .tmux-output-shell > .tmux-chat,
 .tmux-output-shell > .tmux-focus,
 .tmux-output-shell > .tmux-terminal {
   flex: 1 1 auto;
   height: auto;
   min-height: 0;
-  border: 1px solid var(--border);
-  border-radius: 2px;
+  border: 0;
+  border-radius: 0;
   box-shadow: none;
 }
 

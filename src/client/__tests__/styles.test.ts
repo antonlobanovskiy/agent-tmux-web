@@ -190,6 +190,19 @@ describe("responsive mobile CSS", () => {
     expect(mobileBlock).toContain(".tmux-menu.open");
   });
 
+  it("uses the workspace as the only output frame", () => {
+    const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");
+    const workspaceRule = css.match(/(?:^|})\s*\.tmux-workspace\s*\{([^}]*)\}/)?.[1] ?? "";
+    const outputFrameRule = css.match(
+      /(?:^|})\s*\.tmux-empty-session\s*,\s*\.tmux-output-shell\s*>\s*\.tmux-chat\s*,\s*\.tmux-output-shell\s*>\s*\.tmux-focus\s*,\s*\.tmux-output-shell\s*>\s*\.tmux-terminal\s*\{([^}]*)\}/
+    )?.[1] ?? "";
+
+    expect(workspaceRule).toMatch(/padding:\s*0\s*;/);
+    expect(outputFrameRule).toMatch(/(?:^|;)\s*border:\s*0\s*(?:;|$)/);
+    expect(outputFrameRule).toMatch(/(?:^|;)\s*border-radius:\s*0\s*(?:;|$)/);
+    expect(outputFrameRule).toMatch(/(?:^|;)\s*box-shadow:\s*none\s*(?:;|$)/);
+  });
+
   it("keeps the desktop grid through the intermediate breakpoint", () => {
     const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");
     const intermediateBlock = css.slice(
