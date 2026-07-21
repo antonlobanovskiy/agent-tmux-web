@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:net";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -27,9 +28,32 @@ const BACKDROP_PROMPT = [
 ].join(", ");
 const IMAGE_ENDPOINT = process.env.MARKETING_IMAGE_ENDPOINT
   ?? `https://image.pollinations.ai/prompt/${encodeURIComponent(BACKDROP_PROMPT)}?width=${SHOWCASE_WIDTH}&height=${SHOWCASE_HEIGHT}&seed=${IMAGE_SEED}&model=flux&nologo=true`;
+const APPROVED_ASSETS = [
+  "agent-tmux-web-hero.png",
+  "agent-tmux-web-showcase-poster.png",
+  "agent-tmux-web-showcase.mp4",
+  "desktop-raw.png",
+  "mobile-focus.png",
+  "mobile-gui.png",
+  "mobile-raw.png",
+  "modes-overview.png"
+].sort();
+const EXPECTED_PNG_DIMENSIONS = new Map([
+  ["agent-tmux-web-hero.png", [HERO_WIDTH, HERO_HEIGHT]],
+  ["agent-tmux-web-showcase-poster.png", [SHOWCASE_WIDTH, SHOWCASE_HEIGHT]],
+  ["desktop-raw.png", [DESKTOP_WIDTH, DESKTOP_HEIGHT]],
+  ["mobile-focus.png", [MOBILE_WIDTH, MOBILE_HEIGHT]],
+  ["mobile-gui.png", [MOBILE_WIDTH, MOBILE_HEIGHT]],
+  ["mobile-raw.png", [MOBILE_WIDTH, MOBILE_HEIGHT]],
+  ["modes-overview.png", [SHOWCASE_WIDTH, SHOWCASE_HEIGHT]]
+]);
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const assetsDir = path.join(root, "docs", "assets");
+const docsDir = path.join(root, "docs");
+const publishedAssetsDir = path.join(root, "docs", "assets");
+const stagingAssetsDir = path.join(docsDir, `.assets-staging-${process.pid}`);
+const backupAssetsDir = path.join(docsDir, `.assets-backup-${process.pid}`);
+const assetsDir = stagingAssetsDir;
 const framesDir = path.join(assetsDir, "frames");
 const appPort = Number(process.env.MARKETING_APP_PORT ?? 6180);
 const appUrl = `http://127.0.0.1:${appPort}`;
@@ -79,30 +103,55 @@ const showcaseScenes = [
   }
 ];
 
-await rm(assetsDir, { recursive: true, force: true });
-await mkdir(framesDir, { recursive: true });
-
-const server = spawn("node", ["dist/server/server/index.js"], {
-  cwd: root,
-  env: {
-    ...process.env,
-    HOST: "127.0.0.1",
-    PORT: String(appPort),
-    CODEX_APP_SERVER_AUTOSTART: "0",
-    CLI_WEB_DEFAULT_CWD: "/workspace/project"
-  },
-  stdio: ["ignore", "pipe", "pipe"]
-});
-
-server.stdout.on("data", (chunk) => process.stdout.write(chunk));
-server.stderr.on("data", (chunk) => process.stderr.write(chunk));
-
 let browser;
-let completed = false;
+let server;
+let generationAbortController;
+let stoppingServer = false;
 
 try {
+  await prepareStagingDirectories();
+  await assertLoopbackPortAvailable(appPort);
+
+  server = spawn("node", ["dist/server/server/index.js"], {
+    cwd: root,
+    env: {
+      ...process.env,
+      HOST: "127.0.0.1",
+      PORT: String(appPort),
+      CODEX_APP_SERVER_AUTOSTART: "0",
+      CLI_WEB_DEFAULT_CWD: "/workspace/project"
+    },
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  server.stdout.on("data", (chunk) => process.stdout.write(chunk));
+  server.stderr.on("data", (chunk) => process.stderr.write(chunk));
+
+  generationAbortController = new AbortController();
+  const serverFailure = monitorServer(server, generationAbortController);
+  const generationPromise = generateAndPublishAssets(generationAbortController.signal);
+  try {
+    await Promise.race([generationPromise, serverFailure]);
+  } catch (error) {
+    generationAbortController.abort(error);
+    await browser?.close().catch(() => {});
+    await generationPromise.catch(() => {});
+    throw error;
+  }
+
+  console.log(`Marketing assets written to ${path.relative(root, publishedAssetsDir)}`);
+} finally {
+  stoppingServer = true;
+  generationAbortController?.abort();
+  await browser?.close().catch(() => {});
+  await stopServer(server);
+  await rm(stagingAssetsDir, { recursive: true, force: true });
+  await rm(backupAssetsDir, { recursive: true, force: true });
+}
+
+async function generateAndPublishAssets(signal) {
   console.log(`Waiting for app health at ${appUrl}`);
-  await waitForHttp(`${appUrl}/healthz`);
+  await waitForHttp(`${appUrl}/healthz`, signal);
+  signal.throwIfAborted();
 
   console.log("Starting Playwright Chromium");
   browser = await chromium.launch({
@@ -110,90 +159,95 @@ try {
     executablePath: process.env.CHROMIUM_BIN || undefined,
     args: ["--no-sandbox"]
   });
+  signal.throwIfAborted();
 
   const captureContext = await browser.newContext({
     deviceScaleFactor: 1,
     isMobile: true,
     viewport: { width: MOBILE_WIDTH, height: MOBILE_HEIGHT }
   });
-  const page = await captureContext.newPage();
+  try {
+    const page = await captureContext.newPage();
+    await page.goto(demoUrl, { waitUntil: "domcontentloaded" });
+    await delay(1200, signal);
+    await chooseView(page, "Raw", signal);
+    await capture(page, path.join(assetsDir, "mobile-raw.png"), signal);
+    await chooseView(page, "GUI", signal);
+    await capture(page, path.join(assetsDir, "mobile-gui.png"), signal);
+    await chooseView(page, "Focus", signal);
+    await evaluate(page, "document.querySelector('.tmux-focus')?.scrollTo({ top: 0 })");
+    await delay(100, signal);
+    await capture(page, path.join(assetsDir, "mobile-focus.png"), signal);
+    await chooseView(page, "Raw", signal);
+    await setViewport(page, DESKTOP_WIDTH, DESKTOP_HEIGHT);
+    await delay(500, signal);
+    await capture(page, path.join(assetsDir, "desktop-raw.png"), signal);
+  } finally {
+    await captureContext.close().catch(() => {});
+  }
 
-  await page.goto(demoUrl, { waitUntil: "domcontentloaded" });
-  await delay(1200);
-  await chooseView(page, "Raw");
-  await capture(page, path.join(assetsDir, "mobile-raw.png"));
-  await chooseView(page, "GUI");
-  await capture(page, path.join(assetsDir, "mobile-gui.png"));
-  await chooseView(page, "Focus");
-  await capture(page, path.join(assetsDir, "mobile-focus.png"));
-  await chooseView(page, "Raw");
-  await setViewport(page, DESKTOP_WIDTH, DESKTOP_HEIGHT);
-  await delay(500);
-  await capture(page, path.join(assetsDir, "desktop-raw.png"));
-  await captureContext.close();
-
-  await generateBackdrop();
+  await generateBackdrop(signal);
 
   const compositionContext = await browser.newContext({
     deviceScaleFactor: 1,
     viewport: { width: SHOWCASE_WIDTH, height: SHOWCASE_HEIGHT }
   });
-  const compositionPage = await compositionContext.newPage();
-  await renderHero(compositionPage);
-  await renderModesOverview(compositionPage);
-  await renderShowcaseAssets(compositionPage);
-  await compositionContext.close();
+  try {
+    const compositionPage = await compositionContext.newPage();
+    await renderHero(compositionPage, signal);
+    await renderModesOverview(compositionPage, signal);
+    await renderShowcaseAssets(compositionPage, signal);
+  } finally {
+    await compositionContext.close().catch(() => {});
+  }
 
-  completed = true;
-  console.log(`Marketing assets written to ${path.relative(root, assetsDir)}`);
-} finally {
-  await browser?.close().catch(() => {});
-  if (server.exitCode === null) {
-    server.kill("SIGTERM");
-  }
-  if (completed) {
-    await rm(framesDir, { recursive: true, force: true });
-  } else {
-    await rm(assetsDir, { recursive: true, force: true });
-  }
+  signal.throwIfAborted();
+  await rm(framesDir, { recursive: true, force: true });
+  await validateStagedAssets();
+  signal.throwIfAborted();
+  await publishAssetsAtomically();
 }
 
-async function generateBackdrop() {
+async function generateBackdrop(signal) {
   const source = path.join(framesDir, "generated-backdrop-source");
   const output = path.join(framesDir, "generated-backdrop.png");
-  const response = await fetch(IMAGE_ENDPOINT, { signal: AbortSignal.timeout(120_000) });
+  const response = await fetch(IMAGE_ENDPOINT, {
+    signal: AbortSignal.any([signal, AbortSignal.timeout(120_000)])
+  });
   if (!response.ok || !(response.headers.get("content-type") ?? "").startsWith("image/")) {
     throw new Error(`Image generation failed with HTTP ${response.status}`);
   }
   await writeFile(source, Buffer.from(await response.arrayBuffer()));
-  await run("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-i", source, "-vf", `scale=${SHOWCASE_WIDTH}:${SHOWCASE_HEIGHT}:force_original_aspect_ratio=increase,crop=${SHOWCASE_WIDTH}:${SHOWCASE_HEIGHT}`, output]);
+  await run("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-i", source, "-vf", `scale=${SHOWCASE_WIDTH}:${SHOWCASE_HEIGHT}:force_original_aspect_ratio=increase,crop=${SHOWCASE_WIDTH}:${SHOWCASE_HEIGHT}`, output], signal);
   return output;
 }
 
-async function capture(page, file) {
+async function capture(page, file, signal) {
+  signal.throwIfAborted();
   if (!file.includes(`${path.sep}frames${path.sep}`)) {
-    console.log(`Capturing ${path.relative(root, file)}`);
+    console.log(`Capturing docs/assets/${path.basename(file)}`);
   }
   await page.screenshot({ path: file, animations: "disabled" });
+  signal.throwIfAborted();
 }
 
-async function renderHero(page) {
+async function renderHero(page, signal) {
   const htmlFile = path.join(framesDir, "hero.html");
   await writeFile(htmlFile, buildHeroHtml());
   await setViewport(page, HERO_WIDTH, HERO_HEIGHT);
   await page.goto(pathToFileURL(htmlFile).href, { waitUntil: "load" });
-  await capture(page, path.join(assetsDir, "agent-tmux-web-hero.png"));
+  await capture(page, path.join(assetsDir, "agent-tmux-web-hero.png"), signal);
 }
 
-async function renderModesOverview(page) {
+async function renderModesOverview(page, signal) {
   const htmlFile = path.join(framesDir, "modes-overview.html");
   await writeFile(htmlFile, buildModesOverviewHtml());
   await setViewport(page, SHOWCASE_WIDTH, SHOWCASE_HEIGHT);
   await page.goto(pathToFileURL(htmlFile).href, { waitUntil: "load" });
-  await capture(page, path.join(assetsDir, "modes-overview.png"));
+  await capture(page, path.join(assetsDir, "modes-overview.png"), signal);
 }
 
-async function renderShowcaseAssets(page) {
+async function renderShowcaseAssets(page, signal) {
   const showcaseFramesDir = path.join(framesDir, "showcase");
   await mkdir(showcaseFramesDir, { recursive: true });
   const htmlFile = path.join(framesDir, "showcase.html");
@@ -203,12 +257,12 @@ async function renderShowcaseAssets(page) {
   await page.waitForFunction(() => window.assetsReady === true);
 
   await evaluate(page, `window.renderFrame(${Math.floor(FRAMES_PER_SCENE / 2)})`);
-  await capture(page, path.join(assetsDir, "agent-tmux-web-showcase-poster.png"));
+  await capture(page, path.join(assetsDir, "agent-tmux-web-showcase-poster.png"), signal);
 
   const totalFrames = FRAMES_PER_SCENE * showcaseScenes.length;
   for (let frameIndex = 0; frameIndex < totalFrames; frameIndex += 1) {
     await evaluate(page, `window.renderFrame(${frameIndex})`);
-    await capture(page, path.join(showcaseFramesDir, `frame-${String(frameIndex).padStart(4, "0")}.png`));
+    await capture(page, path.join(showcaseFramesDir, `frame-${String(frameIndex).padStart(4, "0")}.png`), signal);
   }
 
   await run("ffmpeg", [
@@ -218,7 +272,7 @@ async function renderShowcaseAssets(page) {
     "-c:v", "libx264", "-preset", "slow", "-crf", "18",
     "-pix_fmt", "yuv420p", "-movflags", "+faststart",
     path.join(assetsDir, "agent-tmux-web-showcase.mp4")
-  ]);
+  ], signal);
 }
 
 function buildHeroHtml() {
@@ -694,6 +748,136 @@ function backdropMarkup() {
   return `<img class="backdrop" alt="" src="generated-backdrop.png"><div class="backdrop-shade"></div>`;
 }
 
+async function prepareStagingDirectories() {
+  if (await pathExists(backupAssetsDir)) {
+    if (!(await pathExists(publishedAssetsDir))) {
+      await rename(backupAssetsDir, publishedAssetsDir);
+    } else {
+      await rm(backupAssetsDir, { recursive: true, force: true });
+    }
+  }
+  await rm(stagingAssetsDir, { recursive: true, force: true });
+  await mkdir(framesDir, { recursive: true });
+}
+
+async function assertLoopbackPortAvailable(port) {
+  await new Promise((resolve, reject) => {
+    const probe = createServer();
+    probe.unref();
+    probe.once("error", (error) => {
+      const message = error.code === "EADDRINUSE"
+        ? `Loopback port ${port} is already in use; refusing to capture from an unowned service`
+        : `Unable to verify loopback port ${port}: ${error.message}`;
+      reject(new Error(message, { cause: error }));
+    });
+    probe.listen(port, "127.0.0.1", () => {
+      probe.close((error) => error ? reject(error) : resolve());
+    });
+  });
+}
+
+function monitorServer(child, abortController) {
+  return new Promise((_, reject) => {
+    const fail = (error) => {
+      if (stoppingServer) {
+        return;
+      }
+      abortController.abort(error);
+      reject(error);
+    };
+    child.once("error", (error) => {
+      fail(new Error(`Capture server failed to start: ${error.message}`, { cause: error }));
+    });
+    child.once("exit", (code, signal) => {
+      fail(new Error(`Capture server exited unexpectedly (${signal ?? `code ${code}`})`));
+    });
+  });
+}
+
+async function stopServer(child) {
+  if (!child || child.exitCode !== null) {
+    return;
+  }
+  await new Promise((resolve) => {
+    const timer = setTimeout(resolve, 2_000);
+    child.once("exit", () => {
+      clearTimeout(timer);
+      resolve();
+    });
+    child.kill("SIGTERM");
+  });
+  if (child.exitCode === null) {
+    child.kill("SIGKILL");
+  }
+}
+
+async function validateStagedAssets() {
+  const files = (await readdir(stagingAssetsDir)).sort();
+  if (JSON.stringify(files) !== JSON.stringify(APPROVED_ASSETS)) {
+    throw new Error(`Unexpected staged asset inventory: ${files.join(", ")}`);
+  }
+
+  for (const [name, [expectedWidth, expectedHeight]] of EXPECTED_PNG_DIMENSIONS) {
+    const metadata = await probeAsset(path.join(stagingAssetsDir, name));
+    const stream = metadata.streams?.[0];
+    if (stream?.codec_name !== "png" || stream.width !== expectedWidth || stream.height !== expectedHeight) {
+      throw new Error(`Invalid ${name} metadata: ${JSON.stringify(stream)}`);
+    }
+  }
+
+  const video = await probeAsset(path.join(stagingAssetsDir, "agent-tmux-web-showcase.mp4"));
+  const stream = video.streams?.[0];
+  const duration = Number(video.format?.duration);
+  if (
+    stream?.codec_name !== "h264"
+    || stream.width !== SHOWCASE_WIDTH
+    || stream.height !== SHOWCASE_HEIGHT
+    || stream.pix_fmt !== "yuv420p"
+    || stream.r_frame_rate !== `${SHOWCASE_FPS}/1`
+    || duration < 12
+    || duration > 18
+  ) {
+    throw new Error(`Invalid showcase metadata: ${JSON.stringify(video)}`);
+  }
+}
+
+async function probeAsset(file) {
+  const output = await runForOutput("ffprobe", [
+    "-v", "error",
+    "-show_entries", "stream=codec_name,pix_fmt,width,height,r_frame_rate,avg_frame_rate",
+    "-show_entries", "format=duration,size",
+    "-of", "json",
+    file
+  ]);
+  return JSON.parse(output);
+}
+
+async function publishAssetsAtomically() {
+  const hadPublishedAssets = await pathExists(publishedAssetsDir);
+  await rm(backupAssetsDir, { recursive: true, force: true });
+  if (hadPublishedAssets) {
+    await rename(publishedAssetsDir, backupAssetsDir);
+  }
+  try {
+    await rename(stagingAssetsDir, publishedAssetsDir);
+  } catch (error) {
+    if (hadPublishedAssets && !(await pathExists(publishedAssetsDir)) && await pathExists(backupAssetsDir)) {
+      await rename(backupAssetsDir, publishedAssetsDir);
+    }
+    throw error;
+  }
+  await rm(backupAssetsDir, { recursive: true, force: true });
+}
+
+async function pathExists(file) {
+  try {
+    await access(file);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function setViewport(page, width, height) {
   await page.setViewportSize({ width, height });
 }
@@ -702,42 +886,84 @@ async function evaluate(page, expression) {
   await page.evaluate(expression);
 }
 
-async function chooseView(page, label) {
+async function chooseView(page, label, signal) {
+  signal.throwIfAborted();
   await page.locator(".tmux-view-menu summary").click();
   await page.getByRole("menuitemradio", { name: label }).click();
-  await delay(350);
+  await delay(350, signal);
 }
 
-async function waitForHttp(url) {
+async function waitForHttp(url, signal) {
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
+    signal.throwIfAborted();
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { signal });
       if (response.ok) {
         return;
       }
-    } catch {
+    } catch (error) {
+      signal.throwIfAborted();
       // Service is still starting.
     }
-    await delay(200);
+    await delay(200, signal);
   }
   throw new Error(`Timed out waiting for ${url}`);
 }
 
-async function run(command, args) {
+async function run(command, args, signal) {
+  signal?.throwIfAborted();
   await new Promise((resolve, reject) => {
     const child = spawn(command, args, { cwd: root, stdio: "inherit" });
+    const onAbort = () => {
+      child.kill("SIGTERM");
+      reject(signal.reason instanceof Error ? signal.reason : new Error(`${command} aborted`));
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
     child.on("exit", (code) => {
+      signal?.removeEventListener("abort", onAbort);
       if (code === 0) {
         resolve();
       } else {
         reject(new Error(`${command} exited with ${code}`));
       }
     });
+    child.on("error", (error) => {
+      signal?.removeEventListener("abort", onAbort);
+      reject(error);
+    });
+  });
+}
+
+async function runForOutput(command, args) {
+  return await new Promise((resolve, reject) => {
+    const child = spawn(command, args, { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+    const stdout = [];
+    const stderr = [];
+    child.stdout.on("data", (chunk) => stdout.push(chunk));
+    child.stderr.on("data", (chunk) => stderr.push(chunk));
+    child.on("exit", (code) => {
+      if (code === 0) {
+        resolve(Buffer.concat(stdout).toString("utf8"));
+      } else {
+        reject(new Error(`${command} exited with ${code}: ${Buffer.concat(stderr).toString("utf8")}`));
+      }
+    });
     child.on("error", reject);
   });
 }
 
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function delay(ms, signal) {
+  signal?.throwIfAborted();
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(signal.reason instanceof Error ? signal.reason : new Error("Operation aborted"));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 }

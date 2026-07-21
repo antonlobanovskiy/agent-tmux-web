@@ -231,8 +231,8 @@ describe("current user guidance", () => {
   it("selects GUI before capturing mobile GUI marketing media", () => {
     const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
     const navigation = marketingCapture.indexOf("await page.goto(demoUrl");
-    const guiSelection = marketingCapture.indexOf('await chooseView(page, "GUI");', navigation);
-    const mobileGuiCapture = marketingCapture.indexOf('await capture(page, path.join(assetsDir, "mobile-gui.png"));');
+    const guiSelection = marketingCapture.indexOf('await chooseView(page, "GUI", signal);', navigation);
+    const mobileGuiCapture = marketingCapture.indexOf('await capture(page, path.join(assetsDir, "mobile-gui.png"), signal);');
 
     expect(navigation).toBeGreaterThanOrEqual(0);
     expect(guiSelection).toBeGreaterThan(navigation);
@@ -251,9 +251,7 @@ describe("current user guidance", () => {
       "agent-tmux-web-showcase-poster.png",
       "agent-tmux-web-showcase.mp4"
     ];
-    const shipped = readdirSync(join(process.cwd(), "docs/assets"))
-      .filter((file) => /\.(?:png|mp4)$/i.test(file))
-      .sort();
+    const shipped = readdirSync(join(process.cwd(), "docs/assets")).sort();
     const marketing = readFileSync(join(process.cwd(), "docs/marketing.md"), "utf8");
 
     expect(shipped).toEqual([...approved].sort());
@@ -264,6 +262,58 @@ describe("current user guidance", () => {
     expect(marketingCapture).toContain('\"-crf\", \"18\"');
     expect(marketingCapture).toContain('\"yuv420p\"');
     expect(marketingCapture).not.toContain("agent-tmux-web-showcase.gif");
+  });
+
+  it("resets Focus to its status and attention summary before capture", () => {
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+    const focusSelection = marketingCapture.indexOf('await chooseView(page, "Focus", signal);');
+    const focusReset = marketingCapture.indexOf(
+      "document.querySelector('.tmux-focus')?.scrollTo({ top: 0 })",
+      focusSelection
+    );
+    const focusCapture = marketingCapture.indexOf(
+      'await capture(page, path.join(assetsDir, "mobile-focus.png"), signal);',
+      focusSelection
+    );
+
+    expect(focusSelection).toBeGreaterThanOrEqual(0);
+    expect(focusReset).toBeGreaterThan(focusSelection);
+    expect(focusCapture).toBeGreaterThan(focusReset);
+  });
+
+  it("owns and monitors the loopback capture server", () => {
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+    const portPreflight = marketingCapture.indexOf("await assertLoopbackPortAvailable(appPort);");
+    const serverSpawn = marketingCapture.indexOf('spawn("node", ["dist/server/server/index.js"]');
+
+    expect(marketingCapture).toMatch(/import\s+\{\s*createServer\s*\}\s+from\s+["']node:net["']/);
+    expect(portPreflight).toBeGreaterThanOrEqual(0);
+    expect(serverSpawn).toBeGreaterThan(portPreflight);
+    expect(marketingCapture).toMatch(
+      /const\s+serverFailure\s*=\s*monitorServer\(\s*server\s*,\s*generationAbortController\s*\)/
+    );
+    expect(marketingCapture).toMatch(
+      /const\s+generationPromise\s*=\s*generateAndPublishAssets\(\s*generationAbortController\.signal\s*\)/
+    );
+    expect(marketingCapture).toMatch(
+      /Promise\.race\(\s*\[\s*generationPromise\s*,\s*serverFailure\s*\]\s*\)/
+    );
+    expect(marketingCapture).toMatch(/(?:server|child)\.once\(\s*["']exit["']/);
+  });
+
+  it("validates staged assets before atomic publication and preserves reviewed output on failure", () => {
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+    const validation = marketingCapture.indexOf("await validateStagedAssets();");
+    const publication = marketingCapture.indexOf("await publishAssetsAtomically();");
+
+    expect(marketingCapture).toMatch(/const\s+publishedAssetsDir\s*=\s*path\.join\(\s*root\s*,\s*["']docs["']\s*,\s*["']assets["']\s*\)/);
+    expect(marketingCapture).toMatch(/const\s+stagingAssetsDir\s*=\s*path\.join\([^\n]+\.assets-staging-/);
+    expect(marketingCapture).toMatch(/const\s+backupAssetsDir\s*=\s*path\.join\([^\n]+\.assets-backup-/);
+    expect(validation).toBeGreaterThanOrEqual(0);
+    expect(publication).toBeGreaterThan(validation);
+    expect(marketingCapture).toMatch(/rename\(\s*publishedAssetsDir\s*,\s*backupAssetsDir\s*\)/);
+    expect(marketingCapture).toMatch(/rename\(\s*stagingAssetsDir\s*,\s*publishedAssetsDir\s*\)/);
+    expect(marketingCapture).not.toMatch(/rm\(\s*publishedAssetsDir\s*,/);
   });
 
   it("presents the reviewed README visual hierarchy with accurate alt text", () => {
