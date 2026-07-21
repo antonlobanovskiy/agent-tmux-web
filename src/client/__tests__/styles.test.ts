@@ -254,8 +254,19 @@ describe("current user guidance", () => {
     const shipped = readdirSync(join(process.cwd(), "docs/assets"))
       .filter((file) => /\.(?:png|mp4)$/i.test(file))
       .sort();
+    const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
+    const marketing = readFileSync(join(process.cwd(), "docs/marketing.md"), "utf8");
 
     expect(shipped).toEqual([...approved].sort());
+    for (const asset of approved) {
+      expect(marketing).toContain(`docs/assets/${asset}`);
+    }
+    expect(readme).toContain("Professional showcase");
+    expect(readme).toContain("desktop-raw.png");
+    expect(readme).toContain("mobile-raw.png");
+    expect(readme).toContain("mobile-gui.png");
+    expect(readme).toContain("mobile-focus.png");
+    expect(readme).not.toMatch(/mobile-tty|View: TTY|Terminal.*Details/);
     expect(marketingCapture).toContain("const SHOWCASE_FPS = 30;");
     expect(marketingCapture).toContain('\"-crf\", \"18\"');
     expect(marketingCapture).toContain('\"yuv420p\"');
@@ -317,7 +328,6 @@ describe("current user guidance", () => {
     expect(readme).not.toContain("modes-overview.png");
     expect(marketing).not.toMatch(/\bTTY\b|GUI\/TTY/);
     expect(marketing).not.toContain("mobile-tty.png");
-    expect(marketing).not.toContain("modes-overview.png");
     expect(aiSetup).not.toMatch(/\bTTY\b/);
     expect(marketingCapture).not.toMatch(/\bTTY\b|mobile-tty\.png/);
     expect(fullUiMode).not.toMatch(/\bTTY\b|details panel/i);

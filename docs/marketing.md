@@ -58,17 +58,29 @@ alerts.
 
 ## Local Asset Generation
 
-Generated screenshots and videos do not ship with the release. If reviewed
-public demo assets would be useful, generate local candidates with:
+The reviewed public inventory is:
+
+- `docs/assets/agent-tmux-web-hero.png`
+- `docs/assets/desktop-raw.png`
+- `docs/assets/mobile-raw.png`
+- `docs/assets/mobile-gui.png`
+- `docs/assets/mobile-focus.png`
+- `docs/assets/modes-overview.png`
+- `docs/assets/agent-tmux-web-showcase-poster.png`
+- `docs/assets/agent-tmux-web-showcase.mp4`
+
+Regenerate local candidates with:
 
 ```bash
 pnpm build
 pnpm capture:marketing
 ```
 
-The opt-in capture script writes candidates under `docs/assets/` using
-Playwright Chromium and `ffmpeg`. On a fresh machine, run
+Run capture only against loopback demo mode, never real tmux sessions. The
+product UI must come from that demo; image generation may be used only for the
+non-product backdrop. The opt-in capture script writes candidates under
+`docs/assets/` using Playwright Chromium and `ffmpeg`. On a fresh machine, run
 `pnpm exec playwright install chromium` if Playwright reports a missing browser.
-Review every output for private data, current UI accuracy, and supportable
-product claims before selecting any file for publication. Do not publish or
-commit generated output by default.
+Before commit, visually inspect every output, scan its metadata, and complete a
+privacy and copy review for private data, current UI accuracy, and supportable
+product claims.

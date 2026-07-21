@@ -12,6 +12,24 @@ sessions. It is useful when SSH on a phone is too cramped, when mobile browsers
 disconnect, or when you want one place to switch between several terminal-agent
 tabs without killing the work.
 
+[![Agent Tmux Web Raw-first workbench](./docs/assets/agent-tmux-web-hero.png)](./docs/assets/agent-tmux-web-showcase.mp4)
+
+*Raw-first control on desktop, with the same persistent tmux sessions available from mobile.*
+
+## Product Views
+
+![Desktop Raw workbench](./docs/assets/desktop-raw.png)
+
+<p>
+  <img src="./docs/assets/mobile-raw.png" alt="Mobile Raw terminal with touch terminal keys" width="31%">
+  <img src="./docs/assets/mobile-gui.png" alt="Mobile GUI transcript view" width="31%">
+  <img src="./docs/assets/mobile-focus.png" alt="Mobile Focus status overview" width="31%">
+</p>
+
+### Professional showcase
+
+[![Agent Tmux Web showcase poster](./docs/assets/agent-tmux-web-showcase-poster.png)](./docs/assets/agent-tmux-web-showcase.mp4)
+
 ## What You Get
 
 - Long-running tmux sessions that survive browser disconnects and phone sleep.
@@ -351,10 +369,12 @@ pnpm build
 pnpm capture:marketing
 ```
 
-The opt-in capture script writes local output under `docs/assets/` and uses
-Playwright Chromium and `ffmpeg`. If Chromium is missing on a fresh machine, run
-`pnpm exec playwright install chromium`. Generated media is not part of the
-release; review it for privacy and accuracy before choosing to publish it.
+The opt-in capture script regenerates the reviewed public inventory under
+`docs/assets/` from loopback demo mode using Playwright Chromium and `ffmpeg`.
+If Chromium is missing on a fresh machine, run
+`pnpm exec playwright install chromium`. Treat regenerated output as candidates:
+visually inspect it, scan metadata, and complete a privacy and copy review before
+commit. Image generation is limited to the non-product backdrop.
 
 Marketing copy guidance is in [docs/marketing.md](./docs/marketing.md).
 
