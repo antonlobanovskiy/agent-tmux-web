@@ -2,7 +2,7 @@
 
 ## Goal
 
-Restore finger scrolling in Raw terminal mode on Android and touch browsers, remove the floating native `Set` button, expose Android connection configuration through the existing View menu, deploy the web fix to the private service, and produce a private installable APK with the existing Tailscale URL and token defaults.
+Restore finger scrolling in Raw terminal mode on Android and touch browsers, remove the floating native `Set` button, expose Android connection configuration through the existing View menu, deploy the web fix to the private service, and produce a private installable APK with the existing Tailscale URL default.
 
 ## Root Cause
 
@@ -57,7 +57,7 @@ The menu item is omitted in regular browsers. Browser users do not receive a dea
 
 - The private service client bundle is rebuilt from the verified branch so it serves the corrected xterm code.
 - The service is not restarted if a client-only rebuild is sufficient; tmux sessions are never stopped.
-- The private APK uses ignored local configuration for URL, token, and signing values.
+- The private APK uses the ignored local URL configuration. The verified configuration has no default token or release keystore, so the build keeps the token empty and preserves this machine's existing debug signing identity.
 - The private build uses version name `0.1.24-private.1` and version code `20026` so Android accepts it as an update over the prior `20025` private build.
 - The APK is staged only through the private Tailscale-reachable service and is never committed or uploaded to a public GitHub release.
 
@@ -66,7 +66,7 @@ The menu item is omitted in regular browsers. Browser users do not receive a dea
 - If the Android bridge call throws or is unavailable, the web client reports a concise existing-style error instead of leaving the menu open.
 - The setup form retains URL validation and does not replace a valid stored configuration with an empty value.
 - A failed server load does not conditionally reintroduce the floating button. Connection configuration remains a menu action whenever the loaded workbench is available.
-- Before staging this private build, a value-suppressing preflight requires a non-empty default URL, the token expected by the configured private service, and the existing signing identity. Secret values are never printed in logs.
+- Before staging this private build, a value-suppressing preflight requires a non-empty default URL, confirms the default token remains empty for the current private service, and records the signing certificate without printing configuration values.
 
 ## Verification
 
