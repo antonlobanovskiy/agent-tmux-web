@@ -7,6 +7,10 @@ const root = process.cwd();
 const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { version: string };
 const gradle = readFileSync(join(root, "android/app/build.gradle"), "utf8");
 const changelog = readFileSync(join(root, "CHANGELOG.md"), "utf8");
+const releasePlan = readFileSync(
+  join(root, "docs/superpowers/plans/2026-07-21-v0.1.24-release-visuals.md"),
+  "utf8"
+);
 
 describe("v0.1.24 release metadata", () => {
   it("keeps package and Android versions aligned", () => {
@@ -25,5 +29,10 @@ describe("v0.1.24 release metadata", () => {
     expect(release).toContain("edge-to-edge");
     expect(release).toContain("version code `25`");
     expect(release).not.toMatch(/\bTTY view\b|Terminal.*Details tabs/);
+  });
+
+  it("keeps the public release plan free of machine-specific home paths", () => {
+    expect(releasePlan).not.toMatch(/\/home\/[^/\s]+/);
+    expect(releasePlan).toContain('CHROMIUM_BIN="$HOME/');
   });
 });
