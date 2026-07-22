@@ -50,6 +50,10 @@ describe("responsive mobile CSS", () => {
     expect(css).toContain(".tmux-notify-button");
     expect(app).toContain("View:");
     expect(app).toContain('raw: "Raw"');
+    expect(app).toContain("hasAndroidConnectionSettings");
+    expect(app).toContain("openAndroidConnectionSettings");
+    expect(app).toContain(">App</span>");
+    expect(app).toContain(">Connection settings</span>");
     expect(mobileBlock).toContain("max-width: 150px");
     expect(mobileBlock).toContain("grid-template-columns: minmax(0, auto) 36px 36px minmax(0, 1fr) 36px");
     expect(mobileBlock).not.toContain("grid-template-columns: 36px 36px 36px 36px 36px 36px 36px minmax(0, 1fr)");

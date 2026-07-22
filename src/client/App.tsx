@@ -82,6 +82,7 @@ import { buildTmuxDoneNotification } from "./tmuxNotifications.js";
 import { normalizeRequestedTmuxSession, readRequestedTmuxSession, removeRequestedTmuxSession } from "./tmuxSessionTarget.js";
 import { buildTmuxAttentionEvents } from "./tmuxAttention.js";
 import { canShowBrowserNotifications, canShowWebSocketTaskNotifications, getBrowserNotificationAvailability, getBrowserNotificationSnapshot, setAndroidWatchPollingEnabled, showAgentNotification } from "./browserNotifications.js";
+import { hasAndroidConnectionSettings, openAndroidConnectionSettings } from "./androidConnectionSettings.js";
 
 type TimelineEntry = {
   id: string;
@@ -313,6 +314,7 @@ export function App() {
   const terminalActiveRef = useRef(terminalActive);
   const tmuxCaptureRequestIdRef = useRef(0);
   const tmuxToolLaunchRequestIdRef = useRef(0);
+  const androidConnectionSettingsAvailable = hasAndroidConnectionSettings();
 
   const modelEfforts = useMemo(() => {
     const found = models.find((entry) => entry.id === model || entry.model === model);
@@ -1248,6 +1250,13 @@ export function App() {
     setTerminalStatus(theme === "light" ? "light mode on" : "dark mode on");
   }
 
+  function showAndroidConnectionSettings() {
+    closeTmuxViewMenu();
+    if (!openAndroidConnectionSettings()) {
+      setError("Unable to open Android connection settings");
+    }
+  }
+
   async function toggleTmuxNotifications() {
     if (tmuxNotificationsEnabled) {
       setTmuxNotificationsEnabled(false);
@@ -2001,6 +2010,15 @@ export function App() {
                     <span>Dark</span>
                   </button>
                 </div>
+                {androidConnectionSettingsAvailable && (
+                  <div className="tmux-view-menu-section">
+                    <span>App</span>
+                    <button role="menuitem" type="button" onClick={showAndroidConnectionSettings}>
+                      <Wrench size={15} />
+                      <span>Connection settings</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </details>
             <button
