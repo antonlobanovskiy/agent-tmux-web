@@ -59,6 +59,17 @@ describe("responsive mobile CSS", () => {
     expect(mobileBlock).not.toContain("grid-template-columns: 36px 36px 36px 36px 36px 36px 36px minmax(0, 1fr)");
   });
 
+  it("removes the floating Android Set button in favor of the bridge menu", () => {
+    const mainActivity = readFileSync(join(
+      process.cwd(),
+      "android/app/src/main/java/com/agenttmux/web/MainActivity.java"
+    ), "utf8");
+
+    expect(mainActivity).not.toContain("addSettingsButton");
+    expect(mainActivity).not.toContain('setText("Set")');
+    expect(mainActivity).toContain("new AgentNotificationBridge(this, this::showSetup)");
+  });
+
   it("makes Raw the default terminal view without TTY-only code", () => {
     const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
     const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");

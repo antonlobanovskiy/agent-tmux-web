@@ -12,10 +12,32 @@ import android.webkit.JavascriptInterface;
 import android.widget.Toast;
 
 public final class AgentNotificationBridge {
-    private final Activity activity;
+    @FunctionalInterface
+    interface UiThreadRunner {
+        void run(Runnable action);
+    }
 
-    public AgentNotificationBridge(Activity activity) {
+    private final Activity activity;
+    private final UiThreadRunner uiThreadRunner;
+    private final Runnable openConnectionSettings;
+
+    public AgentNotificationBridge(Activity activity, Runnable openConnectionSettings) {
+        this(activity, activity::runOnUiThread, openConnectionSettings);
+    }
+
+    AgentNotificationBridge(
+        Activity activity,
+        UiThreadRunner uiThreadRunner,
+        Runnable openConnectionSettings
+    ) {
         this.activity = activity;
+        this.uiThreadRunner = uiThreadRunner;
+        this.openConnectionSettings = openConnectionSettings;
+    }
+
+    @JavascriptInterface
+    public void openConnectionSettings() {
+        uiThreadRunner.run(openConnectionSettings);
     }
 
     @JavascriptInterface

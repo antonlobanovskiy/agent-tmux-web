@@ -69,7 +69,6 @@ public final class MainActivity extends Activity {
         ));
 
         configureWebView();
-        addSettingsButton();
         requestNotificationPermission();
 
         if (serverUrl().isEmpty()) {
@@ -127,7 +126,10 @@ public final class MainActivity extends Activity {
 
     private void configureWebView() {
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
-        webView.addJavascriptInterface(new AgentNotificationBridge(this), "AgentTmuxAndroid");
+        webView.addJavascriptInterface(
+            new AgentNotificationBridge(this, this::showSetup),
+            "AgentTmuxAndroid"
+        );
         webView.setBackgroundColor(Color.rgb(13, 15, 16));
 
         WebSettings settings = webView.getSettings();
@@ -278,20 +280,6 @@ public final class MainActivity extends Activity {
         WebView.HitTestResult hitTestResult = view == null ? null : view.getHitTestResult();
         String url = hitTestResult == null ? "" : hitTestResult.getExtra();
         return url == null ? "" : url.trim();
-    }
-
-    private void addSettingsButton() {
-        Button button = new Button(this);
-        button.setText("Set");
-        button.setTextSize(11);
-        button.setAllCaps(false);
-        button.setAlpha(0.82f);
-        button.setOnClickListener(view -> showSetup());
-
-        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(dp(52), dp(38));
-        params.gravity = Gravity.TOP | Gravity.START;
-        params.setMargins(dp(8), dp(8), 0, 0);
-        root.addView(button, params);
     }
 
     private void showSetup() {
