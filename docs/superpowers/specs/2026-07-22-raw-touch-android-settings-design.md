@@ -22,10 +22,16 @@ Pin the coherent xterm beta set that contains the merged upstream touch fix:
 
 Exact versions prevent beta drift and keep all xterm packages on the same build line. The application will not add a custom touch-to-wheel bridge because that could interfere with long-press selection, link handling, alternate-screen behavior, and tmux mouse reporting.
 
+Rendered QA found a second upstream beta defect: valid direct touch changes carry finite coordinates and scroll correctly, but post-touch inertia changes omit `clientX`, `clientY`, `pageX`, and `pageY`. xterm converts those coordinate-less changes to tmux mouse reports containing `NaN`, which can leak into the shell prompt.
+
+Add one capture-phase guard for xterm's internal `-xterm-gesturechange` event. The guard calls `stopImmediatePropagation()` only when any of those four coordinates is non-finite. Finite direct touch changes continue to xterm unchanged. The application does not synthesize scrolling or replacement momentum; momentum is intentionally disabled until upstream inertia events carry valid coordinates or xterm rejects invalid coordinates itself.
+
 Rejected alternatives:
 
 - Downgrade to xterm 5.5.0: stable touch behavior, but reverses the 6.x viewport migration and increases unrelated regression risk.
 - Add an application-level touch bridge: avoids beta packages, but duplicates terminal gesture semantics and is likely to conflict with selection and mouse protocols.
+
+An isolated A/B test rejected the xterm 5.5.0 fallback because it ignores touch entirely while tmux mouse mode is active. The guarded beta moved through tmux history using only valid direct touch reports and emitted no malformed PTY input.
 
 ## Android Settings UI
 
@@ -44,7 +50,8 @@ The menu item is omitted in regular browsers. Browser users do not receive a dea
 - `src/client/androidBridge.ts` adds the optional `openConnectionSettings(): void` bridge capability.
 - `src/client/App.tsx` detects that capability and conditionally renders the menu item in the existing View menu.
 - Selecting the item closes the native HTML `details` menu before invoking the bridge.
-- Raw terminal setup remains otherwise unchanged and consumes the corrected xterm gesture implementation.
+- `src/client/rawTerminalGestureGuard.ts` owns the finite-coordinate predicate and capture-listener lifecycle.
+- Raw terminal setup installs that guard on the terminal host after xterm opens and removes it during effect cleanup.
 
 ### Android Wrapper
 
@@ -64,6 +71,7 @@ The menu item is omitted in regular browsers. Browser users do not receive a dea
 ## Error Handling
 
 - If the Android bridge call throws or is unavailable, the web client reports a concise existing-style error instead of leaving the menu open.
+- Invalid coordinate-less xterm inertia changes are stopped before mouse conversion; finite gesture changes are never modified or stopped.
 - The setup form retains URL validation and does not replace a valid stored configuration with an empty value.
 - A failed server load does not conditionally reintroduce the floating button. Connection configuration remains a menu action whenever the loaded workbench is available.
 - Before staging this private build, a value-suppressing preflight requires a non-empty default URL, confirms the default token remains empty for the current private service, and records the signing certificate without printing configuration values.
@@ -73,6 +81,7 @@ The menu item is omitted in regular browsers. Browser users do not receive a dea
 ### Automated
 
 - Add a dependency regression test that requires the exact matching xterm versions.
+- Add unit coverage for finite/non-finite gesture classification, capture-listener registration, selective blocking, and cleanup.
 - Add client tests for Android-only menu visibility, bridge invocation, menu closure, and browser omission.
 - Add Android unit coverage for bridge-to-settings callback behavior.
 - Run the full web suite, TypeScript checks, production build, and Android debug/release unit tests.
@@ -85,7 +94,8 @@ The menu item is omitted in regular browsers. Browser users do not receive a dea
 - Confirm no framework overlay or unexplained console errors.
 - Verify desktop wheel scrolling still works.
 - Verify touch scrolling with normal xterm scrollback and with tmux mouse mode enabled.
-- Verify long-press selection, copied selection, links, soft keys, rotation, reconnect, and terminal resizing remain usable.
+- Verify all Raw touch WebSocket inputs and PTY writes use finite numeric SGR mouse coordinates and contain no `NaN`.
+- Verify links, soft keys, rotation, reconnect, and terminal resizing remain usable. Record long-press selection as unresolved when tmux mouse mode disables it; do not claim a physical-device pass from browser emulation.
 - Perform a final physical-device check after APK installation because browser touch emulation cannot fully reproduce Android WebView gesture dispatch.
 
 ## Privacy And Distribution
@@ -101,3 +111,4 @@ The menu item is omitted in regular browsers. Browser users do not receive a dea
 - Redesigning the setup panel.
 - Bundling a complete offline copy of the web workbench into the APK.
 - Changing tmux mouse configuration or terminal copy-mode semantics.
+- Implementing replacement inertial momentum or claiming long-press selection works in tmux mouse mode without a physical-device pass.

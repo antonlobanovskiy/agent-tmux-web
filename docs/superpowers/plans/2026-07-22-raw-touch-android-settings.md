@@ -4,7 +4,7 @@
 
 **Goal:** Restore Raw terminal finger scrolling, move Android connection configuration into the existing View menu, deploy the corrected web client privately, and provide an updateable private APK with the existing Tailscale URL default.
 
-**Architecture:** Fix scrolling at its confirmed source by exactly pinning the coherent xterm beta line containing upstream touch gestures; do not add application gesture shims. Add one testable web bridge helper and one narrow Android UI-thread callback so the existing View menu can open the existing native setup panel without a floating native button. Merge the reviewed branch locally before rebuilding the private service and APK because the APK loads the server-hosted client.
+**Architecture:** Fix scrolling at its confirmed source by exactly pinning the coherent xterm beta line containing upstream touch gestures, then block only its coordinate-less inertia events before mouse conversion without synthesizing replacement scrolling. Add one testable web bridge helper and one narrow Android UI-thread callback so the existing View menu can open the existing native setup panel without a floating native button. Merge the reviewed branch locally before rebuilding the private service and APK because the APK loads the server-hosted client.
 
 **Tech Stack:** React 19, TypeScript, xterm 6.1 beta, Vitest, Playwright Chromium, Android Java/WebView, JUnit 4, Gradle, tmux, systemd user service
 
@@ -12,6 +12,8 @@
 
 - Pin exactly `@xterm/xterm@6.1.0-beta.291`, `@xterm/addon-fit@0.12.0-beta.291`, and `@xterm/addon-web-links@0.13.0-beta.291` with no semver range.
 - Do not add a custom touch-to-wheel or touch-to-scroll bridge.
+- Stop only `-xterm-gesturechange` events with a non-finite `clientX`, `clientY`, `pageX`, or `pageY`; pass finite direct touch changes through unchanged.
+- Do not synthesize replacement inertial momentum.
 - Remove the native floating `Set` button completely.
 - Render `Connection settings` only when `window.AgentTmuxAndroid.openConnectionSettings` exists.
 - Put `Connection settings` in an Android-only `App` section of the existing View menu.
@@ -410,7 +412,143 @@ Expected: 32 debug and 32 release Android tests pass (64 executions total); web 
 
 ---
 
-### Task 4: Rendered QA, Local Deployment, And Private APK
+### Task 4: Block Malformed Xterm Inertia Reports
+
+**Files:**
+- Create: `src/client/rawTerminalGestureGuard.ts`
+- Create: `src/client/__tests__/rawTerminalGestureGuard.test.ts`
+- Modify: `src/client/App.tsx:667-843`
+- Modify: `src/client/__tests__/styles.test.ts`
+- Modify: `registry.json`
+
+**Interfaces:**
+- Consumes: xterm's internal `-xterm-gesturechange` event and the Raw terminal host lifecycle.
+- Produces: `installRawTerminalGestureGuard(node): () => void`, which blocks only non-finite coordinate events and returns exact listener cleanup.
+
+- [ ] **Step 1: Add failing guard behavior tests**
+
+Create `src/client/__tests__/rawTerminalGestureGuard.test.ts`:
+
+```ts
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  installRawTerminalGestureGuard,
+  shouldBlockRawTerminalGesture
+} from "../rawTerminalGestureGuard.js";
+
+describe("Raw terminal gesture guard", () => {
+  it("blocks only gestures with non-finite coordinates", () => {
+    expect(shouldBlockRawTerminalGesture({ clientX: 12, clientY: 24, pageX: 12, pageY: 24 })).toBe(false);
+    expect(shouldBlockRawTerminalGesture({ clientX: undefined, clientY: 24, pageX: 12, pageY: 24 })).toBe(true);
+    expect(shouldBlockRawTerminalGesture({ clientX: Number.NaN, clientY: 24, pageX: 12, pageY: 24 })).toBe(true);
+  });
+
+  it("registers in capture phase, blocks invalid inertia, and removes exactly", () => {
+    const addEventListener = vi.fn();
+    const removeEventListener = vi.fn();
+    const node = { addEventListener, removeEventListener };
+    const cleanup = installRawTerminalGestureGuard(node);
+    const listener = addEventListener.mock.calls[0]?.[1] as (event: Event) => void;
+    const stopImmediatePropagation = vi.fn();
+
+    listener({
+      clientX: undefined,
+      clientY: undefined,
+      pageX: undefined,
+      pageY: undefined,
+      stopImmediatePropagation
+    } as unknown as Event);
+    expect(stopImmediatePropagation).toHaveBeenCalledOnce();
+
+    cleanup();
+    expect(addEventListener).toHaveBeenCalledWith("-xterm-gesturechange", listener, true);
+    expect(removeEventListener).toHaveBeenCalledWith("-xterm-gesturechange", listener, true);
+  });
+});
+```
+
+Extend the Raw source assertion in `styles.test.ts`:
+
+```ts
+expect(app).toContain("installRawTerminalGestureGuard(node)");
+expect(app).toContain("removeRawTerminalGestureGuard()");
+```
+
+- [ ] **Step 2: Run focused tests and verify RED**
+
+```bash
+pnpm test src/client/__tests__/rawTerminalGestureGuard.test.ts src/client/__tests__/styles.test.ts
+```
+
+Expected: FAIL because the guard module and Raw lifecycle wiring do not exist.
+
+- [ ] **Step 3: Implement the selective capture guard**
+
+Create `src/client/rawTerminalGestureGuard.ts`:
+
+```ts
+const XTERM_GESTURE_CHANGE_EVENT = "-xterm-gesturechange";
+
+type RawTerminalGestureCoordinates = {
+  clientX?: number;
+  clientY?: number;
+  pageX?: number;
+  pageY?: number;
+};
+
+type RawTerminalGestureTarget = Pick<HTMLElement, "addEventListener" | "removeEventListener">;
+
+export function shouldBlockRawTerminalGesture(event: RawTerminalGestureCoordinates): boolean {
+  return ![event.clientX, event.clientY, event.pageX, event.pageY].every(Number.isFinite);
+}
+
+export function installRawTerminalGestureGuard(node: RawTerminalGestureTarget): () => void {
+  const stopInvalidInertia = (event: Event) => {
+    if (shouldBlockRawTerminalGesture(event as MouseEvent)) {
+      event.stopImmediatePropagation();
+    }
+  };
+  node.addEventListener(XTERM_GESTURE_CHANGE_EVENT, stopInvalidInertia, true);
+  return () => node.removeEventListener(XTERM_GESTURE_CHANGE_EVENT, stopInvalidInertia, true);
+}
+```
+
+Register the new runtime file and self-contained test in the same `web-app` and `full-project` registry sections used by other client helpers.
+
+- [ ] **Step 4: Wire guard lifecycle into Raw terminal setup**
+
+Import the helper in `App.tsx`. Immediately after `terminal.open(node)`, add:
+
+```ts
+const removeRawTerminalGestureGuard = installRawTerminalGestureGuard(node);
+```
+
+In the Raw effect cleanup, call:
+
+```ts
+removeRawTerminalGestureGuard();
+```
+
+Call cleanup before `terminal.dispose()`. Do not alter terminal input, wheel handling, CSS, selection, or socket data.
+
+- [ ] **Step 5: Verify and commit Task 4**
+
+```bash
+pnpm test src/client/__tests__/rawTerminalGestureGuard.test.ts src/client/__tests__/styles.test.ts src/shared/__tests__/registry.test.ts
+pnpm test
+pnpm typecheck
+pnpm build
+git diff --check
+git add src/client/rawTerminalGestureGuard.ts src/client/__tests__/rawTerminalGestureGuard.test.ts src/client/App.tsx src/client/__tests__/styles.test.ts registry.json
+git commit -m "Block malformed xterm touch inertia"
+```
+
+Expected: focused/full tests and builds pass; no custom scroll synthesis or PTY filtering exists.
+
+---
+
+### Task 5: Rendered QA, Local Deployment, And Private APK
 
 **Files:**
 - Create temporarily: `/tmp/opencode/raw-touch-settings-qa/`
@@ -482,11 +620,13 @@ visible .xterm-rows text changes from the original tail to older touch-test line
 the xterm viewport reports a lower viewportY than buffer baseY
 ```
 
-Then verify desktop wheel scrolling, link activation, long-press/selection behavior, soft keys, reconnect, and a viewport rotation. Always remove only the disposable session:
+Then verify desktop wheel scrolling, link activation, soft keys, reconnect, and a viewport rotation. Record long-press selection as pending when tmux mouse mode disables selection; do not treat that limitation as a scrolling failure or physical-device pass. Always remove only the disposable session:
 
 ```bash
 tmux kill-session -t "$session"
 ```
+
+Instrument the disposable loopback server immediately before its PTY write only for this QA run. Verify every browser `type: "input"` message exactly matches its PTY write and every SGR mouse report contains finite numeric coordinates. Fail the gate if any input contains `NaN`, `Infinity`, `undefined`, or malformed `ESC [ < ... M/m` coordinates.
 
 - [ ] **Step 4: Obtain final branch review before deployment**
 
