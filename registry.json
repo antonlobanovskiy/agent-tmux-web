@@ -56,6 +56,7 @@
         { "path": "src/client/linkify.ts", "type": "registry:file", "target": "~/src/client/linkify.ts" },
         { "path": "src/client/rawTerminalLinks.ts", "type": "registry:file", "target": "~/src/client/rawTerminalLinks.ts" },
         { "path": "src/client/rawTerminalMode.ts", "type": "registry:file", "target": "~/src/client/rawTerminalMode.ts" },
+        { "path": "src/client/rawTerminalGestureGuard.ts", "type": "registry:file", "target": "~/src/client/rawTerminalGestureGuard.ts" },
         { "path": "src/client/rawTerminalSelection.ts", "type": "registry:file", "target": "~/src/client/rawTerminalSelection.ts" },
         { "path": "src/client/main.tsx", "type": "registry:file", "target": "~/src/client/main.tsx" },
         { "path": "src/client/slashCommands.ts", "type": "registry:file", "target": "~/src/client/slashCommands.ts" },
@@ -78,6 +79,7 @@
         { "path": "src/client/__tests__/linkify.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/linkify.test.ts" },
         { "path": "src/client/__tests__/rawTerminalLinks.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/rawTerminalLinks.test.ts" },
         { "path": "src/client/__tests__/rawTerminalMode.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/rawTerminalMode.test.ts" },
+        { "path": "src/client/__tests__/rawTerminalGestureGuard.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/rawTerminalGestureGuard.test.ts" },
         { "path": "src/client/__tests__/rawTerminalSelection.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/rawTerminalSelection.test.ts" },
         { "path": "src/client/__tests__/slashCommands.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/slashCommands.test.ts" },
         { "path": "src/client/__tests__/theme.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/theme.test.ts" },
@@ -267,6 +269,11 @@
           "target": "~/src/client/rawTerminalMode.ts"
         },
         {
+          "path": "src/client/rawTerminalGestureGuard.ts",
+          "type": "registry:file",
+          "target": "~/src/client/rawTerminalGestureGuard.ts"
+        },
+        {
           "path": "src/client/rawTerminalSelection.ts",
           "type": "registry:file",
           "target": "~/src/client/rawTerminalSelection.ts"
@@ -375,6 +382,11 @@
           "path": "src/client/__tests__/rawTerminalMode.test.ts",
           "type": "registry:file",
           "target": "~/src/client/__tests__/rawTerminalMode.test.ts"
+        },
+        {
+          "path": "src/client/__tests__/rawTerminalGestureGuard.test.ts",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/rawTerminalGestureGuard.test.ts"
         },
         {
           "path": "src/client/__tests__/rawTerminalSelection.test.ts",

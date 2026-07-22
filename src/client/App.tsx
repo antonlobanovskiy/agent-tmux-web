@@ -58,6 +58,7 @@ import { applyTextareaPaste, buildPastedPromptText, extractPastedImageFiles, for
 import { LinkifiedText } from "./LinkifiedText.js";
 import { openRawTerminalLink } from "./rawTerminalLinks.js";
 import { shouldShowRawTerminalShortcuts, shouldShowTmuxJumpToLatest, shouldShowTmuxSendForm } from "./rawTerminalMode.js";
+import { installRawTerminalGestureGuard } from "./rawTerminalGestureGuard.js";
 import { createRawTerminalSelectionHandler } from "./rawTerminalSelection.js";
 import { parseTmuxChatOutput, splitTmuxChatMessage, type TmuxChatMessage } from "./tmuxGui.js";
 import { cleanTmuxAssistantCopyText } from "./tmuxCopy.js";
@@ -694,6 +695,7 @@ export function App() {
     terminal.loadAddon(fitAddon);
     terminal.loadAddon(webLinksAddon);
     terminal.open(node);
+    const removeRawTerminalGestureGuard = installRawTerminalGestureGuard(node);
     rawTerminalRef.current = terminal;
 
     const selectionDisposable = terminal.onSelectionChange(createRawTerminalSelectionHandler({
@@ -840,6 +842,7 @@ export function App() {
         socket.onclose = null;
         socket.close();
       }
+      removeRawTerminalGestureGuard();
       terminal.dispose();
     };
   }, [colorTheme, rawTerminalConnectionId, selectedTmux, terminalActive]);

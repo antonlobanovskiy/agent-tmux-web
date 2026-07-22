@@ -81,6 +81,8 @@ describe("responsive mobile CSS", () => {
     expect(app).toContain("shouldShowRawTerminalShortcuts");
     expect(app).toContain("WebLinksAddon");
     expect(app).toContain("createRawTerminalSelectionHandler");
+    expect(app).toContain("installRawTerminalGestureGuard(node)");
+    expect(app).toContain("removeRawTerminalGestureGuard()");
     expect(app).toContain('role="menuitemradio"');
     expect(css).not.toContain(".tmux-opencode-tabs");
   });
