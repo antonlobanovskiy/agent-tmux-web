@@ -6,6 +6,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { chromium } from "playwright";
 
+import {
+  assertShowcaseMetadata,
+  InvalidMarketingAssetError,
+  recoverStaleAssetDirectories
+} from "./marketing-assets.mjs";
+
 const SHOWCASE_WIDTH = 1920;
 const SHOWCASE_HEIGHT = 1080;
 const SHOWCASE_FPS = 30;
@@ -47,6 +53,7 @@ const EXPECTED_PNG_DIMENSIONS = new Map([
   ["mobile-raw.png", [MOBILE_WIDTH, MOBILE_HEIGHT]],
   ["modes-overview.png", [SHOWCASE_WIDTH, SHOWCASE_HEIGHT]]
 ]);
+const SIGNAL_EXIT_CODES = { SIGINT: 130, SIGTERM: 143 };
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const docsDir = path.join(root, "docs");
@@ -105,12 +112,20 @@ const showcaseScenes = [
 
 let browser;
 let server;
-let generationAbortController;
+const generationAbortController = new AbortController();
 let stoppingServer = false;
+let interruptedSignal;
+let failure;
+const handleSigint = () => handleTerminationSignal("SIGINT");
+const handleSigterm = () => handleTerminationSignal("SIGTERM");
+process.once("SIGINT", handleSigint);
+process.once("SIGTERM", handleSigterm);
 
 try {
   await prepareStagingDirectories();
+  generationAbortController.signal.throwIfAborted();
   await assertLoopbackPortAvailable(appPort);
+  generationAbortController.signal.throwIfAborted();
 
   server = spawn("node", ["dist/server/server/index.js"], {
     cwd: root,
@@ -126,7 +141,6 @@ try {
   server.stdout.on("data", (chunk) => process.stdout.write(chunk));
   server.stderr.on("data", (chunk) => process.stderr.write(chunk));
 
-  generationAbortController = new AbortController();
   const serverFailure = monitorServer(server, generationAbortController);
   const generationPromise = generateAndPublishAssets(generationAbortController.signal);
   try {
@@ -139,13 +153,23 @@ try {
   }
 
   console.log(`Marketing assets written to ${path.relative(root, publishedAssetsDir)}`);
+} catch (error) {
+  failure = error;
 } finally {
   stoppingServer = true;
-  generationAbortController?.abort();
+  generationAbortController.abort();
   await browser?.close().catch(() => {});
   await stopServer(server);
   await rm(stagingAssetsDir, { recursive: true, force: true });
   await rm(backupAssetsDir, { recursive: true, force: true });
+  process.removeListener("SIGINT", handleSigint);
+  process.removeListener("SIGTERM", handleSigterm);
+}
+
+if (interruptedSignal) {
+  process.exitCode = SIGNAL_EXIT_CODES[interruptedSignal];
+} else if (failure) {
+  throw failure;
 }
 
 async function generateAndPublishAssets(signal) {
@@ -156,6 +180,8 @@ async function generateAndPublishAssets(signal) {
   console.log("Starting Playwright Chromium");
   browser = await chromium.launch({
     headless: true,
+    handleSIGINT: false,
+    handleSIGTERM: false,
     executablePath: process.env.CHROMIUM_BIN || undefined,
     args: ["--no-sandbox"]
   });
@@ -749,6 +775,11 @@ function backdropMarkup() {
 }
 
 async function prepareStagingDirectories() {
+  await recoverStaleAssetDirectories({
+    docsDir,
+    publishedAssetsDir,
+    validateAssetDirectory
+  });
   if (await pathExists(backupAssetsDir)) {
     if (!(await pathExists(publishedAssetsDir))) {
       await rename(backupAssetsDir, publishedAssetsDir);
@@ -812,39 +843,37 @@ async function stopServer(child) {
 }
 
 async function validateStagedAssets() {
-  const files = (await readdir(stagingAssetsDir)).sort();
+  await validateAssetDirectory(stagingAssetsDir);
+}
+
+async function validateAssetDirectory(directory) {
+  const files = (await readdir(directory)).sort();
   if (JSON.stringify(files) !== JSON.stringify(APPROVED_ASSETS)) {
-    throw new Error(`Unexpected staged asset inventory: ${files.join(", ")}`);
+    throw new InvalidMarketingAssetError(`Unexpected asset inventory in ${directory}: ${files.join(", ")}`);
   }
 
   for (const [name, [expectedWidth, expectedHeight]] of EXPECTED_PNG_DIMENSIONS) {
-    const metadata = await probeAsset(path.join(stagingAssetsDir, name));
+    const metadata = await probeAsset(path.join(directory, name));
     const stream = metadata.streams?.[0];
     if (stream?.codec_name !== "png" || stream.width !== expectedWidth || stream.height !== expectedHeight) {
-      throw new Error(`Invalid ${name} metadata: ${JSON.stringify(stream)}`);
+      throw new InvalidMarketingAssetError(`Invalid ${name} metadata: ${JSON.stringify(stream)}`);
     }
   }
 
-  const video = await probeAsset(path.join(stagingAssetsDir, "agent-tmux-web-showcase.mp4"));
-  const stream = video.streams?.[0];
-  const duration = Number(video.format?.duration);
-  if (
-    stream?.codec_name !== "h264"
-    || stream.width !== SHOWCASE_WIDTH
-    || stream.height !== SHOWCASE_HEIGHT
-    || stream.pix_fmt !== "yuv420p"
-    || stream.r_frame_rate !== `${SHOWCASE_FPS}/1`
-    || duration < 12
-    || duration > 18
-  ) {
-    throw new Error(`Invalid showcase metadata: ${JSON.stringify(video)}`);
-  }
+  const video = await probeAsset(path.join(directory, "agent-tmux-web-showcase.mp4"));
+  assertShowcaseMetadata(video, {
+    width: SHOWCASE_WIDTH,
+    height: SHOWCASE_HEIGHT,
+    fps: SHOWCASE_FPS,
+    minDuration: 12,
+    maxDuration: 18
+  });
 }
 
 async function probeAsset(file) {
   const output = await runForOutput("ffprobe", [
     "-v", "error",
-    "-show_entries", "stream=codec_name,pix_fmt,width,height,r_frame_rate,avg_frame_rate",
+    "-show_entries", "stream=codec_type,codec_name,pix_fmt,width,height,r_frame_rate,avg_frame_rate",
     "-show_entries", "format=duration,size",
     "-of", "json",
     file
@@ -966,4 +995,12 @@ function delay(ms, signal) {
     }, ms);
     signal?.addEventListener("abort", onAbort, { once: true });
   });
+}
+
+function handleTerminationSignal(signal) {
+  if (interruptedSignal) {
+    return;
+  }
+  interruptedSignal = signal;
+  generationAbortController.abort(new Error(`Marketing capture interrupted by ${signal}`));
 }

@@ -316,6 +316,49 @@ describe("current user guidance", () => {
     expect(marketingCapture).not.toMatch(/rm\(\s*publishedAssetsDir\s*,/);
   });
 
+  it("recovers stale cross-PID capture directories before creating current staging", () => {
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+    const recovery = marketingCapture.indexOf("await recoverStaleAssetDirectories(");
+    const currentStaging = marketingCapture.indexOf("await mkdir(framesDir, { recursive: true });");
+
+    expect(recovery).toBeGreaterThanOrEqual(0);
+    expect(currentStaging).toBeGreaterThan(recovery);
+    expect(marketingCapture).toContain("validateAssetDirectory");
+  });
+
+  it("aborts capture on SIGINT and SIGTERM before shared cleanup sets signal exit status", () => {
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+
+    expect(marketingCapture).toMatch(/process\.once\(\s*["']SIGINT["']/);
+    expect(marketingCapture).toMatch(/process\.once\(\s*["']SIGTERM["']/);
+    expect(marketingCapture).toMatch(/generationAbortController\.abort\(/);
+    expect(marketingCapture).toMatch(/handleSIGINT\s*:\s*false/);
+    expect(marketingCapture).toMatch(/handleSIGTERM\s*:\s*false/);
+    expect(marketingCapture).toMatch(/SIGINT\s*:\s*130/);
+    expect(marketingCapture).toMatch(/SIGTERM\s*:\s*143/);
+    expect(marketingCapture).toMatch(/process\.exitCode\s*=\s*SIGNAL_EXIT_CODES\[interruptedSignal\]/);
+
+    const cleanup = marketingCapture.slice(marketingCapture.indexOf("} finally {"));
+    expect(cleanup).toContain("await browser?.close()");
+    expect(cleanup).toContain("await stopServer(server)");
+    expect(cleanup).toContain("await rm(stagingAssetsDir");
+    expect(cleanup).toContain("await rm(backupAssetsDir");
+  });
+
+  it("ignores interrupted marketing staging and backup directories", () => {
+    const gitignore = readFileSync(join(process.cwd(), ".gitignore"), "utf8").split(/\r?\n/);
+
+    expect(gitignore).toContain("docs/.assets-staging-*");
+    expect(gitignore).toContain("docs/.assets-backup-*");
+  });
+
+  it("requests codec types and validates the complete showcase stream list", () => {
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+
+    expect(marketingCapture).toContain("stream=codec_type,codec_name,pix_fmt,width,height,r_frame_rate,avg_frame_rate");
+    expect(marketingCapture).toContain("assertShowcaseMetadata(video");
+  });
+
   it("presents the reviewed README visual hierarchy with accurate alt text", () => {
     const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
     const introductionClosing = "tabs without killing the work.";
