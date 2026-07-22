@@ -57,7 +57,12 @@ import { writeClipboardText } from "./clipboard.js";
 import { applyTextareaPaste, buildPastedPromptText, extractPastedImageFiles, formatUploadedFilesForPrompt, isMobileInputDevice, readInputDeviceContext, shouldSubmitTextareaEnter } from "./inputBehavior.js";
 import { LinkifiedText } from "./LinkifiedText.js";
 import { openRawTerminalLink } from "./rawTerminalLinks.js";
-import { shouldShowRawTerminalShortcuts, shouldShowTmuxJumpToLatest, shouldShowTmuxSendForm } from "./rawTerminalMode.js";
+import {
+  shouldFocusRawTerminalTap,
+  shouldShowRawTerminalShortcuts,
+  shouldShowTmuxJumpToLatest,
+  shouldShowTmuxSendForm
+} from "./rawTerminalMode.js";
 import { installRawTerminalGestureGuard } from "./rawTerminalGestureGuard.js";
 import { createRawTerminalSelectionHandler } from "./rawTerminalSelection.js";
 import { parseTmuxChatOutput, splitTmuxChatMessage, type TmuxChatMessage } from "./tmuxGui.js";
@@ -696,6 +701,26 @@ export function App() {
     terminal.loadAddon(webLinksAddon);
     terminal.open(node);
     const removeRawTerminalGestureGuard = installRawTerminalGestureGuard(node);
+    const terminalScreen = terminal.element?.querySelector<HTMLElement>(".xterm-screen") ?? null;
+    const focusTerminalFromTap = (event: Event) => {
+      if (!terminalScreen) {
+        return;
+      }
+      const bounds = terminalScreen.getBoundingClientRect();
+      const pageY = (event as Event & { pageY?: number }).pageY;
+      if (shouldFocusRawTerminalTap({
+        baseY: terminal.buffer.active.baseY,
+        cursorY: terminal.buffer.active.cursorY,
+        pageY,
+        rows: terminal.rows,
+        screenHeight: bounds.height,
+        screenPageTop: bounds.top + window.scrollY,
+        viewportY: terminal.buffer.active.viewportY
+      })) {
+        terminal.focus();
+      }
+    };
+    terminalScreen?.addEventListener("-xterm-gesturetap", focusTerminalFromTap);
     rawTerminalRef.current = terminal;
 
     const selectionDisposable = terminal.onSelectionChange(createRawTerminalSelectionHandler({
@@ -712,11 +737,6 @@ export function App() {
         }
       }
     }));
-
-    const focusTerminal = () => {
-      terminal.focus();
-    };
-    node.addEventListener("pointerdown", focusTerminal);
 
     const fitTerminal = () => {
       try {
@@ -759,7 +779,9 @@ export function App() {
     if (demoMode) {
       terminal.write(DEMO_RAW_TERMINAL_OUTPUT);
       setTerminalStatus(`live terminal for ${session}`);
-      terminal.focus();
+      if (!mobileRawInput) {
+        terminal.focus();
+      }
     } else {
       const params = new URLSearchParams({
         session,
@@ -780,7 +802,9 @@ export function App() {
         terminalSocketRef.current = terminalSocket;
         terminalSessionRef.current = session;
         setTerminalStatus(`live terminal for ${session}`);
-        terminal.focus();
+        if (!mobileRawInput) {
+          terminal.focus();
+        }
       };
       terminalSocket.onmessage = (event) => {
         const payload = parseTerminalSocketMessage(event.data);
@@ -825,7 +849,7 @@ export function App() {
       socket?.removeEventListener("open", sendResize);
       window.removeEventListener("resize", resize);
       resizeObserver.disconnect();
-      node.removeEventListener("pointerdown", focusTerminal);
+      terminalScreen?.removeEventListener("-xterm-gesturetap", focusTerminalFromTap);
       inputDisposable.dispose();
       selectionDisposable.dispose();
       if (socket && terminalSocketRef.current === socket) {
@@ -845,7 +869,7 @@ export function App() {
       removeRawTerminalGestureGuard();
       terminal.dispose();
     };
-  }, [colorTheme, rawTerminalConnectionId, selectedTmux, terminalActive]);
+  }, [colorTheme, mobileRawInput, rawTerminalConnectionId, selectedTmux, terminalActive]);
 
   async function sendMessage(event: FormEvent) {
     event.preventDefault();
@@ -1310,7 +1334,6 @@ export function App() {
   }
 
   function sendRawTerminalData(data: string) {
-    focusRawTerminal();
     if (demoMode && terminalActive) {
       setTerminalStatus(`sent ${describeTerminalKey(data)} to ${selectedTmux}`);
       return;
@@ -1321,11 +1344,6 @@ export function App() {
       return;
     }
     socket.send(JSON.stringify({ type: "input", data }));
-    focusRawTerminal();
-  }
-
-  function focusRawTerminal() {
-    rawTerminalRef.current?.focus();
   }
 
   function sendTmuxViaTerminal(session: string, text: string): boolean {
@@ -2201,7 +2219,6 @@ export function App() {
                 aria-label="Raw interactive tmux terminal"
                 className="tmux-terminal"
                 role="application"
-                onPointerDown={focusRawTerminal}
               />
             ) : tmuxFocusActive ? (
               <TmuxFocusView
