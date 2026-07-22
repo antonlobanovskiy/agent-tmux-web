@@ -281,6 +281,10 @@ async function renderShowcaseAssets(page, signal) {
   await setViewport(page, SHOWCASE_WIDTH, SHOWCASE_HEIGHT);
   await page.goto(pathToFileURL(htmlFile).href, { waitUntil: "load" });
   await page.waitForFunction(() => window.assetsReady === true);
+  const assetsError = await page.evaluate(() => window.assetsError);
+  if (assetsError) {
+    throw new Error(`Showcase asset preload failed: ${assetsError}`);
+  }
 
   await evaluate(page, `window.renderFrame(${Math.floor(FRAMES_PER_SCENE / 2)})`);
   await capture(page, path.join(assetsDir, "agent-tmux-web-showcase-poster.png"), signal);
@@ -654,12 +658,17 @@ function buildShowcaseHtml() {
       : 1 - Math.pow(-2 * value + 2, 3) / 2;
 
     window.assetsReady = false;
+    window.assetsError = null;
     Promise.all(scenes.filter((scene) => scene.media).map((scene) => new Promise((resolve, reject) => {
       const preload = new Image();
       preload.onload = resolve;
-      preload.onerror = reject;
+      preload.onerror = () => reject(new Error("Failed to preload showcase asset: " + scene.media));
       preload.src = scene.media;
-    }))).then(() => { window.assetsReady = true; });
+    }))).catch((error) => {
+      window.assetsError = error instanceof Error ? error.message : String(error);
+    }).finally(() => {
+      window.assetsReady = true;
+    });
 
     function setLayerScene(layer, index) {
       if (layer.dataset.sceneIndex === String(index)) {

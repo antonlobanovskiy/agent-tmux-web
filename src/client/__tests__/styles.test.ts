@@ -264,6 +264,20 @@ describe("current user guidance", () => {
     expect(marketingCapture).not.toContain("agent-tmux-web-showcase.gif");
   });
 
+  it("fails fast when showcase image preloading fails", () => {
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+    const showcaseRenderer = marketingCapture.slice(
+      marketingCapture.indexOf("async function renderShowcaseAssets"),
+      marketingCapture.indexOf("function buildHeroHtml")
+    );
+
+    expect(marketingCapture).toContain("window.assetsError = null;");
+    expect(marketingCapture).toContain("window.assetsError = error instanceof Error ? error.message : String(error);");
+    expect(marketingCapture).toMatch(/\.finally\(\(\) => \{\s*window\.assetsReady = true;\s*\}\)/);
+    expect(showcaseRenderer).toContain("const assetsError = await page.evaluate(() => window.assetsError);");
+    expect(showcaseRenderer).toContain("Showcase asset preload failed");
+  });
+
   it("resets Focus to its status and attention summary before capture", () => {
     const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
     const focusSelection = marketingCapture.indexOf('await chooseView(page, "Focus", signal);');

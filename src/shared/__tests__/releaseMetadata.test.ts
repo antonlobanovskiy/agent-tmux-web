@@ -32,7 +32,11 @@ describe("v0.1.24 release metadata", () => {
   });
 
   it("keeps the public release plan free of machine-specific home paths", () => {
-    expect(releasePlan).not.toMatch(/\/home\/[^/\s]+/);
+    const machineSpecificHomePath = /(?:\/(?:home|Users)\/[^/\s]+|[A-Z]:\\Users\\[^\\\s]+)/i;
+    for (const example of ["/home/alice/project", "/Users/alice/project", "C:\\Users\\alice\\project"]) {
+      expect(example).toMatch(machineSpecificHomePath);
+    }
+    expect(releasePlan).not.toMatch(machineSpecificHomePath);
     expect(releasePlan).toContain('CHROMIUM_BIN="$HOME/');
   });
 });
