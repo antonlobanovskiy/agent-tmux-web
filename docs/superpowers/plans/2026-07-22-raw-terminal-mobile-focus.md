@@ -619,7 +619,7 @@ Expected: main fast-forwards to the reviewed head and all gates pass. Do not pus
 - [ ] **Step 2: Verify the live client rebuild without restarting service or tmux**
 
 ```bash
-systemctl --user is-active agent-tmux-web.service
+systemctl --user is-active codex-web.service
 curl --fail --silent http://127.0.0.1:6174/healthz
 ```
 
