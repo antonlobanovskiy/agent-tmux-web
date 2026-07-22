@@ -8,15 +8,16 @@ uploads, machine-specific service edits, or private signing material.
 
 ## Unreleased
 
-- Separated OpenCode's 42-column context sidebar from the conversation and
-  prompt area in captured TTY view instead of allowing terminal wrapping to
-  merge the two regions.
-- Added responsive `Terminal` and `Details` tabs when a wide OpenCode pane is
-  viewed on a phone, with independent scroll positions for each tab.
-- Added `Full UI` and capability-detected `Linear TTY` OpenCode launcher modes;
-  Full UI remains the default and Linear TTY provides native tmux scrollback.
-- Kept OpenCode desktop captures wide enough for centered dialogs such as the
-  model picker to remain inside the terminal region.
+## 0.1.24 - 2026-07-21
+
+- Redesigned the app as a dense responsive tmux workbench and made Raw the default view across launchers and sessions.
+- Removed the redundant TTY output while keeping GUI and Focus available for readable capture and status triage.
+- Added safe Raw HTTP(S) link opening and automatic device-local selection copying in browsers and Android.
+- Replaced client-visible upload storage paths with safe attachment references such as `~/.agent-tmux/attachments/...`.
+- Hardened Raw reconnect/capture lifecycle behavior and Android external-link validation.
+- Flattened Raw, GUI, Focus, and empty output so the workspace renders edge-to-edge without nested framing.
+- Refreshed public GitHub visuals and the smooth product showcase using fake demo data only.
+- Bumped public Android defaults to `0.1.24` / version code `25`.
 
 ## 0.1.23 - 2026-07-18
 

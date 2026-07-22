@@ -22,3 +22,5 @@ android/app/*.keystore
 android/app/build/
 .DS_Store
 .worktrees/
+docs/.assets-staging-*
+docs/.assets-backup-*

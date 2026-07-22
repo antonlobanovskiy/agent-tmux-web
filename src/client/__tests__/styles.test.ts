@@ -1,5 +1,4 @@
-import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -23,16 +22,6 @@ function extractBalancedCssBlock(css: string, marker: string) {
   }
 
   throw new Error(`Unbalanced CSS block: ${marker}`);
-}
-
-function trackedExistingFiles(directory: string): string[] {
-  const gitLines = (args: string[]) => execFileSync("git", args, {
-    cwd: process.cwd(),
-    encoding: "utf8"
-  }).trim().split("\n").filter(Boolean);
-  const tracked = gitLines(["ls-files", "--", directory]);
-  const deleted = new Set(gitLines(["ls-files", "--deleted", "--", directory]));
-  return tracked.filter((file) => !deleted.has(file));
 }
 
 describe("responsive mobile CSS", () => {
@@ -239,27 +228,230 @@ describe("responsive mobile CSS", () => {
 });
 
 describe("current user guidance", () => {
-  it("selects GUI before capturing mobile chat marketing media", () => {
+  it("selects GUI before capturing mobile GUI marketing media", () => {
     const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
     const navigation = marketingCapture.indexOf("await page.goto(demoUrl");
-    const guiSelection = marketingCapture.indexOf('await chooseView(page, "GUI");', navigation);
-    const mobileChatCapture = marketingCapture.indexOf('await capture(page, path.join(assetsDir, "mobile-chat.png"));');
+    const guiSelection = marketingCapture.indexOf('await chooseView(page, "GUI", signal);', navigation);
+    const mobileGuiCapture = marketingCapture.indexOf('await capture(page, path.join(assetsDir, "mobile-gui.png"), signal);');
 
     expect(navigation).toBeGreaterThanOrEqual(0);
     expect(guiSelection).toBeGreaterThan(navigation);
-    expect(mobileChatCapture).toBeGreaterThan(guiSelection);
+    expect(mobileGuiCapture).toBeGreaterThan(guiSelection);
   });
 
-  it("does not ship or publish generated marketing media", () => {
-    const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
+  it("ships only the approved current marketing assets", () => {
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+    const approved = [
+      "agent-tmux-web-hero.png",
+      "desktop-raw.png",
+      "mobile-raw.png",
+      "mobile-gui.png",
+      "mobile-focus.png",
+      "modes-overview.png",
+      "agent-tmux-web-showcase-poster.png",
+      "agent-tmux-web-showcase.mp4"
+    ];
+    const shipped = readdirSync(join(process.cwd(), "docs/assets")).sort();
     const marketing = readFileSync(join(process.cwd(), "docs/marketing.md"), "utf8");
-    const generatedMediaReference = /docs\/assets\/[^\s)`"]+\.(?:png|gif|mp4)\b/i;
-    const shippedMedia = trackedExistingFiles("docs/assets")
-      .filter((file) => /\.(?:png|gif|mp4)$/i.test(file));
 
-    expect(readme).not.toMatch(generatedMediaReference);
-    expect(marketing).not.toMatch(generatedMediaReference);
-    expect(shippedMedia).toEqual([]);
+    expect(shipped).toEqual([...approved].sort());
+    for (const asset of approved) {
+      expect(marketing).toContain(`docs/assets/${asset}`);
+    }
+    expect(marketingCapture).toContain("const SHOWCASE_FPS = 30;");
+    expect(marketingCapture).toContain('\"-crf\", \"18\"');
+    expect(marketingCapture).toContain('\"yuv420p\"');
+    expect(marketingCapture).not.toContain("agent-tmux-web-showcase.gif");
+  });
+
+  it("fails fast when showcase image preloading fails", () => {
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+    const showcaseRenderer = marketingCapture.slice(
+      marketingCapture.indexOf("async function renderShowcaseAssets"),
+      marketingCapture.indexOf("function buildHeroHtml")
+    );
+
+    expect(marketingCapture).toContain("window.assetsError = null;");
+    expect(marketingCapture).toContain("window.assetsError = error instanceof Error ? error.message : String(error);");
+    expect(marketingCapture).toMatch(/\.finally\(\(\) => \{\s*window\.assetsReady = true;\s*\}\)/);
+    expect(showcaseRenderer).toContain("const assetsError = await page.evaluate(() => window.assetsError);");
+    expect(showcaseRenderer).toContain("Showcase asset preload failed");
+  });
+
+  it("resets Focus to its status and attention summary before capture", () => {
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+    const focusSelection = marketingCapture.indexOf('await chooseView(page, "Focus", signal);');
+    const focusReset = marketingCapture.indexOf(
+      "document.querySelector('.tmux-focus')?.scrollTo({ top: 0 })",
+      focusSelection
+    );
+    const focusCapture = marketingCapture.indexOf(
+      'await capture(page, path.join(assetsDir, "mobile-focus.png"), signal);',
+      focusSelection
+    );
+
+    expect(focusSelection).toBeGreaterThanOrEqual(0);
+    expect(focusReset).toBeGreaterThan(focusSelection);
+    expect(focusCapture).toBeGreaterThan(focusReset);
+  });
+
+  it("owns and monitors the loopback capture server", () => {
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+    const portPreflight = marketingCapture.indexOf("await assertLoopbackPortAvailable(appPort);");
+    const serverSpawn = marketingCapture.indexOf('spawn("node", ["dist/server/server/index.js"]');
+
+    expect(marketingCapture).toMatch(/import\s+\{\s*createServer\s*\}\s+from\s+["']node:net["']/);
+    expect(portPreflight).toBeGreaterThanOrEqual(0);
+    expect(serverSpawn).toBeGreaterThan(portPreflight);
+    expect(marketingCapture).toMatch(
+      /const\s+serverFailure\s*=\s*monitorServer\(\s*server\s*,\s*generationAbortController\s*\)/
+    );
+    expect(marketingCapture).toMatch(
+      /const\s+generationPromise\s*=\s*generateAndPublishAssets\(\s*generationAbortController\.signal\s*\)/
+    );
+    expect(marketingCapture).toMatch(
+      /Promise\.race\(\s*\[\s*generationPromise\s*,\s*serverFailure\s*\]\s*\)/
+    );
+    expect(marketingCapture).toMatch(/(?:server|child)\.once\(\s*["']exit["']/);
+  });
+
+  it("validates staged assets before atomic publication and preserves reviewed output on failure", () => {
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+    const validation = marketingCapture.indexOf("await validateStagedAssets();");
+    const publication = marketingCapture.indexOf("await publishAssetsAtomically();");
+
+    expect(marketingCapture).toMatch(/const\s+publishedAssetsDir\s*=\s*path\.join\(\s*root\s*,\s*["']docs["']\s*,\s*["']assets["']\s*\)/);
+    expect(marketingCapture).toMatch(/const\s+stagingAssetsDir\s*=\s*path\.join\([^\n]+\.assets-staging-/);
+    expect(marketingCapture).toMatch(/const\s+backupAssetsDir\s*=\s*path\.join\([^\n]+\.assets-backup-/);
+    expect(validation).toBeGreaterThanOrEqual(0);
+    expect(publication).toBeGreaterThan(validation);
+    expect(marketingCapture).toMatch(/rename\(\s*publishedAssetsDir\s*,\s*backupAssetsDir\s*\)/);
+    expect(marketingCapture).toMatch(/rename\(\s*stagingAssetsDir\s*,\s*publishedAssetsDir\s*\)/);
+    expect(marketingCapture).not.toMatch(/rm\(\s*publishedAssetsDir\s*,/);
+  });
+
+  it("recovers stale cross-PID capture directories before creating current staging", () => {
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+    const recovery = marketingCapture.indexOf("await recoverStaleAssetDirectories(");
+    const currentStaging = marketingCapture.indexOf("await mkdir(framesDir, { recursive: true });");
+
+    expect(recovery).toBeGreaterThanOrEqual(0);
+    expect(currentStaging).toBeGreaterThan(recovery);
+    expect(marketingCapture).toContain("validateAssetDirectory");
+  });
+
+  it("aborts capture on SIGINT and SIGTERM before shared cleanup sets signal exit status", () => {
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+
+    expect(marketingCapture).toMatch(/process\.once\(\s*["']SIGINT["']/);
+    expect(marketingCapture).toMatch(/process\.once\(\s*["']SIGTERM["']/);
+    expect(marketingCapture).toMatch(/generationAbortController\.abort\(/);
+    expect(marketingCapture).toMatch(/handleSIGINT\s*:\s*false/);
+    expect(marketingCapture).toMatch(/handleSIGTERM\s*:\s*false/);
+    expect(marketingCapture).toMatch(/SIGINT\s*:\s*130/);
+    expect(marketingCapture).toMatch(/SIGTERM\s*:\s*143/);
+    expect(marketingCapture).toMatch(/process\.exitCode\s*=\s*SIGNAL_EXIT_CODES\[interruptedSignal\]/);
+
+    const cleanup = marketingCapture.slice(marketingCapture.indexOf("} finally {"));
+    expect(cleanup).toContain("await browser?.close()");
+    expect(cleanup).toContain("await stopServer(server)");
+    expect(cleanup).toContain("await rm(stagingAssetsDir");
+    expect(cleanup).toContain("await rm(backupAssetsDir");
+  });
+
+  it("ignores interrupted marketing staging and backup directories", () => {
+    const gitignore = readFileSync(join(process.cwd(), ".gitignore"), "utf8").split(/\r?\n/);
+
+    expect(gitignore).toContain("docs/.assets-staging-*");
+    expect(gitignore).toContain("docs/.assets-backup-*");
+  });
+
+  it("requests codec types and validates the complete showcase stream list", () => {
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+
+    expect(marketingCapture).toContain("stream=codec_type,codec_name,pix_fmt,width,height,r_frame_rate,avg_frame_rate");
+    expect(marketingCapture).toContain("assertShowcaseMetadata(video");
+  });
+
+  it("presents the reviewed README visual hierarchy with accurate alt text", () => {
+    const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
+    const introductionClosing = "tabs without killing the work.";
+    const introductionEnd = readme.indexOf(introductionClosing);
+
+    expect(introductionEnd).toBeGreaterThanOrEqual(0);
+    expect(readme.slice(introductionEnd + introductionClosing.length)).toMatch(
+      /^\s*\[!\[Agent Tmux Web hero with desktop Raw terminal session\]\(\.\/docs\/assets\/agent-tmux-web-hero\.png\)\]\(\.\/docs\/assets\/agent-tmux-web-showcase\.mp4\)/
+    );
+    expect(readme).toMatch(
+      /!\[Desktop Raw terminal session\]\(\.\/docs\/assets\/desktop-raw\.png\)/
+    );
+    expect(readme).toMatch(
+      /\[!\[Agent Tmux Web showcase poster with desktop Raw terminal session\]\(\.\/docs\/assets\/agent-tmux-web-showcase-poster\.png\)\]\(\.\/docs\/assets\/agent-tmux-web-showcase\.mp4\)/
+    );
+
+    const productViewsStart = readme.indexOf("## Product Views");
+    const showcaseStart = readme.indexOf("### Professional showcase", productViewsStart);
+    expect(productViewsStart).toBeGreaterThan(introductionEnd);
+    expect(showcaseStart).toBeGreaterThan(productViewsStart);
+
+    const productViews = readme.slice(productViewsStart, showcaseStart);
+    const mobileRow = productViews.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i)?.[1] ?? "";
+    const mobileImages = [...mobileRow.matchAll(/<img\b[^>]*>/gi)].map((match) => match[0]);
+    const readAttribute = (image: string, name: string) =>
+      image.match(new RegExp(`\\b${name}\\s*=\\s*["']([^"']+)["']`, "i"))?.[1];
+
+    expect(mobileImages).toHaveLength(3);
+    expect(
+      mobileImages.map((image) => ({
+        src: readAttribute(image, "src"),
+        alt: readAttribute(image, "alt")
+      }))
+    ).toEqual([
+      { src: "./docs/assets/mobile-raw.png", alt: "Mobile Raw terminal session" },
+      { src: "./docs/assets/mobile-gui.png", alt: "Mobile GUI transcript view" },
+      { src: "./docs/assets/mobile-focus.png", alt: "Mobile Focus conversation view" }
+    ]);
+    expect(readme).not.toMatch(/<video\b[^>]*\bautoplay(?:\s|=|>)/i);
+    expect(readme).not.toMatch(/mobile-tty|View: TTY|Terminal.*Details/);
+  });
+
+  it("captures marketing PNGs at their approved native dimensions", () => {
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+    const captureContext = marketingCapture.slice(
+      marketingCapture.indexOf("const captureContext"),
+      marketingCapture.indexOf("const page", marketingCapture.indexOf("const captureContext"))
+    );
+    const heroRenderer = marketingCapture.slice(
+      marketingCapture.indexOf("async function renderHero"),
+      marketingCapture.indexOf("async function renderModesOverview")
+    );
+
+    expect(marketingCapture).toMatch(/const\s+HERO_WIDTH\s*=\s*1600\s*;/);
+    expect(marketingCapture).toMatch(/const\s+HERO_HEIGHT\s*=\s*900\s*;/);
+    expect(marketingCapture).toMatch(/const\s+DESKTOP_WIDTH\s*=\s*1440\s*;/);
+    expect(marketingCapture).toMatch(/const\s+DESKTOP_HEIGHT\s*=\s*900\s*;/);
+    expect(marketingCapture).toMatch(/const\s+MOBILE_WIDTH\s*=\s*390\s*;/);
+    expect(marketingCapture).toMatch(/const\s+MOBILE_HEIGHT\s*=\s*844\s*;/);
+    expect(captureContext).toMatch(/deviceScaleFactor\s*:\s*1\b/);
+    expect(captureContext).not.toMatch(/deviceScaleFactor\s*:\s*2\b/);
+    expect(heroRenderer).toMatch(/setViewport\(\s*page\s*,\s*HERO_WIDTH\s*,\s*HERO_HEIGHT\s*\)/);
+  });
+
+  it("crossfades overlapping showcase scenes with cubic eased restrained motion", () => {
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+
+    expect(marketingCapture).toMatch(/const\s+TRANSITION_FRAMES\s*=\s*\d+\s*;/);
+    expect(marketingCapture).toMatch(/querySelectorAll\(\s*["']\.scene-layer["']\s*\)/);
+    expect(marketingCapture).toMatch(/incomingOpacity\s*=\s*ease\s*\(/);
+    expect(marketingCapture).toMatch(/outgoingOpacity\s*=\s*1\s*-\s*incomingOpacity/);
+    expect(marketingCapture).toMatch(/--scene-opacity["']\s*,\s*String\(\s*outgoingOpacity\s*\)/);
+    expect(marketingCapture).toMatch(/--scene-opacity["']\s*,\s*String\(\s*incomingOpacity\s*\)/);
+    expect(marketingCapture).toMatch(/outgoingCopyOpacity\s*=\s*1\s*-\s*ease\s*\(/);
+    expect(marketingCapture).toMatch(/incomingCopyOpacity\s*=\s*ease\s*\(/);
+    expect(marketingCapture).toMatch(/--copy-opacity["']\s*,\s*String\(\s*outgoingCopyOpacity\s*\)/);
+    expect(marketingCapture).toMatch(/--copy-opacity["']\s*,\s*String\(\s*incomingCopyOpacity\s*\)/);
+    expect(marketingCapture).toMatch(/0\.99\s*\+\s*0\.02\s*\*\s*eased/);
+    expect(marketingCapture).not.toMatch(/--visibility["']\s*,\s*["']1["']/);
   });
 
   it("describes only the current Agent Tmux views while retaining OpenCode's Linear TTY mode", () => {
@@ -278,7 +470,6 @@ describe("current user guidance", () => {
     expect(readme).not.toContain("modes-overview.png");
     expect(marketing).not.toMatch(/\bTTY\b|GUI\/TTY/);
     expect(marketing).not.toContain("mobile-tty.png");
-    expect(marketing).not.toContain("modes-overview.png");
     expect(aiSetup).not.toMatch(/\bTTY\b/);
     expect(marketingCapture).not.toMatch(/\bTTY\b|mobile-tty\.png/);
     expect(fullUiMode).not.toMatch(/\bTTY\b|details panel/i);
