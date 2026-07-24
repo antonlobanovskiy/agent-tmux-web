@@ -119,6 +119,7 @@ describe("responsive mobile CSS", () => {
     expect(app).toContain("prefetchTmuxCapture");
     expect(app).toContain("applyCachedTmuxCapture(selectedTmux)");
     expect(app).toContain("window.setInterval(refreshCache, TMUX_CAPTURE_POLL_INTERVAL_MS)");
+    expect(app.match(/clientWidth: String\(resolveTmuxCaptureClientWidth\(\)\)/g)).toHaveLength(2);
     expect(app).toContain('ref={tmuxCaptureWidthRef}');
     expect(app).toContain("tmuxCaptureWidthRef.current?.clientWidth");
   });

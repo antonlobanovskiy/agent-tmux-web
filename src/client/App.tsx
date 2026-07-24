@@ -562,7 +562,7 @@ export function App() {
       const params = new URLSearchParams({
         session,
         lines: String(TMUX_CAPTURE_HISTORY_LINES),
-        clientWidth: String(window.innerWidth || 1280)
+        clientWidth: String(resolveTmuxCaptureClientWidth())
       });
       const result = await api<TmuxCaptureDto>(`/api/tmux/capture?${params.toString()}`);
       tmuxCaptureCacheRef.current[session] = { output: result.output, sidebar: result.sidebar };
