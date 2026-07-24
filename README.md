@@ -12,23 +12,24 @@ sessions. It is useful when SSH on a phone is too cramped, when mobile browsers
 disconnect, or when you want one place to switch between several terminal-agent
 tabs without killing the work.
 
-[![Agent Tmux Web hero with desktop Raw terminal session](./docs/assets/agent-tmux-web-hero.png)](./docs/assets/agent-tmux-web-showcase.mp4)
+[![Agent Tmux Web hero with desktop TTY session](./docs/assets/agent-tmux-web-hero.png)](./docs/assets/agent-tmux-web-showcase.mp4)
 
-*Raw-first control on desktop, with the same persistent tmux sessions available from mobile.*
+*TTY-first monitoring with exact Raw control available whenever the terminal itself matters.*
 
 ## Product Views
 
-![Desktop Raw terminal session](./docs/assets/desktop-raw.png)
+![Desktop TTY session with OpenCode stream and details](./docs/assets/desktop-tty.png)
 
 <p>
-  <img src="./docs/assets/mobile-raw.png" alt="Mobile Raw terminal session" width="31%">
-  <img src="./docs/assets/mobile-gui.png" alt="Mobile GUI transcript view" width="31%">
-  <img src="./docs/assets/mobile-focus.png" alt="Mobile Focus conversation view" width="31%">
+  <img src="./docs/assets/mobile-tty.png" alt="Mobile TTY stream view" width="24%">
+  <img src="./docs/assets/mobile-raw.png" alt="Mobile Raw terminal session" width="24%">
+  <img src="./docs/assets/mobile-gui.png" alt="Mobile GUI transcript view" width="24%">
+  <img src="./docs/assets/mobile-focus.png" alt="Mobile Focus conversation view" width="24%">
 </p>
 
 ### Professional showcase
 
-[![Agent Tmux Web showcase poster with desktop Raw terminal session](./docs/assets/agent-tmux-web-showcase-poster.png)](./docs/assets/agent-tmux-web-showcase.mp4)
+[![Agent Tmux Web showcase poster with desktop TTY session](./docs/assets/agent-tmux-web-showcase-poster.png)](./docs/assets/agent-tmux-web-showcase.mp4)
 
 ## What You Get
 
@@ -41,15 +42,18 @@ tabs without killing the work.
   control for saving named custom CLI commands.
 - Harness-specific Default, Plan, Auto, Auto Edit, Autopilot, and Yolo controls
   with incompatible permission modes kept mutually exclusive.
-- Raw mode by default for direct interactive tmux control, including shell and
-  TUI work.
+- TTY mode by default for selectable text and clickable links. OpenCode's conversation
+  stream is separated from its details panel, with mobile tabs and a desktop
+  side panel.
+- Raw mode for direct interactive tmux control, including shell and TUI work.
 - GUI mode for readable chat-style agent output.
 - Focus mode for quick phone check-ins with detailed status and recent-attention
   summaries.
 - Green/yellow/red status dots for running, waiting/idle, and error sessions.
 - Stable scrollback while new tmux output continues arriving.
 - File uploads and pasted clipboard images from Android, iOS, or desktop
-  browsers, with safe `~/.agent-tmux/attachments/...` prompt references.
+  browsers, including direct Raw terminal paste with safe
+  `~/.agent-tmux/attachments/...` prompt references.
 - Browser and Android notifications when watched tasks return to a prompt.
 - Light and dark themes.
 - Generic public Android APK plus optional private APK builds for your own
@@ -151,14 +155,22 @@ mode, and notifications.
 2. Choose a launcher, pin favorites to the top, or use `+` to save a named
    custom command on that device.
 3. Press `Run`, or type directly into the tmux input.
-4. Raw opens by default for exact terminal input. Open the clearly labeled
-   `View` dropdown and use `GUI` for readable agent output or `Focus` for status
-   and recent-attention summaries.
-5. Use the bell button when you want task-done alerts.
-6. Use the paperclip button to upload files, or paste clipboard images directly
-   into the chat input. Uploads remain temporary on the server, while prompts
-   receive safe `~/.agent-tmux/attachments/...` references readable by local
-   CLIs.
+4. TTY opens by default. Open `View` and use `Raw` for exact terminal input,
+   `GUI` for readable agent output, or `Focus` for status and recent-attention
+   summaries. With session memory enabled, each tmux session returns to its
+   last selected view.
+5. Open `Settings` to choose the default view, remember each session or always
+   return to the default, change the theme, copy the server URL, or update
+   Android connection settings.
+6. Use the bell button when you want task-done alerts.
+7. Use the paperclip button to upload files, or paste clipboard images into a
+   captured-view prompt or directly into Raw with `Ctrl+V`/`Cmd+V`.
+   `Ctrl+Shift+V` can recover images when the browser permits async clipboard
+   reads. Uploads remain temporary on the server, while prompts receive safe
+   `~/.agent-tmux/attachments/...` references readable by local CLIs.
+8. In Raw, modified keys pass through tmux like a local terminal. OpenCode can
+   distinguish `Shift+Enter` for a newline while browser clipboard shortcuts
+   stay on the viewing device.
 
 Status dots:
 
@@ -188,7 +200,7 @@ The APK is written to:
 android/app/build/outputs/apk/release/agent-tmux-web-v<version>-release.apk
 ```
 
-Google Play upload bundles:
+Generic Android App Bundles (configure an upload key before Play submission):
 
 ```bash
 pnpm android:build:play
@@ -236,7 +248,7 @@ Built-in launcher modes:
 
 | Harness | Command | Launch modes |
 | --- | --- | --- |
-| OpenCode | `opencode` | Full UI (default), Linear TTY; Default, Auto (default) |
+| OpenCode | `opencode` | Default, Auto (default) |
 | Codex | `codex` | Default, Auto, Yolo |
 | Claude Code | `claude` | Default, Plan, Accept edits, Auto, Yolo |
 | Gemini CLI | `gemini` | Default, Plan, Auto edit, Yolo |

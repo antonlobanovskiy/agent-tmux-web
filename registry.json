@@ -38,7 +38,10 @@
         { "path": "CHANGELOG.md", "type": "registry:file", "target": "~/CHANGELOG.md" },
         { "path": "docs/registry.md", "type": "registry:file", "target": "~/docs/registry.md" },
         { "path": "docs/marketing.md", "type": "registry:file", "target": "~/docs/marketing.md" },
+        { "path": "docs/releasing.md", "type": "registry:file", "target": "~/docs/releasing.md" },
         { "path": "scripts/capture-marketing.mjs", "type": "registry:file", "target": "~/scripts/capture-marketing.mjs" },
+        { "path": "scripts/marketing-assets.mjs", "type": "registry:file", "target": "~/scripts/marketing-assets.mjs" },
+        { "path": "scripts/verify-raw-terminal-focus.mjs", "type": "registry:file", "target": "~/scripts/verify-raw-terminal-focus.mjs" },
         { "path": "package.json", "type": "registry:file", "target": "~/package.json" },
         { "path": "pnpm-lock.yaml", "type": "registry:file", "target": "~/pnpm-lock.yaml" },
         { "path": "index.html", "type": "registry:file", "target": "~/index.html" },
@@ -46,6 +49,7 @@
         { "path": "tsconfig.json", "type": "registry:file", "target": "~/tsconfig.json" },
         { "path": "tsconfig.server.json", "type": "registry:file", "target": "~/tsconfig.server.json" },
         { "path": "src/client/App.tsx", "type": "registry:file", "target": "~/src/client/App.tsx" },
+        { "path": "src/client/TmuxTtyView.tsx", "type": "registry:file", "target": "~/src/client/TmuxTtyView.tsx" },
         { "path": "src/client/LinkifiedText.tsx", "type": "registry:file", "target": "~/src/client/LinkifiedText.tsx" },
         { "path": "src/client/agentStatus.ts", "type": "registry:file", "target": "~/src/client/agentStatus.ts" },
         { "path": "src/client/androidBridge.ts", "type": "registry:file", "target": "~/src/client/androidBridge.ts" },
@@ -54,6 +58,7 @@
         { "path": "src/client/clipboard.ts", "type": "registry:file", "target": "~/src/client/clipboard.ts" },
         { "path": "src/client/inputBehavior.ts", "type": "registry:file", "target": "~/src/client/inputBehavior.ts" },
         { "path": "src/client/linkify.ts", "type": "registry:file", "target": "~/src/client/linkify.ts" },
+        { "path": "src/client/openCodeSidebar.ts", "type": "registry:file", "target": "~/src/client/openCodeSidebar.ts" },
         { "path": "src/client/rawTerminalLinks.ts", "type": "registry:file", "target": "~/src/client/rawTerminalLinks.ts" },
         { "path": "src/client/rawTerminalMode.ts", "type": "registry:file", "target": "~/src/client/rawTerminalMode.ts" },
         { "path": "src/client/rawTerminalGestureGuard.ts", "type": "registry:file", "target": "~/src/client/rawTerminalGestureGuard.ts" },
@@ -68,15 +73,18 @@
         { "path": "src/client/tmuxFollow.ts", "type": "registry:file", "target": "~/src/client/tmuxFollow.ts" },
         { "path": "src/client/tmuxGui.ts", "type": "registry:file", "target": "~/src/client/tmuxGui.ts" },
         { "path": "src/client/tmuxNotifications.ts", "type": "registry:file", "target": "~/src/client/tmuxNotifications.ts" },
+        { "path": "src/client/tmuxOutputLines.tsx", "type": "registry:file", "target": "~/src/client/tmuxOutputLines.tsx" },
         { "path": "src/client/tmuxOperationGuards.ts", "type": "registry:file", "target": "~/src/client/tmuxOperationGuards.ts" },
         { "path": "src/client/tmuxSessionTarget.ts", "type": "registry:file", "target": "~/src/client/tmuxSessionTarget.ts" },
         { "path": "src/client/tmuxToolPreferences.ts", "type": "registry:file", "target": "~/src/client/tmuxToolPreferences.ts" },
+        { "path": "src/client/tmuxViewPreferences.ts", "type": "registry:file", "target": "~/src/client/tmuxViewPreferences.ts" },
         { "path": "src/client/__tests__/browserNotifications.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/browserNotifications.test.ts" },
         { "path": "src/client/__tests__/clipboard.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/clipboard.test.ts" },
         { "path": "src/client/__tests__/agentStatus.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/agentStatus.test.ts" },
         { "path": "src/client/__tests__/androidConnectionSettings.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/androidConnectionSettings.test.ts" },
         { "path": "src/client/__tests__/inputBehavior.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/inputBehavior.test.ts" },
         { "path": "src/client/__tests__/linkify.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/linkify.test.ts" },
+        { "path": "src/client/__tests__/openCodeSidebar.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/openCodeSidebar.test.ts" },
         { "path": "src/client/__tests__/rawTerminalLinks.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/rawTerminalLinks.test.ts" },
         { "path": "src/client/__tests__/rawTerminalMode.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/rawTerminalMode.test.ts" },
         { "path": "src/client/__tests__/rawTerminalGestureGuard.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/rawTerminalGestureGuard.test.ts" },
@@ -89,9 +97,12 @@
         { "path": "src/client/__tests__/tmuxFollow.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/tmuxFollow.test.ts" },
         { "path": "src/client/__tests__/tmuxGui.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/tmuxGui.test.ts" },
         { "path": "src/client/__tests__/tmuxNotifications.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/tmuxNotifications.test.ts" },
+        { "path": "src/client/__tests__/TmuxTtyView.test.tsx", "type": "registry:file", "target": "~/src/client/__tests__/TmuxTtyView.test.tsx" },
+        { "path": "src/client/__tests__/tmuxOutputLines.test.tsx", "type": "registry:file", "target": "~/src/client/__tests__/tmuxOutputLines.test.tsx" },
         { "path": "src/client/__tests__/tmuxOperationGuards.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/tmuxOperationGuards.test.ts" },
         { "path": "src/client/__tests__/tmuxSessionTarget.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/tmuxSessionTarget.test.ts" },
         { "path": "src/client/__tests__/tmuxToolPreferences.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/tmuxToolPreferences.test.ts" },
+        { "path": "src/client/__tests__/tmuxViewPreferences.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/tmuxViewPreferences.test.ts" },
         { "path": "src/server/codexBridge.ts", "type": "registry:file", "target": "~/src/server/codexBridge.ts" },
         { "path": "src/server/index.ts", "type": "registry:file", "target": "~/src/server/index.ts" },
         { "path": "src/server/terminal.ts", "type": "registry:file", "target": "~/src/server/terminal.ts" },
@@ -108,6 +119,7 @@
         { "path": "src/shared/tmuxStatus.ts", "type": "registry:file", "target": "~/src/shared/tmuxStatus.ts" },
         { "path": "src/shared/tmuxTools.ts", "type": "registry:file", "target": "~/src/shared/tmuxTools.ts" },
         { "path": "src/shared/__tests__/codexEvents.test.ts", "type": "registry:file", "target": "~/src/shared/__tests__/codexEvents.test.ts" },
+        { "path": "src/shared/__tests__/releaseMetadata.test.ts", "type": "registry:file", "target": "~/src/shared/__tests__/releaseMetadata.test.ts" },
         { "path": "src/shared/__tests__/tmuxTools.test.ts", "type": "registry:file", "target": "~/src/shared/__tests__/tmuxTools.test.ts" },
         { "path": "INSTALL.md", "type": "registry:file", "target": "~/INSTALL.md" },
         { "path": "AI_SETUP.md", "type": "registry:file", "target": "~/AI_SETUP.md" },
@@ -219,6 +231,11 @@
           "target": "~/src/client/App.tsx"
         },
         {
+          "path": "src/client/TmuxTtyView.tsx",
+          "type": "registry:file",
+          "target": "~/src/client/TmuxTtyView.tsx"
+        },
+        {
           "path": "src/client/LinkifiedText.tsx",
           "type": "registry:file",
           "target": "~/src/client/LinkifiedText.tsx"
@@ -257,6 +274,11 @@
           "path": "src/client/linkify.ts",
           "type": "registry:file",
           "target": "~/src/client/linkify.ts"
+        },
+        {
+          "path": "src/client/openCodeSidebar.ts",
+          "type": "registry:file",
+          "target": "~/src/client/openCodeSidebar.ts"
         },
         {
           "path": "src/client/rawTerminalLinks.ts",
@@ -329,6 +351,11 @@
           "target": "~/src/client/tmuxNotifications.ts"
         },
         {
+          "path": "src/client/tmuxOutputLines.tsx",
+          "type": "registry:file",
+          "target": "~/src/client/tmuxOutputLines.tsx"
+        },
+        {
           "path": "src/client/tmuxOperationGuards.ts",
           "type": "registry:file",
           "target": "~/src/client/tmuxOperationGuards.ts"
@@ -342,6 +369,11 @@
           "path": "src/client/tmuxToolPreferences.ts",
           "type": "registry:file",
           "target": "~/src/client/tmuxToolPreferences.ts"
+        },
+        {
+          "path": "src/client/tmuxViewPreferences.ts",
+          "type": "registry:file",
+          "target": "~/src/client/tmuxViewPreferences.ts"
         },
         {
           "path": "src/client/__tests__/browserNotifications.test.ts",
@@ -372,6 +404,11 @@
           "path": "src/client/__tests__/linkify.test.ts",
           "type": "registry:file",
           "target": "~/src/client/__tests__/linkify.test.ts"
+        },
+        {
+          "path": "src/client/__tests__/openCodeSidebar.test.ts",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/openCodeSidebar.test.ts"
         },
         {
           "path": "src/client/__tests__/rawTerminalLinks.test.ts",
@@ -434,6 +471,16 @@
           "target": "~/src/client/__tests__/tmuxNotifications.test.ts"
         },
         {
+          "path": "src/client/__tests__/TmuxTtyView.test.tsx",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/TmuxTtyView.test.tsx"
+        },
+        {
+          "path": "src/client/__tests__/tmuxOutputLines.test.tsx",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/tmuxOutputLines.test.tsx"
+        },
+        {
           "path": "src/client/__tests__/tmuxOperationGuards.test.ts",
           "type": "registry:file",
           "target": "~/src/client/__tests__/tmuxOperationGuards.test.ts"
@@ -447,6 +494,11 @@
           "path": "src/client/__tests__/tmuxToolPreferences.test.ts",
           "type": "registry:file",
           "target": "~/src/client/__tests__/tmuxToolPreferences.test.ts"
+        },
+        {
+          "path": "src/client/__tests__/tmuxViewPreferences.test.ts",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/tmuxViewPreferences.test.ts"
         },
         {
           "path": "src/server/codexBridge.ts",
@@ -591,7 +643,7 @@
       "name": "android-wrapper",
       "type": "registry:item",
       "title": "Android Wrapper",
-      "description": "Sideload-only Android WebView wrapper, native upload bridge, and notification watcher source.",
+      "description": "Android WebView wrapper, sideload APK, AAB, native upload bridge, and notification watcher source.",
       "files": [
         {
           "path": "android/README.md",

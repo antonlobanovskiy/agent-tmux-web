@@ -108,6 +108,10 @@ async function verifyDesktopFocus(browser, url) {
 
 async function loadRaw(page, url) {
   await page.goto(url, { waitUntil: "networkidle" });
+  if (await page.locator(".xterm-helper-textarea").count() === 0) {
+    await page.getByLabel(/Change view\. Current view:/).click();
+    await page.getByRole("menuitemradio", { name: "Raw" }).click();
+  }
   await page.locator(".xterm-helper-textarea").waitFor({ state: "attached" });
   await page.locator(".xterm-screen").waitFor({ state: "visible" });
 }

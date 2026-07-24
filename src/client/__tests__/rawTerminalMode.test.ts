@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  rawTerminalExtendedKeySequence,
   shouldFocusRawTerminalTap,
+  shouldProcessRawTerminalKeyEvent,
   shouldShowRawTerminalShortcuts,
   shouldShowTmuxJumpToLatest,
   shouldShowTmuxSendForm
@@ -18,6 +20,53 @@ const cursorTap = {
 };
 
 describe("raw terminal mode", () => {
+  it("keeps terminal-emulator clipboard shortcuts in the browser", () => {
+    const keyEvent = {
+      altKey: false,
+      ctrlKey: false,
+      key: "v",
+      metaKey: false,
+      shiftKey: false
+    };
+
+    expect(shouldProcessRawTerminalKeyEvent({ ...keyEvent, ctrlKey: true })).toBe(false);
+    expect(shouldProcessRawTerminalKeyEvent({ ...keyEvent, ctrlKey: true, shiftKey: true })).toBe(false);
+    expect(shouldProcessRawTerminalKeyEvent({ ...keyEvent, key: "c", ctrlKey: true, shiftKey: true })).toBe(false);
+    expect(shouldProcessRawTerminalKeyEvent({ ...keyEvent, metaKey: true })).toBe(false);
+    expect(shouldProcessRawTerminalKeyEvent({ ...keyEvent, key: "c", metaKey: true })).toBe(false);
+    expect(shouldProcessRawTerminalKeyEvent({ ...keyEvent, key: "Insert", shiftKey: true })).toBe(false);
+    expect(shouldProcessRawTerminalKeyEvent({ ...keyEvent, key: "Insert", ctrlKey: true })).toBe(false);
+  });
+
+  it("passes application shortcuts and modified keys through xterm", () => {
+    const keyEvent = {
+      altKey: false,
+      ctrlKey: false,
+      key: "Enter",
+      metaKey: false,
+      shiftKey: true
+    };
+
+    expect(shouldProcessRawTerminalKeyEvent(keyEvent)).toBe(true);
+    expect(shouldProcessRawTerminalKeyEvent({ ...keyEvent, key: "c", ctrlKey: true, shiftKey: false })).toBe(true);
+  });
+
+  it("encodes modified Enter and Ctrl+Shift application chords for tmux", () => {
+    const keyEvent = {
+      altKey: false,
+      ctrlKey: false,
+      key: "Enter",
+      metaKey: false,
+      shiftKey: true
+    };
+
+    expect(rawTerminalExtendedKeySequence(keyEvent)).toBe("\x1b[13;2u");
+    expect(rawTerminalExtendedKeySequence({ ...keyEvent, ctrlKey: true })).toBe("\x1b[13;6u");
+    expect(rawTerminalExtendedKeySequence({ ...keyEvent, key: "P", ctrlKey: true })).toBe("\x1b[80;6u");
+    expect(rawTerminalExtendedKeySequence({ ...keyEvent, key: "v", ctrlKey: true })).toBeNull();
+    expect(rawTerminalExtendedKeySequence({ ...keyEvent, key: "ArrowUp" })).toBeNull();
+  });
+
   it("shows the tmux send form only with a selected non-Raw session", () => {
     expect(shouldShowTmuxSendForm({ terminalActive: false, sessionSelected: true })).toBe(true);
     expect(shouldShowTmuxSendForm({ terminalActive: true, sessionSelected: true })).toBe(false);

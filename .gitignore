@@ -24,3 +24,4 @@ android/app/build/
 .worktrees/
 docs/.assets-staging-*
 docs/.assets-backup-*
+OPENCODE_UI_HANDOFF.md

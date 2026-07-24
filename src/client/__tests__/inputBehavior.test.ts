@@ -6,6 +6,7 @@ import {
   extractPastedImageFiles,
   formatUploadedFilesForPrompt,
   isMobileInputDevice,
+  readClipboardImageFiles,
   shouldSubmitTextareaEnter
 } from "../inputBehavior.js";
 
@@ -48,6 +49,21 @@ describe("input behavior", () => {
     });
 
     expect(files).toEqual([image]);
+  });
+
+  it("reads screenshot blobs from the async Clipboard API", async () => {
+    const image = new Blob(["png-data"], { type: "image/png" });
+    const files = await readClipboardImageFiles({
+      read: async () => [
+        { types: ["text/plain"], getType: async () => new Blob(["text"]) },
+        { types: ["image/png"], getType: async () => image }
+      ]
+    });
+
+    expect(files).toHaveLength(1);
+    expect(files[0].name).toBe("pasted-image-1.png");
+    expect(files[0].type).toBe("image/png");
+    expect(files[0].size).toBe(image.size);
   });
 
   it("preserves clipboard text before inserted uploaded file references", () => {

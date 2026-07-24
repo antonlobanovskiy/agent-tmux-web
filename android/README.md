@@ -35,11 +35,15 @@ Build a shareable public sideload APK with no embedded server URL or token:
 pnpm android:build:public
 ```
 
-Build a public Google Play upload bundle with no embedded server URL or token:
+Build a generic Android App Bundle with no embedded server URL or token:
 
 ```bash
 pnpm android:build:play
 ```
+
+The command produces a Play-upload-ready bundle only when all four
+`agentTmuxRelease*` signing properties are configured. Otherwise it uses the
+Android debug key and is suitable only for local or GitHub release verification.
 
 The APKs are written to:
 

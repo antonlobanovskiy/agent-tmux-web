@@ -22,7 +22,9 @@ import android.view.Window;
 import android.webkit.CookieManager;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -98,6 +100,11 @@ public final class MainActivity extends Activity {
             return;
         }
 
+        if (!serverUrl().isEmpty()) {
+            showSetup();
+            return;
+        }
+
         super.onBackPressed();
     }
 
@@ -153,6 +160,20 @@ public final class MainActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 return shouldOpenExternally(request.getUrl());
+            }
+
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                if (request.isForMainFrame()) {
+                    showSetup();
+                }
+            }
+
+            @Override
+            public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
+                if (request.isForMainFrame() && errorResponse.getStatusCode() >= 400) {
+                    showSetup();
+                }
             }
         });
 
@@ -326,7 +347,7 @@ public final class MainActivity extends Activity {
             WatchPollingService.startIfEnabled(this);
         });
 
-        TextView note = label("The Android app does not run tmux locally. It loads your private server and keeps the same GUI, raw tmux mode, uploads, and launchers.", 13, "#87918D");
+        TextView note = label("The Android app does not run tmux locally. It loads your private server and keeps the same GUI, Raw, TTY, uploads, and launchers. Press Back from the root page to reopen these settings.", 13, "#87918D");
         note.setPadding(0, dp(16), 0, 0);
 
         panel.addView(title);

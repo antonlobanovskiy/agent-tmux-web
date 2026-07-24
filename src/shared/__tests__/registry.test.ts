@@ -229,7 +229,11 @@ describe("source registry", () => {
       "CHANGELOG.md",
       "docs/registry.md",
       "docs/marketing.md",
+      "docs/releasing.md",
       "scripts/capture-marketing.mjs",
+      "scripts/marketing-assets.mjs",
+      "scripts/verify-raw-terminal-focus.mjs",
+      "src/shared/__tests__/releaseMetadata.test.ts",
       ...sourceItems.flatMap((item) => item.files.map((file) => file.path))
     ]);
     expect([...new Set(ownPaths)].sort()).toEqual([...expectedPaths].sort());

@@ -593,7 +593,7 @@ Expected: no open Critical or Important findings. Fix any finding with a failing
 ### Task 4: Fast-Forward Deployment And Private APK 0.1.24-private.2
 
 **Files:**
-- Modify locally: `/home/antonlobanovskiy/dev/codex-web` by fast-forward merge only
+- Modify locally: the primary checkout by fast-forward merge only
 - Create ignored artifact: `android/app/build/outputs/apk/release/agent-tmux-web-v0.1.24-private.2-release.apk`
 - Create ignored staged download: `dist/client/assets/agent-tmux-web-v0.1.24-private.2-release.apk`
 
@@ -603,7 +603,7 @@ Expected: no open Critical or Important findings. Fix any finding with a failing
 
 - [ ] **Step 1: Fast-forward local main without touching unrelated files**
 
-In `/home/antonlobanovskiy/dev/codex-web`, inspect `git status --short --branch`, `git diff`, and `git log --oneline -10`. Confirm unrelated `OPENCODE_UI_HANDOFF.md` remains untouched, then run:
+In the primary checkout, inspect `git status --short --branch`, `git diff`, and `git log --oneline -10`. Confirm unrelated local files remain untouched, then run:
 
 ```bash
 git merge --ff-only agent/fix-raw-touch-settings

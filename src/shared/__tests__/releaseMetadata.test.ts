@@ -7,36 +7,33 @@ const root = process.cwd();
 const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { version: string };
 const gradle = readFileSync(join(root, "android/app/build.gradle"), "utf8");
 const changelog = readFileSync(join(root, "CHANGELOG.md"), "utf8");
-const releasePlan = readFileSync(
-  join(root, "docs/superpowers/plans/2026-07-21-v0.1.24-release-visuals.md"),
-  "utf8"
-);
+const releaseGuide = readFileSync(join(root, "docs/releasing.md"), "utf8");
 
-describe("v0.1.24 release metadata", () => {
+describe("release metadata", () => {
   it("keeps package and Android versions aligned", () => {
-    expect(packageJson.version).toBe("0.1.24");
-    expect(gradle).toMatch(/versionCode configuredVersionCode \? configuredVersionCode\.toInteger\(\) : 25\b/);
-    expect(gradle).toContain('versionName configuredVersionName ?: "0.1.24"');
+    expect(gradle).toContain(`versionName configuredVersionName ?: "${packageJson.version}"`);
+    expect(gradle).toMatch(/versionCode configuredVersionCode \? configuredVersionCode\.toInteger\(\) : \d+\b/);
+    expect(changelog).toContain(`## ${packageJson.version} - `);
   });
 
-  it("documents the release without stale removed-view guidance", () => {
+  it("documents the current release and Android version code", () => {
+    const nextHeading = changelog.indexOf("\n## ", changelog.indexOf(`## ${packageJson.version} - `) + 1);
     const release = changelog.slice(
-      changelog.indexOf("## 0.1.24 - 2026-07-21"),
-      changelog.indexOf("## 0.1.23 - 2026-07-18")
+      changelog.indexOf(`## ${packageJson.version} - `),
+      nextHeading === -1 ? undefined : nextHeading
     );
     expect(release).toContain("Raw");
-    expect(release).toContain("safe attachment references");
-    expect(release).toContain("edge-to-edge");
-    expect(release).toContain("version code `25`");
-    expect(release).not.toMatch(/\bTTY view\b|Terminal.*Details tabs/);
+    expect(release).toContain("TTY");
+    expect(release).toContain("screenshot paste");
+    expect(release).toMatch(/version code `\d+`/);
   });
 
-  it("keeps the public release plan free of machine-specific home paths", () => {
+  it("keeps the public release guide free of machine-specific home paths", () => {
     const machineSpecificHomePath = /(?:\/(?:home|Users)\/[^/\s]+|[A-Z]:\\Users\\[^\\\s]+)/i;
     for (const example of ["/home/alice/project", "/Users/alice/project", "C:\\Users\\alice\\project"]) {
       expect(example).toMatch(machineSpecificHomePath);
     }
-    expect(releasePlan).not.toMatch(machineSpecificHomePath);
-    expect(releasePlan).toContain('CHROMIUM_BIN="$HOME/');
+    expect(releaseGuide).not.toMatch(machineSpecificHomePath);
+    expect(releaseGuide).toContain("pnpm android:build:public");
   });
 });

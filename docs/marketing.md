@@ -22,8 +22,8 @@ attach, and temporary file uploads over a private network path.
   custom commands locally with the `+` control.
 - Use grouped launcher modes for Default, Plan, Auto, Auto Edit, Autopilot, and
   Yolo presets without stacking incompatible permission modes.
-- Start in Raw for direct tmux terminal control, then switch to normalized GUI
-  or Focus views when you want captured output and status summaries.
+- Start in selectable TTY, switch to Raw for direct tmux terminal control, or
+  use normalized GUI and Focus views for captured output and status summaries.
 - Use Focus mode and session status dots to see which tmux tab is running,
   waiting, or failing.
 - Scroll back through active sessions without losing your place, then jump back
@@ -31,8 +31,8 @@ attach, and temporary file uploads over a private network path.
 - Force Sync manually refreshes the captured pane without attaching to tmux.
 - Upload files from Android or desktop browsers while local CLIs receive safe
   `~/.agent-tmux/attachments/...` references and temporary storage stays internal.
-- Use the clearly labeled view dropdown for Raw, GUI, Focus, Light, and Dark
-  controls without crowding the tmux toolbar.
+- Use the view dropdown for Raw, TTY, GUI, and Focus. Default-view, per-session
+  memory, theme, and connection controls live in Settings.
 - Android sideload APK wraps the private server UI with native file picking and
   task-complete notifications.
 - Browser/native notifications can alert when a watched tmux task returns to
@@ -50,9 +50,10 @@ attach, and temporary file uploads over a private network path.
 
 ## Android Demo Note
 
-The Android APK is sideload-only and generic in public builds. It should show a
-setup screen where users enter their own server URL/token, then it loads the
-same Raw, GUI, and Focus views shown in the browser demo. Turn on `Notify` in
+The public Android APK is generic and can be sideloaded from GitHub Releases.
+The repository can also build an AAB for Play testing once an upload key is
+configured. Both formats show a setup screen where users enter their own server URL/token, then load the
+same Raw, TTY, GUI, and Focus views shown in the browser demo. Turn on `Notify` in
 the tmux toolbar to start the native foreground watcher for task-complete
 alerts.
 
@@ -61,7 +62,8 @@ alerts.
 The reviewed public inventory is:
 
 - `docs/assets/agent-tmux-web-hero.png`
-- `docs/assets/desktop-raw.png`
+- `docs/assets/desktop-tty.png`
+- `docs/assets/mobile-tty.png`
 - `docs/assets/mobile-raw.png`
 - `docs/assets/mobile-gui.png`
 - `docs/assets/mobile-focus.png`
