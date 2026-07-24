@@ -38,19 +38,21 @@ const APPROVED_ASSETS = [
   "agent-tmux-web-hero.png",
   "agent-tmux-web-showcase-poster.png",
   "agent-tmux-web-showcase.mp4",
-  "desktop-raw.png",
+  "desktop-tty.png",
   "mobile-focus.png",
   "mobile-gui.png",
   "mobile-raw.png",
+  "mobile-tty.png",
   "modes-overview.png"
 ].sort();
 const EXPECTED_PNG_DIMENSIONS = new Map([
   ["agent-tmux-web-hero.png", [HERO_WIDTH, HERO_HEIGHT]],
   ["agent-tmux-web-showcase-poster.png", [SHOWCASE_WIDTH, SHOWCASE_HEIGHT]],
-  ["desktop-raw.png", [DESKTOP_WIDTH, DESKTOP_HEIGHT]],
+  ["desktop-tty.png", [DESKTOP_WIDTH, DESKTOP_HEIGHT]],
   ["mobile-focus.png", [MOBILE_WIDTH, MOBILE_HEIGHT]],
   ["mobile-gui.png", [MOBILE_WIDTH, MOBILE_HEIGHT]],
   ["mobile-raw.png", [MOBILE_WIDTH, MOBILE_HEIGHT]],
+  ["mobile-tty.png", [MOBILE_WIDTH, MOBILE_HEIGHT]],
   ["modes-overview.png", [SHOWCASE_WIDTH, SHOWCASE_HEIGHT]]
 ]);
 const SIGNAL_EXIT_CODES = { SIGINT: 130, SIGTERM: 143 };
@@ -70,15 +72,22 @@ const showcaseScenes = [
     eyebrow: "Agent Tmux Web",
     title: "Keep terminal agents running.",
     body: "Run terminal agents inside tmux on your server, then reconnect from desktop or Android.",
-    media: "../desktop-raw.png",
+    media: "../desktop-tty.png",
     layout: "desktop"
   },
   {
-    eyebrow: "Desktop Raw",
-    title: "Exact tmux control on a wider canvas.",
-    body: "Work directly in the terminal without giving up session persistence.",
-    media: "../desktop-raw.png",
+    eyebrow: "Desktop TTY",
+    title: "Readable output without leaving tmux.",
+    body: "Select text, open links, and keep OpenCode conversation and details visible together.",
+    media: "../desktop-tty.png",
     layout: "desktop"
+  },
+  {
+    eyebrow: "Mobile TTY",
+    title: "Check the stream, then inspect details.",
+    body: "Use compact Stream and Details tabs while the agent keeps running on your server.",
+    media: "../mobile-tty.png",
+    layout: "phone"
   },
   {
     eyebrow: "Mobile Raw",
@@ -196,6 +205,8 @@ async function generateAndPublishAssets(signal) {
     const page = await captureContext.newPage();
     await page.goto(demoUrl, { waitUntil: "domcontentloaded" });
     await delay(1200, signal);
+    await chooseView(page, "TTY", signal);
+    await capture(page, path.join(assetsDir, "mobile-tty.png"), signal);
     await chooseView(page, "Raw", signal);
     await capture(page, path.join(assetsDir, "mobile-raw.png"), signal);
     await chooseView(page, "GUI", signal);
@@ -204,10 +215,10 @@ async function generateAndPublishAssets(signal) {
     await evaluate(page, "document.querySelector('.tmux-focus')?.scrollTo({ top: 0 })");
     await delay(100, signal);
     await capture(page, path.join(assetsDir, "mobile-focus.png"), signal);
-    await chooseView(page, "Raw", signal);
+    await chooseView(page, "TTY", signal);
     await setViewport(page, DESKTOP_WIDTH, DESKTOP_HEIGHT);
     await delay(500, signal);
-    await capture(page, path.join(assetsDir, "desktop-raw.png"), signal);
+    await capture(page, path.join(assetsDir, "desktop-tty.png"), signal);
   } finally {
     await captureContext.close().catch(() => {});
   }
@@ -385,7 +396,7 @@ function buildHeroHtml() {
       <h1>Keep terminal agents running.</h1>
       <p>Run terminal agents inside tmux on your server, then reconnect from desktop or Android.</p>
     </section>
-    <div class="desktop"><img alt="Agent Tmux Web Raw view on desktop" src="../desktop-raw.png"></div>
+    <div class="desktop"><img alt="Agent Tmux Web TTY view on desktop" src="../desktop-tty.png"></div>
     <div class="rule"></div>
   </main>
 </body>
@@ -394,6 +405,7 @@ function buildHeroHtml() {
 
 function buildModesOverviewHtml() {
   const modes = [
+    { label: "TTY", description: "Selectable stream", image: "../mobile-tty.png" },
     { label: "Raw", description: "Direct terminal", image: "../mobile-raw.png" },
     { label: "GUI", description: "Readable transcript", image: "../mobile-gui.png" },
     { label: "Focus", description: "Attention triage", image: "../mobile-focus.png" }
@@ -440,24 +452,24 @@ function buildModesOverviewHtml() {
       position: relative;
       z-index: 2;
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 38px;
-      margin-top: 40px;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+      margin-top: 36px;
     }
     article {
       display: grid;
-      grid-template-columns: 180px 1fr;
+      grid-template-rows: auto 1fr;
       align-items: start;
       min-width: 0;
       height: 800px;
-      padding: 24px 24px 0;
+      padding: 20px 18px 0;
       overflow: hidden;
       border: 1px solid rgba(230, 243, 239, 0.14);
       border-radius: 8px;
       background: rgba(13, 17, 18, 0.72);
       box-shadow: 0 28px 70px rgba(0, 0, 0, 0.36);
     }
-    .label { padding-top: 8px; }
+    .label { padding: 4px 4px 18px; }
     .label strong {
       display: block;
       color: #6bc4ad;
@@ -467,13 +479,14 @@ function buildModesOverviewHtml() {
     }
     .label span {
       display: block;
-      margin-top: 13px;
+      margin-top: 8px;
       color: #c1cbc8;
       font-size: 17px;
       line-height: 1.35;
     }
     .phone {
-      width: 340px;
+      justify-self: center;
+      width: 300px;
       padding: 10px;
       border: 1px solid rgba(230, 243, 239, 0.2);
       border-radius: 32px 32px 0 0;
@@ -491,8 +504,8 @@ function buildModesOverviewHtml() {
   <main>
     ${backdropMarkup()}
     <header>
-      <h1>Three views. One persistent tmux session.</h1>
-      <p>Move between exact terminal control, a readable agent transcript, and status-focused triage.</p>
+      <h1>Four views. One persistent tmux session.</h1>
+      <p>Move between selectable TTY output, exact terminal control, a readable transcript, and focused triage.</p>
     </header>
     <section class="modes">
       ${modes.map((mode) => `<article>
@@ -926,7 +939,7 @@ async function evaluate(page, expression) {
 
 async function chooseView(page, label, signal) {
   signal.throwIfAborted();
-  await page.locator(".tmux-view-menu summary").click();
+  await page.getByLabel(/Change view\. Current view:/).click();
   await page.getByRole("menuitemradio", { name: label }).click();
   await delay(350, signal);
 }

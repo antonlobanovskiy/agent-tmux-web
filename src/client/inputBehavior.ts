@@ -25,6 +25,13 @@ type ClipboardImageSource = {
   items?: ArrayLike<ClipboardImageItem> | null;
 };
 
+type BrowserClipboardReader = {
+  read: () => Promise<Array<{
+    getType: (type: string) => Promise<Blob>;
+    types: readonly string[];
+  }>>;
+};
+
 type EnterKeyLike = {
   key: string;
   shiftKey: boolean;
@@ -65,6 +72,25 @@ export function extractPastedImageFiles(source: ClipboardImageSource): File[] {
   return Array.from(source.files ?? [])
     .filter((file) => isImageFile(file))
     .map((file, index) => normalizePastedImageFile(file, index));
+}
+
+export async function readClipboardImageFiles(
+  clipboard: BrowserClipboardReader | undefined = typeof navigator === "undefined" ? undefined : navigator.clipboard
+): Promise<File[]> {
+  if (typeof clipboard?.read !== "function") {
+    return [];
+  }
+
+  const files: File[] = [];
+  for (const item of await clipboard.read()) {
+    const imageType = item.types.find((type) => /^image\//i.test(type));
+    if (!imageType) {
+      continue;
+    }
+    const blob = await item.getType(imageType);
+    files.push(normalizePastedImageFile(new File([blob], "", { type: imageType }), files.length, imageType));
+  }
+  return files;
 }
 
 export function buildPastedPromptText(pastedText: string, attachmentText: string): string {

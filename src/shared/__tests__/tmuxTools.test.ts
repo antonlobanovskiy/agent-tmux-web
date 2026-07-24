@@ -45,14 +45,12 @@ describe("default tmux tools", () => {
       .toEqual(["yolo"]);
   });
 
-  it("lets OpenCode choose one interface and one permission mode", () => {
-    expect(defaultTmuxToolModeIds(tool("opencode"))).toEqual(["full-tui", "auto"]);
-    expect(resolveTmuxToolModeIds(tool("opencode"), ["mini-ui", "full-tui", "default", "auto"]))
-      .toEqual(["full-tui", "auto"]);
-    expect(buildTmuxToolCommand(tool("opencode"), ["full-tui", "default"]))
+  it("lets OpenCode choose one permission mode", () => {
+    expect(defaultTmuxToolModeIds(tool("opencode"))).toEqual(["auto"]);
+    expect(resolveTmuxToolModeIds(tool("opencode"), ["default", "auto"]))
+      .toEqual(["auto"]);
+    expect(buildTmuxToolCommand(tool("opencode"), ["default"]))
       .toBe("opencode");
-    expect(buildTmuxToolCommand(tool("opencode"), ["mini-ui", "auto"]))
-      .toBe("opencode --mini --replay-limit 100 --auto");
   });
 
   it("replaces grouped modes while toggling independent modes", () => {

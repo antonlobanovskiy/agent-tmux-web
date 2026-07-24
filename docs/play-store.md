@@ -21,6 +21,9 @@ android/app/build/outputs/bundle/release/app-release.aab
 ```
 
 The command also runs the public Android artifact string check against the AAB.
+Configure all four `agentTmuxRelease*` signing properties before uploading this
+bundle to Play. Without them, local verification falls back to the Android debug
+key and the resulting AAB is only a generic test artifact.
 
 For sideload releases, continue using:
 

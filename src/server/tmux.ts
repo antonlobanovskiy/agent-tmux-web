@@ -1,4 +1,4 @@
-import { execFile, spawnSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import stringWidth from "string-width";
 
@@ -27,13 +27,10 @@ export type CodexTmuxCommandOptions = {
 
 export type TmuxToolConfig = TmuxToolDto;
 
-export type TmuxToolCapabilities = {
-  opencodeMiniUi: boolean;
-};
-
 export type TmuxPaneMetadata = {
   currentCommand: string;
   width: number;
+  height: number;
   alternateScreen: boolean;
 };
 
@@ -142,37 +139,7 @@ export function parseTmuxTools(value: string | undefined = process.env.CLI_WEB_T
 }
 
 export function listTmuxTools(): TmuxToolConfig[] {
-  const tools = parseTmuxTools();
-  if (!tools.some((tool) => tool.id === "opencode" && tool.modes?.some((mode) => mode.id === "mini-ui"))) {
-    return tools;
-  }
-  return resolveTmuxToolsForCapabilities(tools, {
-    opencodeMiniUi: detectOpenCodeMiniUiSupport()
-  });
-}
-
-export function resolveTmuxToolsForCapabilities(
-  tools: TmuxToolConfig[],
-  capabilities: TmuxToolCapabilities
-): TmuxToolConfig[] {
-  if (capabilities.opencodeMiniUi) {
-    return tools;
-  }
-  return tools.map((tool) => {
-    if (tool.id !== "opencode" || !tool.modes?.some((mode) => mode.id === "mini-ui")) {
-      return tool;
-    }
-    return {
-      ...tool,
-      modes: tool.modes
-        .filter((mode) => mode.id !== "mini-ui")
-        .map((mode) => mode.id === "full-tui" ? { ...mode, defaultEnabled: true } : mode)
-    };
-  });
-}
-
-export function openCodeHelpSupportsMiniUi(help: string): boolean {
-  return /(?:^|\s)--mini(?:\s|$)/m.test(help) && /(?:^|\s)--replay-limit(?:\s|$)/m.test(help);
+  return parseTmuxTools();
 }
 
 export function buildTmuxNewSessionArgs(name: string, cwd?: string | null): string[] {
@@ -363,7 +330,7 @@ export async function captureTmuxPaneView(session: string, lines = 1000): Promis
     return { output };
   }
 
-  return splitOpenCodeTuiCapture(output, metadata.width) ?? { output };
+  return splitOpenCodeTuiCapture(output, metadata.width, metadata.height) ?? { output };
 }
 
 export async function inspectTmuxPane(session: string): Promise<TmuxPaneMetadata> {
@@ -372,20 +339,22 @@ export async function inspectTmuxPane(session: string): Promise<TmuxPaneMetadata
     "-p",
     "-t",
     session,
-    "#{pane_current_command}\t#{pane_width}\t#{alternate_on}"
+    "#{pane_current_command}\t#{pane_width}\t#{pane_height}\t#{alternate_on}"
   ]);
   return parseTmuxPaneMetadata(stdout);
 }
 
 export function parseTmuxPaneMetadata(output: string): TmuxPaneMetadata {
-  const [currentCommand = "", widthValue = "", alternateValue = ""] = output.trim().split("\t");
+  const [currentCommand = "", widthValue = "", heightValue = "", alternateValue = ""] = output.trim().split("\t");
   const width = Number(widthValue);
-  if (!currentCommand || !Number.isInteger(width) || width < 1 || !/^[01]$/.test(alternateValue)) {
+  const height = Number(heightValue);
+  if (!currentCommand || !Number.isInteger(width) || width < 1 || !Number.isInteger(height) || height < 1 || !/^[01]$/.test(alternateValue)) {
     throw new Error("Invalid tmux pane metadata");
   }
   return {
     currentCommand,
     width,
+    height,
     alternateScreen: alternateValue === "1"
   };
 }
@@ -408,7 +377,7 @@ export function fitTmuxCaptureSizeForPane(size: TerminalSize, metadata: TmuxPane
   };
 }
 
-export function splitOpenCodeTuiCapture(output: string, paneWidth: number): TmuxPaneCapture | null {
+export function splitOpenCodeTuiCapture(output: string, paneWidth: number, paneHeight?: number): TmuxPaneCapture | null {
   const sidebarWidth = 42;
   if (!Number.isInteger(paneWidth) || paneWidth <= 120 || paneWidth <= sidebarWidth) {
     return null;
@@ -417,7 +386,13 @@ export function splitOpenCodeTuiCapture(output: string, paneWidth: number): Tmux
   const splitColumn = paneWidth - sidebarWidth;
   const mainLines: string[] = [];
   const sidebarLines: string[] = [];
-  for (const line of output.split(/\r?\n/)) {
+  const lines = output.split(/\r?\n/);
+  const visibleStart = paneHeight ? Math.max(0, lines.length - paneHeight) : 0;
+  for (const [index, line] of lines.entries()) {
+    if (index < visibleStart) {
+      mainLines.push(line.trimEnd());
+      continue;
+    }
     const [main, sidebar] = splitDisplayLineAtColumn(line, splitColumn);
     mainLines.push(main.trimEnd());
     sidebarLines.push(sidebar.trimEnd());
@@ -519,17 +494,4 @@ function isCodexTmuxOutput(output: string): boolean {
   return normalized.includes("openai codex")
     || normalized.includes("use /skills to list available skills")
     || /gpt-[\w.-]+.*\/model to change/.test(normalized);
-}
-
-function detectOpenCodeMiniUiSupport(): boolean {
-  try {
-    const result = spawnSync("opencode", ["--help"], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-      timeout: 3000
-    });
-    return openCodeHelpSupportsMiniUi(`${result.stdout ?? ""}\n${result.stderr ?? ""}`);
-  } catch {
-    return false;
-  }
 }

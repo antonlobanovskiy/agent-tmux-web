@@ -101,7 +101,10 @@ deployment is separate. Keep user-specific runtime config out of git.
    - Tmux sessions list without crashing.
    - Creating a test session works.
    - Launching a configured CLI tool inserts/runs the expected command.
-   - Raw, GUI, and Focus views can be switched.
+   - TTY is the initial default; Raw, TTY, GUI, and Focus views can be switched.
+   - Settings can remember each session's last view or always use a chosen default.
+   - Raw preserves modified shortcuts such as OpenCode `Shift+Enter`.
+   - `Ctrl+V`/`Cmd+V` can paste local screenshots into Raw as safe attachment references.
 
 7. Expose privately.
    - Prefer Tailscale, a VPN, an SSH tunnel, LAN-only access, or an

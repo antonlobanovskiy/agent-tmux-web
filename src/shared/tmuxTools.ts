@@ -1,7 +1,6 @@
 import type { TmuxToolDto, TmuxToolModeDto } from "./api.js";
 
 const PERMISSION_MODE_GROUP = "permissions";
-const INTERFACE_MODE_GROUP = "interface";
 
 function permissionMode(
   id: string,
@@ -25,21 +24,6 @@ export const DEFAULT_TMUX_TOOLS: TmuxToolDto[] = [
     command: "opencode",
     defaultSessionName: "opencode",
     modes: [
-      {
-        id: "full-tui",
-        label: "Full UI",
-        args: "",
-        defaultEnabled: true,
-        exclusiveGroup: INTERFACE_MODE_GROUP,
-        description: "Keep OpenCode's full terminal UI available for direct interaction in Raw view."
-      },
-      {
-        id: "mini-ui",
-        label: "Linear TTY",
-        args: "--mini --replay-limit 100",
-        exclusiveGroup: INTERFACE_MODE_GROUP,
-        description: "Use OpenCode's linear transcript with native tmux scrollback."
-      },
       permissionMode("default", "Default", "", {
         description: "Use OpenCode's configured permission rules."
       }),

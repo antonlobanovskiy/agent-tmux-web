@@ -18,6 +18,9 @@ export async function writeClipboardText(text: string): Promise<void> {
     throw new Error("Clipboard copy failed");
   }
 
+  const previouslyFocused = document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+    ? document.activeElement
+    : null;
   const textarea = document.createElement("textarea");
   textarea.value = text;
   textarea.setAttribute("readonly", "");
@@ -25,9 +28,16 @@ export async function writeClipboardText(text: string): Promise<void> {
   textarea.style.left = "-9999px";
   textarea.style.top = "0";
   document.body.appendChild(textarea);
-  textarea.select();
-  const copied = document.execCommand("copy");
-  document.body.removeChild(textarea);
+  let copied = false;
+  try {
+    textarea.select();
+    copied = document.execCommand("copy");
+  } finally {
+    document.body.removeChild(textarea);
+    if (previouslyFocused?.isConnected) {
+      previouslyFocused.focus({ preventScroll: true });
+    }
+  }
   if (!copied) {
     throw new Error("Clipboard copy failed");
   }

@@ -8,6 +8,19 @@ uploads, machine-specific service edits, or private signing material.
 
 ## Unreleased
 
+## 0.1.25 - 2026-07-23
+
+- Restored TTY as the default captured view with selectable output, clickable links, and an OpenCode Stream/Details layout for desktop and mobile.
+- Added persistent default-view and per-session view preferences in a dedicated Settings menu.
+- Added background Raw capture caching while preventing stale output from appearing across session changes.
+- Improved Raw input parity with modified-key reporting for Shift+Enter and Ctrl+Shift application shortcuts.
+- Added direct Raw screenshot paste with safe attachment references through Ctrl+V and a permission-aware Ctrl+Shift+V fallback.
+- Restored terminal focus after compatibility clipboard copies and preserved independent Stream/Details scroll positions.
+- Kept TTY capture sizing stable and added native Android recovery when a configured server cannot load.
+- Removed obsolete OpenCode Linear TTY launcher flags so TTY remains an Agent Tmux presentation choice.
+- Refreshed public screenshots and the product showcase around the four current views using fake demo data only.
+- Bumped public Android defaults to `0.1.25` / version code `26`.
+
 ## 0.1.24 - 2026-07-21
 
 - Redesigned the app as a dense responsive tmux workbench and made Raw the default view across launchers and sessions.
