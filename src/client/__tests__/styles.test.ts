@@ -301,13 +301,15 @@ describe("current user guidance", () => {
       marketingCapture.indexOf("const page = await captureContext.newPage()"),
       marketingCapture.indexOf("await captureContext.close()")
     );
+    const darkThemeSelection = captureFlow.indexOf("await selectDarkTheme(page, signal);");
+    const mobileTtyCapture = captureFlow.indexOf('await capture(page, path.join(assetsDir, "mobile-tty.png"), signal);');
+    const settingsOpen = captureFlow.indexOf("await openSettingsMenu(page, signal);");
+    const desktopTtyCapture = captureFlow.indexOf('await capture(page, path.join(assetsDir, "desktop-tty.png"), signal);');
 
-    expect(captureFlow.indexOf("await selectDarkTheme(page, signal);")).toBeLessThan(
-      captureFlow.indexOf('await capture(page, path.join(assetsDir, "mobile-tty.png"), signal);')
-    );
-    expect(captureFlow.indexOf("await openSettingsMenu(page, signal);")).toBeLessThan(
-      captureFlow.indexOf('await capture(page, path.join(assetsDir, "desktop-tty.png"), signal);')
-    );
+    expect(darkThemeSelection).toBeGreaterThanOrEqual(0);
+    expect(mobileTtyCapture).toBeGreaterThan(darkThemeSelection);
+    expect(settingsOpen).toBeGreaterThanOrEqual(0);
+    expect(desktopTtyCapture).toBeGreaterThan(settingsOpen);
     expect(marketingCapture).toContain('document.documentElement.dataset.theme === "dark"');
     expect(marketingCapture).toContain('name: "Dark", exact: true');
   });
