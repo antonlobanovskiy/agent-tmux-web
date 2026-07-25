@@ -90,6 +90,15 @@ export class TmuxWatchStore {
   }
 
   latestEventId(): number {
+    const unsettledEventIds = this.events.flatMap((event) => {
+      const watch = this.watches.get(event.session);
+      return watch?.candidate && watch.phase === event.state && watch.revision === event.revision
+        ? [event.id]
+        : [];
+    });
+    if (unsettledEventIds.length > 0) {
+      return Math.min(...unsettledEventIds) - 1;
+    }
     return this.latestBaselineEventId();
   }
 

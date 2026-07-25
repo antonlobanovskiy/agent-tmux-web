@@ -211,8 +211,19 @@ describe("tmux watch store", () => {
 
     output = "• Working (1s • esc to interrupt)";
     await changingStore.pollOnce();
-    expect(changingStore.latestEventId()).toBe(1);
+    expect(changingStore.latestEventId()).toBe(0);
     expect(changingStore.latestBaselineEventId()).toBe(1);
+    expect(changingStore.getEventsSince(0)).toEqual([]);
+
+    output = "agent-demo $";
+    await changingStore.pollOnce();
+    expect(changingStore.latestEventId()).toBe(1);
+    expect(changingStore.getEventsSince(0)).toHaveLength(1);
+
+    output = "• Working (1s • esc to interrupt)";
+    await changingStore.pollOnce();
+    await changingStore.pollOnce();
+    expect(changingStore.latestEventId()).toBe(1);
     expect(changingStore.getEventsSince(0)).toEqual([]);
   });
 

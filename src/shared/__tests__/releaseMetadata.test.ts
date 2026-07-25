@@ -1,6 +1,6 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 
 import { describe, expect, it } from "vitest";
 
@@ -47,21 +47,14 @@ describe("release metadata", () => {
   });
 
   it("keeps tracked text free of maintainer-specific paths and addresses", () => {
-    const trackedFiles = execFileSync("git", ["ls-files", "-z"], { cwd: root })
-      .toString("utf8")
-      .split("\0")
-      .filter(Boolean);
-    const leaks = trackedFiles.flatMap((filePath) => {
-      const absolutePath = join(root, filePath);
-      if (!existsSync(absolutePath)) {
-        return [];
-      }
-      const content = readFileSync(absolutePath);
-      if (content.includes(0)) {
-        return [];
-      }
-      return /\/home\/antonlobanovskiy|100\.67\.212\.112/.test(content.toString("utf8")) ? [filePath] : [];
-    });
-    expect(leaks).toEqual([]);
+    const pattern = ["/home/" + "antonlobanovskiy", "100" + "\\.67\\.212\\.112"].join("|");
+    const scan = spawnSync(
+      "git",
+      ["grep", "-I", "-l", "-E", pattern, "--"],
+      { cwd: root, encoding: "utf8" }
+    );
+    expect([0, 1]).toContain(scan.status);
+    expect(scan.stderr).toBe("");
+    expect(scan.stdout.trim()).toBe("");
   });
 });
