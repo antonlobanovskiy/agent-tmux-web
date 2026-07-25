@@ -1,6 +1,6 @@
 {
   "name": "agent-tmux-web",
-  "version": "0.1.25",
+  "version": "0.1.26",
   "description": "Mobile-friendly browser control panel for terminal agent CLIs running inside tmux.",
   "private": true,
   "license": "MIT",
@@ -9,8 +9,8 @@
     "dev": "tsx watch src/server/index.ts",
     "build": "vite build && tsc -p tsconfig.server.json",
     "android:build": "pnpm build && cd android && ./gradlew assembleDebug assembleRelease",
-    "android:build:public": "pnpm build && cd android && ./gradlew assembleRelease -PagentTmuxDefaultUrl= -PagentTmuxDefaultToken= -PagentTmuxApplicationIdSuffix= -PagentTmuxAppLabel=\"Agent Tmux\" -PagentTmuxVersionCode=26 -PagentTmuxVersionName=0.1.25 && cd .. && pnpm android:verify-public-apk",
-    "android:build:play": "pnpm build && cd android && ./gradlew bundleRelease -PagentTmuxDefaultUrl= -PagentTmuxDefaultToken= -PagentTmuxApplicationIdSuffix= -PagentTmuxAppLabel=\"Agent Tmux\" -PagentTmuxVersionCode=26 -PagentTmuxVersionName=0.1.25 && cd .. && pnpm android:verify-public-apk android/app/build/outputs/bundle/release/app-release.aab",
+    "android:build:public": "pnpm build && cd android && ./gradlew assembleRelease -PagentTmuxDefaultUrl= -PagentTmuxDefaultToken= -PagentTmuxApplicationIdSuffix= -PagentTmuxAppLabel=\"Agent Tmux\" -PagentTmuxVersionCode=27 -PagentTmuxVersionName=0.1.26 && cd .. && pnpm android:verify-public-apk",
+    "android:build:play": "pnpm build && cd android && ./gradlew bundleRelease -PagentTmuxDefaultUrl= -PagentTmuxDefaultToken= -PagentTmuxApplicationIdSuffix= -PagentTmuxAppLabel=\"Agent Tmux\" -PagentTmuxVersionCode=27 -PagentTmuxVersionName=0.1.26 && cd .. && pnpm android:verify-public-apk android/app/build/outputs/bundle/release/app-release.aab",
     "android:build:private": "node scripts/build-private-apk.mjs",
     "android:stage-apk": "node scripts/stage-apk-download.mjs",
     "android:verify-public-apk": "node scripts/verify-public-apk.mjs",

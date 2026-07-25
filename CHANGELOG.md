@@ -8,6 +8,20 @@ uploads, machine-specific service edits, or private signing material.
 
 ## Unreleased
 
+## 0.1.26 - 2026-07-25
+
+- Fixed Android Raw swipe-typing and deletion corruption by resetting stale xterm IME state and translating semantic delete operations safely.
+- Reworked notifications around confirmed per-session transitions, with one alert when a session needs input and one when it becomes idle.
+- Kept notification event IDs in confirmed delivery order, coalesced overlapping watcher polls, and added Android cursor/parser regression coverage.
+- Added enable-time notification baselines and current-state filtering so existing or outdated idle/waiting events are not replayed.
+- Removed GUI and Focus views, replacing the view menu with a direct TTY/Raw toggle and migrating legacy saved views to TTY.
+- Added semantic green, amber, red, and gray session lights, persistent session pins, and other-viewer counts.
+- Replaced separate sync/reconnect controls with one Refresh action and removed the redundant desktop session menu trigger.
+- Expanded TTY and OpenCode capture history to 5,000 rows and configured app-created tmux panes with matching scrollback.
+- Retained Raw screenshot paste and safe attachment references while simplifying the surrounding view controls.
+- Refreshed TTY/Raw screenshots and showcase media using demo data only.
+- Bumped public Android defaults to `0.1.26` / version code `27`.
+
 ## 0.1.25 - 2026-07-23
 
 - Restored TTY as the default captured view with selectable output, clickable links, and an OpenCode Stream/Details layout for desktop and mobile.

@@ -51,7 +51,7 @@ final class AgentNotifications {
         Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
             ? new Notification.Builder(context, TASK_CHANNEL_ID)
             : new Notification.Builder(context);
-        String safeBody = clean(body, "Task is waiting for input.");
+        String safeBody = clean(body, "A tmux session needs input.");
         String safeTag = clean(tag, "agent-tmux-web");
         String safeSession = NotificationTarget.clean(tmuxSession);
 
@@ -76,7 +76,7 @@ final class AgentNotifications {
         return builder
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Agent Tmux notifications")
-            .setContentText("Watching tmux sessions for completed tasks.")
+            .setContentText("Watching for input-needed and idle sessions.")
             .setContentIntent(mainActivityIntent(context, "", 0))
             .setOngoing(true)
             .setShowWhen(false)
@@ -98,7 +98,7 @@ final class AgentNotifications {
             TASK_CHANNEL_NAME,
             NotificationManager.IMPORTANCE_DEFAULT
         );
-        channel.setDescription("Notifications when a tmux agent is waiting for input.");
+        channel.setDescription("Notifications when a tmux agent needs input or becomes idle.");
         notificationManager.createNotificationChannel(channel);
     }
 
@@ -117,7 +117,7 @@ final class AgentNotifications {
             WATCH_CHANNEL_NAME,
             NotificationManager.IMPORTANCE_LOW
         );
-        channel.setDescription("Keeps Agent Tmux completion checks running in the background.");
+        channel.setDescription("Keeps Agent Tmux input-needed and idle checks running in the background.");
         notificationManager.createNotificationChannel(channel);
     }
 

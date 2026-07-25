@@ -7,21 +7,29 @@ final class NotificationTarget {
     private NotificationTarget() {
     }
 
-    static String title(String session) {
+    static String title(String session, String state) {
         String safeSession = clean(session);
-        return safeSession.isEmpty() ? "Agent Tmux tab is waiting" : safeSession + " tab is waiting";
+        if ("idle".equals(state)) {
+            return safeSession.isEmpty() ? "Agent Tmux is idle" : safeSession + " is idle";
+        }
+        return safeSession.isEmpty() ? "Agent Tmux needs input" : safeSession + " needs input";
     }
 
-    static String body(String label, String session) {
+    static String body(String label, String session, String state) {
         String safeLabel = clean(label);
         String safeSession = clean(session);
         if (safeLabel.isEmpty()) {
             safeLabel = "Tmux task";
         }
-        if (safeSession.isEmpty()) {
-            return safeLabel + " finished and is waiting for input.";
+        if ("idle".equals(state)) {
+            return safeSession.isEmpty()
+                ? safeLabel + " is idle."
+                : safeLabel + " is idle in " + safeSession + ".";
         }
-        return safeLabel + " finished in " + safeSession + " and is waiting for input.";
+        if (safeSession.isEmpty()) {
+            return safeLabel + " needs input.";
+        }
+        return safeLabel + " needs input in " + safeSession + ".";
     }
 
     static String tag(String session) {

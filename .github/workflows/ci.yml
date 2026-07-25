@@ -47,7 +47,7 @@ jobs:
       - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - run: pnpm install --frozen-lockfile
       - run: pnpm android:build:public
-      - run: ./gradlew assembleDebug lintDebug
+      - run: ./gradlew assembleDebug testDebugUnitTest testReleaseUnitTest lintDebug --rerun-tasks
         working-directory: android
       - uses: actions/upload-artifact@v4
         with:

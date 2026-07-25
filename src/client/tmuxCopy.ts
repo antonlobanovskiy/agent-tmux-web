@@ -2,6 +2,40 @@ const DRAFT_REPLY_PATTERN = /^(?:[•*-]\s*)?Draft reply:\s*$/i;
 const LEADING_CODEX_BULLET_PATTERN = /^\s*•\s+/;
 const QUOTE_MARKER_PATTERN = /^\s*>\s?/;
 const LIST_ITEM_PATTERN = /^\s*(?:[-*•]\s+|\d+[.)]\s+)/;
+const ANSI_PATTERN = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
+
+export function extractLatestTmuxAssistantText(output: string): string {
+  let latest = "";
+  let current: string[] = [];
+
+  const flush = () => {
+    const text = trimBlankEdges(current).join("\n").trim();
+    if (text) {
+      latest = text;
+    }
+    current = [];
+  };
+
+  for (const rawLine of output.split(/\r?\n/)) {
+    const line = cleanTerminalLine(rawLine);
+    const trimmed = line.trim();
+    if (/^›\s+/.test(trimmed)) {
+      flush();
+      continue;
+    }
+    if (!trimmed) {
+      if (current.length > 0 && current.at(-1) !== "") {
+        current.push("");
+      }
+      continue;
+    }
+    if (!isTerminalChrome(trimmed)) {
+      current.push(line.trimEnd());
+    }
+  }
+  flush();
+  return latest;
+}
 
 export function cleanTmuxAssistantCopyText(text: string): string {
   const normalized = text.replace(/\r\n?/g, "\n");
@@ -121,4 +155,21 @@ function trimBlankEdges(lines: string[]): string[] {
     end -= 1;
   }
   return lines.slice(start, end);
+}
+
+function cleanTerminalLine(line: string): string {
+  return line
+    .replace(ANSI_PATTERN, "")
+    .replace(/\u001b\][^\u0007]*(?:\u0007|\u001b\\)/g, "")
+    .replace(/\s+$/g, "");
+}
+
+function isTerminalChrome(line: string): boolean {
+  const compact = line.replace(/\s/g, "");
+  return /^[─━═-]{8,}$/.test(compact)
+    || /^gpt-[\w.-]+\s+/i.test(line)
+    || /^worked for \d/i.test(line)
+    || /^[─━═-]+\s*worked for \d/i.test(line)
+    || /^goal achieved\b/i.test(line)
+    || line === "No tmux output captured.";
 }

@@ -8,11 +8,17 @@ import org.junit.Test;
 public final class NotificationTargetTest {
     @Test
     public void buildsSessionSpecificNotificationText() {
-        assertEquals("agent-demo tab is waiting", NotificationTarget.title("agent-demo"));
+        assertEquals("agent-demo needs input", NotificationTarget.title("agent-demo", "waiting-for-input"));
         assertEquals(
-            "Claude finished in agent-demo and is waiting for input.",
-            NotificationTarget.body("Claude", "agent-demo")
+            "Claude needs input in agent-demo.",
+            NotificationTarget.body("Claude", "agent-demo", "waiting-for-input")
         );
+    }
+
+    @Test
+    public void buildsIdleNotificationText() {
+        assertEquals("agent-demo is idle", NotificationTarget.title("agent-demo", "idle"));
+        assertEquals("Claude is idle in agent-demo.", NotificationTarget.body("Claude", "agent-demo", "idle"));
     }
 
     @Test

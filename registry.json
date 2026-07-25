@@ -51,7 +51,6 @@
         { "path": "src/client/App.tsx", "type": "registry:file", "target": "~/src/client/App.tsx" },
         { "path": "src/client/TmuxTtyView.tsx", "type": "registry:file", "target": "~/src/client/TmuxTtyView.tsx" },
         { "path": "src/client/LinkifiedText.tsx", "type": "registry:file", "target": "~/src/client/LinkifiedText.tsx" },
-        { "path": "src/client/agentStatus.ts", "type": "registry:file", "target": "~/src/client/agentStatus.ts" },
         { "path": "src/client/androidBridge.ts", "type": "registry:file", "target": "~/src/client/androidBridge.ts" },
         { "path": "src/client/androidConnectionSettings.ts", "type": "registry:file", "target": "~/src/client/androidConnectionSettings.ts" },
         { "path": "src/client/browserNotifications.ts", "type": "registry:file", "target": "~/src/client/browserNotifications.ts" },
@@ -62,16 +61,15 @@
         { "path": "src/client/rawTerminalLinks.ts", "type": "registry:file", "target": "~/src/client/rawTerminalLinks.ts" },
         { "path": "src/client/rawTerminalMode.ts", "type": "registry:file", "target": "~/src/client/rawTerminalMode.ts" },
         { "path": "src/client/rawTerminalGestureGuard.ts", "type": "registry:file", "target": "~/src/client/rawTerminalGestureGuard.ts" },
+        { "path": "src/client/rawTerminalInputGuard.ts", "type": "registry:file", "target": "~/src/client/rawTerminalInputGuard.ts" },
         { "path": "src/client/rawTerminalSelection.ts", "type": "registry:file", "target": "~/src/client/rawTerminalSelection.ts" },
         { "path": "src/client/main.tsx", "type": "registry:file", "target": "~/src/client/main.tsx" },
         { "path": "src/client/slashCommands.ts", "type": "registry:file", "target": "~/src/client/slashCommands.ts" },
         { "path": "src/client/styles.css", "type": "registry:file", "target": "~/src/client/styles.css" },
         { "path": "src/client/theme.ts", "type": "registry:file", "target": "~/src/client/theme.ts" },
         { "path": "src/client/tmuxActivity.ts", "type": "registry:file", "target": "~/src/client/tmuxActivity.ts" },
-        { "path": "src/client/tmuxAttention.ts", "type": "registry:file", "target": "~/src/client/tmuxAttention.ts" },
         { "path": "src/client/tmuxCopy.ts", "type": "registry:file", "target": "~/src/client/tmuxCopy.ts" },
         { "path": "src/client/tmuxFollow.ts", "type": "registry:file", "target": "~/src/client/tmuxFollow.ts" },
-        { "path": "src/client/tmuxGui.ts", "type": "registry:file", "target": "~/src/client/tmuxGui.ts" },
         { "path": "src/client/tmuxNotifications.ts", "type": "registry:file", "target": "~/src/client/tmuxNotifications.ts" },
         { "path": "src/client/tmuxOutputLines.tsx", "type": "registry:file", "target": "~/src/client/tmuxOutputLines.tsx" },
         { "path": "src/client/tmuxOperationGuards.ts", "type": "registry:file", "target": "~/src/client/tmuxOperationGuards.ts" },
@@ -80,7 +78,6 @@
         { "path": "src/client/tmuxViewPreferences.ts", "type": "registry:file", "target": "~/src/client/tmuxViewPreferences.ts" },
         { "path": "src/client/__tests__/browserNotifications.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/browserNotifications.test.ts" },
         { "path": "src/client/__tests__/clipboard.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/clipboard.test.ts" },
-        { "path": "src/client/__tests__/agentStatus.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/agentStatus.test.ts" },
         { "path": "src/client/__tests__/androidConnectionSettings.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/androidConnectionSettings.test.ts" },
         { "path": "src/client/__tests__/inputBehavior.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/inputBehavior.test.ts" },
         { "path": "src/client/__tests__/linkify.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/linkify.test.ts" },
@@ -88,14 +85,13 @@
         { "path": "src/client/__tests__/rawTerminalLinks.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/rawTerminalLinks.test.ts" },
         { "path": "src/client/__tests__/rawTerminalMode.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/rawTerminalMode.test.ts" },
         { "path": "src/client/__tests__/rawTerminalGestureGuard.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/rawTerminalGestureGuard.test.ts" },
+        { "path": "src/client/__tests__/rawTerminalInputGuard.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/rawTerminalInputGuard.test.ts" },
         { "path": "src/client/__tests__/rawTerminalSelection.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/rawTerminalSelection.test.ts" },
         { "path": "src/client/__tests__/slashCommands.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/slashCommands.test.ts" },
         { "path": "src/client/__tests__/theme.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/theme.test.ts" },
         { "path": "src/client/__tests__/tmuxActivity.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/tmuxActivity.test.ts" },
-        { "path": "src/client/__tests__/tmuxAttention.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/tmuxAttention.test.ts" },
         { "path": "src/client/__tests__/tmuxCopy.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/tmuxCopy.test.ts" },
         { "path": "src/client/__tests__/tmuxFollow.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/tmuxFollow.test.ts" },
-        { "path": "src/client/__tests__/tmuxGui.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/tmuxGui.test.ts" },
         { "path": "src/client/__tests__/tmuxNotifications.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/tmuxNotifications.test.ts" },
         { "path": "src/client/__tests__/TmuxTtyView.test.tsx", "type": "registry:file", "target": "~/src/client/__tests__/TmuxTtyView.test.tsx" },
         { "path": "src/client/__tests__/tmuxOutputLines.test.tsx", "type": "registry:file", "target": "~/src/client/__tests__/tmuxOutputLines.test.tsx" },
@@ -144,6 +140,7 @@
         { "path": "android/app/src/main/java/com/agenttmux/web/ExternalLinkPolicy.java", "type": "registry:file", "target": "~/android/app/src/main/java/com/agenttmux/web/ExternalLinkPolicy.java" },
         { "path": "android/app/src/main/java/com/agenttmux/web/MainActivity.java", "type": "registry:file", "target": "~/android/app/src/main/java/com/agenttmux/web/MainActivity.java" },
         { "path": "android/app/src/main/java/com/agenttmux/web/NotificationTarget.java", "type": "registry:file", "target": "~/android/app/src/main/java/com/agenttmux/web/NotificationTarget.java" },
+        { "path": "android/app/src/main/java/com/agenttmux/web/WatchPollingLogic.java", "type": "registry:file", "target": "~/android/app/src/main/java/com/agenttmux/web/WatchPollingLogic.java" },
         { "path": "android/app/src/main/java/com/agenttmux/web/WatchPollingService.java", "type": "registry:file", "target": "~/android/app/src/main/java/com/agenttmux/web/WatchPollingService.java" },
         { "path": "android/app/src/main/res/drawable/ic_launcher_foreground.xml", "type": "registry:file", "target": "~/android/app/src/main/res/drawable/ic_launcher_foreground.xml" },
         { "path": "android/app/src/main/res/drawable/ic_notification.xml", "type": "registry:file", "target": "~/android/app/src/main/res/drawable/ic_notification.xml" },
@@ -156,6 +153,7 @@
         { "path": "android/app/src/test/java/com/agenttmux/web/AgentNotificationBridgeTest.java", "type": "registry:file", "target": "~/android/app/src/test/java/com/agenttmux/web/AgentNotificationBridgeTest.java" },
         { "path": "android/app/src/test/java/com/agenttmux/web/ExternalLinkPolicyTest.java", "type": "registry:file", "target": "~/android/app/src/test/java/com/agenttmux/web/ExternalLinkPolicyTest.java" },
         { "path": "android/app/src/test/java/com/agenttmux/web/NotificationTargetTest.java", "type": "registry:file", "target": "~/android/app/src/test/java/com/agenttmux/web/NotificationTargetTest.java" },
+        { "path": "android/app/src/test/java/com/agenttmux/web/WatchPollingLogicTest.java", "type": "registry:file", "target": "~/android/app/src/test/java/com/agenttmux/web/WatchPollingLogicTest.java" },
         { "path": "scripts/build-private-apk.mjs", "type": "registry:file", "target": "~/scripts/build-private-apk.mjs" }
       ],
       "docs": "This item contains the complete deduplicated source payload at the selected ref. Install into an empty project directory or inspect first with --dry-run, --diff, or view. Binary media assets, launcher images, and the Gradle wrapper jar are intentionally omitted; clone the repository for the complete asset set. Keep runtime .env files, auth tokens, uploads, APKs, and machine-specific service files out of git.",
@@ -241,11 +239,6 @@
           "target": "~/src/client/LinkifiedText.tsx"
         },
         {
-          "path": "src/client/agentStatus.ts",
-          "type": "registry:file",
-          "target": "~/src/client/agentStatus.ts"
-        },
-        {
           "path": "src/client/androidBridge.ts",
           "type": "registry:file",
           "target": "~/src/client/androidBridge.ts"
@@ -296,6 +289,11 @@
           "target": "~/src/client/rawTerminalGestureGuard.ts"
         },
         {
+          "path": "src/client/rawTerminalInputGuard.ts",
+          "type": "registry:file",
+          "target": "~/src/client/rawTerminalInputGuard.ts"
+        },
+        {
           "path": "src/client/rawTerminalSelection.ts",
           "type": "registry:file",
           "target": "~/src/client/rawTerminalSelection.ts"
@@ -326,11 +324,6 @@
           "target": "~/src/client/tmuxActivity.ts"
         },
         {
-          "path": "src/client/tmuxAttention.ts",
-          "type": "registry:file",
-          "target": "~/src/client/tmuxAttention.ts"
-        },
-        {
           "path": "src/client/tmuxCopy.ts",
           "type": "registry:file",
           "target": "~/src/client/tmuxCopy.ts"
@@ -339,11 +332,6 @@
           "path": "src/client/tmuxFollow.ts",
           "type": "registry:file",
           "target": "~/src/client/tmuxFollow.ts"
-        },
-        {
-          "path": "src/client/tmuxGui.ts",
-          "type": "registry:file",
-          "target": "~/src/client/tmuxGui.ts"
         },
         {
           "path": "src/client/tmuxNotifications.ts",
@@ -386,11 +374,6 @@
           "target": "~/src/client/__tests__/clipboard.test.ts"
         },
         {
-          "path": "src/client/__tests__/agentStatus.test.ts",
-          "type": "registry:file",
-          "target": "~/src/client/__tests__/agentStatus.test.ts"
-        },
-        {
           "path": "src/client/__tests__/androidConnectionSettings.test.ts",
           "type": "registry:file",
           "target": "~/src/client/__tests__/androidConnectionSettings.test.ts"
@@ -426,6 +409,11 @@
           "target": "~/src/client/__tests__/rawTerminalGestureGuard.test.ts"
         },
         {
+          "path": "src/client/__tests__/rawTerminalInputGuard.test.ts",
+          "type": "registry:file",
+          "target": "~/src/client/__tests__/rawTerminalInputGuard.test.ts"
+        },
+        {
           "path": "src/client/__tests__/rawTerminalSelection.test.ts",
           "type": "registry:file",
           "target": "~/src/client/__tests__/rawTerminalSelection.test.ts"
@@ -446,11 +434,6 @@
           "target": "~/src/client/__tests__/tmuxActivity.test.ts"
         },
         {
-          "path": "src/client/__tests__/tmuxAttention.test.ts",
-          "type": "registry:file",
-          "target": "~/src/client/__tests__/tmuxAttention.test.ts"
-        },
-        {
           "path": "src/client/__tests__/tmuxCopy.test.ts",
           "type": "registry:file",
           "target": "~/src/client/__tests__/tmuxCopy.test.ts"
@@ -459,11 +442,6 @@
           "path": "src/client/__tests__/tmuxFollow.test.ts",
           "type": "registry:file",
           "target": "~/src/client/__tests__/tmuxFollow.test.ts"
-        },
-        {
-          "path": "src/client/__tests__/tmuxGui.test.ts",
-          "type": "registry:file",
-          "target": "~/src/client/__tests__/tmuxGui.test.ts"
         },
         {
           "path": "src/client/__tests__/tmuxNotifications.test.ts",
@@ -721,6 +699,11 @@
           "target": "~/android/app/src/main/java/com/agenttmux/web/NotificationTarget.java"
         },
         {
+          "path": "android/app/src/main/java/com/agenttmux/web/WatchPollingLogic.java",
+          "type": "registry:file",
+          "target": "~/android/app/src/main/java/com/agenttmux/web/WatchPollingLogic.java"
+        },
+        {
           "path": "android/app/src/main/java/com/agenttmux/web/WatchPollingService.java",
           "type": "registry:file",
           "target": "~/android/app/src/main/java/com/agenttmux/web/WatchPollingService.java"
@@ -781,6 +764,11 @@
           "target": "~/android/app/src/test/java/com/agenttmux/web/NotificationTargetTest.java"
         },
         {
+          "path": "android/app/src/test/java/com/agenttmux/web/WatchPollingLogicTest.java",
+          "type": "registry:file",
+          "target": "~/android/app/src/test/java/com/agenttmux/web/WatchPollingLogicTest.java"
+        },
+        {
           "path": "scripts/build-private-apk.mjs",
           "type": "registry:file",
           "target": "~/scripts/build-private-apk.mjs"
@@ -797,8 +785,8 @@
     {
       "name": "notifications",
       "type": "registry:item",
-      "title": "Waiting Tab Notifications",
-      "description": "Browser, server, shared, and Android notification routing source for task-done alerts that open the waiting tab.",
+      "title": "Session Transition Notifications",
+      "description": "Browser, server, shared, and Android notification routing for confirmed input-needed and idle alerts that open the relevant session.",
       "files": [
         {
           "path": "src/client/browserNotifications.ts",
@@ -871,6 +859,11 @@
           "target": "~/android/app/src/main/java/com/agenttmux/web/NotificationTarget.java"
         },
         {
+          "path": "android/app/src/main/java/com/agenttmux/web/WatchPollingLogic.java",
+          "type": "registry:file",
+          "target": "~/android/app/src/main/java/com/agenttmux/web/WatchPollingLogic.java"
+        },
+        {
           "path": "android/app/src/main/java/com/agenttmux/web/WatchPollingService.java",
           "type": "registry:file",
           "target": "~/android/app/src/main/java/com/agenttmux/web/WatchPollingService.java"
@@ -884,6 +877,11 @@
           "path": "android/app/src/test/java/com/agenttmux/web/ExternalLinkPolicyTest.java",
           "type": "registry:file",
           "target": "~/android/app/src/test/java/com/agenttmux/web/ExternalLinkPolicyTest.java"
+        },
+        {
+          "path": "android/app/src/test/java/com/agenttmux/web/WatchPollingLogicTest.java",
+          "type": "registry:file",
+          "target": "~/android/app/src/test/java/com/agenttmux/web/WatchPollingLogicTest.java"
         },
         {
           "path": "android/app/src/test/java/com/agenttmux/web/NotificationTargetTest.java",

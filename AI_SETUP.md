@@ -101,7 +101,7 @@ deployment is separate. Keep user-specific runtime config out of git.
    - Tmux sessions list without crashing.
    - Creating a test session works.
    - Launching a configured CLI tool inserts/runs the expected command.
-   - TTY is the initial default; Raw, TTY, GUI, and Focus views can be switched.
+   - TTY is the initial default and the view button toggles directly between TTY and Raw.
    - Settings can remember each session's last view or always use a chosen default.
    - Raw preserves modified shortcuts such as OpenCode `Shift+Enter`.
    - `Ctrl+V`/`Cmd+V` can paste local screenshots into Raw as safe attachment references.
@@ -137,7 +137,7 @@ deployment is separate. Keep user-specific runtime config out of git.
    - Create or select a tmux session.
    - Send a short prompt through the input.
    - Attach Raw mode, then detach and confirm tmux size is restored.
-   - Enable notifications with the bell button if the user wants done alerts.
+   - Enable notifications with the bell button if the user wants input-needed and idle alerts.
      Browser installs need HTTPS or localhost; the Android wrapper can use its
      native notification bridge against the private server URL.
    - Confirm uploads remain temporary, clients receive only safe
@@ -171,9 +171,8 @@ deployment is separate. Keep user-specific runtime config out of git.
   and whether the URL needs `?token=...`.
 - Raw terminal acts resized after detach: detach from the UI, then check for
   active tmux clients with `tmux list-clients`.
-- Notifications do not fire: permission must be granted from the bell button,
-  and the app must see a send/run action before it watches for idle. On Android,
-  leave the foreground watcher notification enabled.
+- Notifications do not fire: permission must be granted from the bell button.
+  On Android, leave the foreground watcher notification enabled.
 - Public APK contains a private URL/token: rebuild with
   `pnpm android:build:public` and verify `android/local.properties` values were
   not used.

@@ -12,19 +12,12 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
-
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
-import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
-import java.util.List;
 
 public final class WatchPollingService extends Service {
     private static final int FOREGROUND_NOTIFICATION_ID = 6174;
@@ -34,7 +27,8 @@ public final class WatchPollingService extends Service {
     private static final String PREF_AUTH_TOKEN = "auth_token";
     private static final String PREF_WATCH_POLLING_ENABLED = "watch_polling_enabled";
     private static final String PREF_WATCH_LAST_EVENT_ID = "watch_last_event_id";
-    private static final String PREF_WATCH_ENABLED_AT_MS = "watch_enabled_at_ms";
+    private static final String PREF_WATCH_GENERATION = "watch_generation";
+    private static final Object BASELINE_LOCK = new Object();
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable pollRunnable = this::poll;
@@ -43,18 +37,23 @@ public final class WatchPollingService extends Service {
     private SharedPreferences preferences;
 
     public static void setEnabled(Context context, boolean enabled) {
-        SharedPreferences prefs = preferences(context);
-        boolean wasEnabled = prefs.getBoolean(PREF_WATCH_POLLING_ENABLED, false);
-        SharedPreferences.Editor editor = prefs.edit()
-            .putBoolean(PREF_WATCH_POLLING_ENABLED, enabled);
-        if (enabled) {
-            if (!wasEnabled || !prefs.contains(PREF_WATCH_ENABLED_AT_MS)) {
-                editor.putLong(PREF_WATCH_ENABLED_AT_MS, System.currentTimeMillis());
+        synchronized (BASELINE_LOCK) {
+            SharedPreferences prefs = preferences(context);
+            boolean wasEnabled = prefs.getBoolean(PREF_WATCH_POLLING_ENABLED, false);
+            SharedPreferences.Editor editor = prefs.edit()
+                .putBoolean(PREF_WATCH_POLLING_ENABLED, enabled);
+            if (enabled != wasEnabled) {
+                editor.putLong(PREF_WATCH_GENERATION, prefs.getLong(PREF_WATCH_GENERATION, 0) + 1);
             }
-        } else {
-            editor.remove(PREF_WATCH_ENABLED_AT_MS);
+            if (enabled) {
+                if (!wasEnabled) {
+                    editor.remove(PREF_WATCH_LAST_EVENT_ID);
+                }
+            } else {
+                editor.remove(PREF_WATCH_LAST_EVENT_ID);
+            }
+            editor.apply();
         }
-        editor.apply();
         if (enabled) {
             start(context);
         } else {
@@ -68,8 +67,19 @@ public final class WatchPollingService extends Service {
 
     public static void startIfEnabled(Context context) {
         if (isEnabled(context)) {
-            ensureEnabledAt(context);
             start(context);
+        }
+    }
+
+    public static void updateConnection(Context context, String serverUrl, String authToken) {
+        synchronized (BASELINE_LOCK) {
+            SharedPreferences prefs = preferences(context);
+            prefs.edit()
+                .putString(PREF_SERVER_URL, normalizeServerUrl(serverUrl))
+                .putString(PREF_AUTH_TOKEN, authToken == null ? "" : authToken.trim())
+                .remove(PREF_WATCH_LAST_EVENT_ID)
+                .putLong(PREF_WATCH_GENERATION, prefs.getLong(PREF_WATCH_GENERATION, 0) + 1)
+                .apply();
         }
     }
 
@@ -150,39 +160,51 @@ public final class WatchPollingService extends Service {
             return;
         }
 
-        long lastEventId = preferences.getLong(PREF_WATCH_LAST_EVENT_ID, 0);
-        long enabledAtMs = preferences.getLong(PREF_WATCH_ENABLED_AT_MS, System.currentTimeMillis());
-        PollResult result = fetchEvents(lastEventId);
-        long nextEventId = Math.max(lastEventId, result.latestEventId);
+        PollSnapshot snapshot = pollSnapshot();
+        WatchPollingLogic.PollDecision decision = WatchPollingLogic.advance(
+            snapshot.lastEventId,
+            snapshot.needsBaseline,
+            fetchEvents(snapshot)
+        );
+        synchronized (BASELINE_LOCK) {
+            if (!decision.shouldPersist || !WatchPollingLogic.isCurrentGeneration(snapshot.generation, preferences.getLong(PREF_WATCH_GENERATION, 0))) {
+                return;
+            }
 
-        for (WatchEvent event : result.events) {
-            if (event.id <= lastEventId) {
-                continue;
+            for (WatchPollingLogic.WatchEvent event : decision.events) {
+                AgentNotifications.postTaskNotification(
+                    this,
+                    NotificationTarget.title(event.session, event.state),
+                    NotificationTarget.body(event.label, event.session, event.state),
+                    NotificationTarget.tag(event.session),
+                    event.session
+                );
             }
-            nextEventId = Math.max(nextEventId, event.id);
-            if (event.finishedAtMs < enabledAtMs) {
-                continue;
-            }
-            AgentNotifications.postTaskNotification(
-                this,
-                NotificationTarget.title(event.session),
-                NotificationTarget.body(event.label, event.session),
-                NotificationTarget.tag(event.session),
-                event.session
-            );
+
+            preferences.edit()
+                .putLong(PREF_WATCH_LAST_EVENT_ID, decision.nextEventId)
+                .apply();
         }
-
-        preferences.edit()
-            .putLong(PREF_WATCH_LAST_EVENT_ID, nextEventId)
-            .apply();
     }
 
-    private PollResult fetchEvents(long since) {
+    private PollSnapshot pollSnapshot() {
+        synchronized (BASELINE_LOCK) {
+            return new PollSnapshot(
+                !preferences.contains(PREF_WATCH_LAST_EVENT_ID),
+                preferences.getLong(PREF_WATCH_LAST_EVENT_ID, 0),
+                preferences.getLong(PREF_WATCH_GENERATION, 0),
+                serverUrl(),
+                authToken()
+            );
+        }
+    }
+
+    private WatchPollingLogic.PollResult fetchEvents(PollSnapshot snapshot) {
         HttpURLConnection connection = null;
         try {
-            Uri uri = Uri.parse(serverUrl() + "/api/tmux/watch/events")
+            Uri uri = Uri.parse(snapshot.serverUrl + "/api/tmux/watch/events")
                 .buildUpon()
-                .appendQueryParameter("since", String.valueOf(since))
+                .appendQueryParameter("since", String.valueOf(snapshot.lastEventId))
                 .build();
             connection = (HttpURLConnection) new URL(uri.toString()).openConnection();
             connection.setConnectTimeout(8000);
@@ -191,38 +213,17 @@ public final class WatchPollingService extends Service {
             connection.setRequestProperty("Accept", "application/json");
             connection.setRequestProperty("User-Agent", "AgentTmuxAndroidWatch/" + BuildConfig.VERSION_NAME);
             connection.setRequestProperty("x-agent-tmux-web-client", "android-watch");
-            String token = authToken();
-            if (!token.isEmpty()) {
-                connection.setRequestProperty("x-agent-tmux-web-token", token);
+            if (!snapshot.authToken.isEmpty()) {
+                connection.setRequestProperty("x-agent-tmux-web-token", snapshot.authToken);
             }
 
             int code = connection.getResponseCode();
             if (code < 200 || code >= 300) {
-                return new PollResult(since, new ArrayList<>());
+                return WatchPollingLogic.parseResponse(code, "", snapshot.lastEventId);
             }
-
-            JSONObject root = new JSONObject(readAll(connection.getInputStream()));
-            long latestEventId = root.optLong("latestEventId", since);
-            JSONArray data = root.optJSONArray("data");
-            List<WatchEvent> events = new ArrayList<>();
-            if (data != null) {
-                for (int index = 0; index < data.length(); index += 1) {
-                    JSONObject item = data.optJSONObject(index);
-                    if (item == null) {
-                        continue;
-                    }
-                    long id = item.optLong("id", 0);
-                    String session = item.optString("session", "").trim();
-                    String label = item.optString("label", "Tmux task").trim();
-                    long finishedAtMs = parseIsoTime(item.optString("finishedAt", ""));
-                    if (id > 0 && !session.isEmpty()) {
-                        events.add(new WatchEvent(id, session, label.isEmpty() ? "Tmux task" : label, finishedAtMs));
-                    }
-                }
-            }
-            return new PollResult(latestEventId, events);
+            return WatchPollingLogic.parseResponse(code, readAll(connection.getInputStream()), snapshot.lastEventId);
         } catch (Exception error) {
-            return new PollResult(since, new ArrayList<>());
+            return WatchPollingLogic.failure(snapshot.lastEventId);
         } finally {
             if (connection != null) {
                 connection.disconnect();
@@ -281,48 +282,20 @@ public final class WatchPollingService extends Service {
         return context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
     }
 
-    private static void ensureEnabledAt(Context context) {
-        SharedPreferences prefs = preferences(context);
-        if (prefs.contains(PREF_WATCH_ENABLED_AT_MS)) {
-            return;
-        }
-        prefs.edit()
-            .putLong(PREF_WATCH_ENABLED_AT_MS, System.currentTimeMillis())
-            .apply();
-    }
+    private static final class PollSnapshot {
+        final boolean needsBaseline;
+        final long lastEventId;
+        final long generation;
+        final String serverUrl;
+        final String authToken;
 
-    private static long parseIsoTime(String value) {
-        if (value == null || value.trim().isEmpty()) {
-            return 0;
-        }
-        try {
-            return Instant.parse(value.trim()).toEpochMilli();
-        } catch (DateTimeParseException error) {
-            return 0;
+        PollSnapshot(boolean needsBaseline, long lastEventId, long generation, String serverUrl, String authToken) {
+            this.needsBaseline = needsBaseline;
+            this.lastEventId = lastEventId;
+            this.generation = generation;
+            this.serverUrl = serverUrl;
+            this.authToken = authToken;
         }
     }
 
-    private static final class PollResult {
-        final long latestEventId;
-        final List<WatchEvent> events;
-
-        PollResult(long latestEventId, List<WatchEvent> events) {
-            this.latestEventId = latestEventId;
-            this.events = events;
-        }
-    }
-
-    private static final class WatchEvent {
-        final long id;
-        final String session;
-        final String label;
-        final long finishedAtMs;
-
-        WatchEvent(long id, String session, String label, long finishedAtMs) {
-            this.id = id;
-            this.session = session;
-            this.label = label;
-            this.finishedAtMs = finishedAtMs;
-        }
-    }
 }

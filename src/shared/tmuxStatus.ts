@@ -18,15 +18,19 @@ export function classifyTmuxStatus(input: TmuxStatusInput): TmuxSessionStatusDto
   const signalText = meaningfulSignalLines(output).slice(-12).join("\n");
   const activeRecently = isActiveRecently(input);
 
-  if (looksLikePermissionPrompt(signalText)) {
-    return status("needs-permission");
-  }
-
   if (looksLikeTmuxWorking(output) && activeRecently) {
     return status("running");
   }
 
-  if (looksLikeError(signalText)) {
+  if (looksLikePermissionPrompt(signalText)) {
+    return status("needs-permission");
+  }
+
+  if (looksLikeQuestion(signalText)) {
+    return status("question");
+  }
+
+  if (looksLikeError(actionablePromptLines(signalText).join("\n"))) {
     return status("error");
   }
 
@@ -34,11 +38,17 @@ export function classifyTmuxStatus(input: TmuxStatusInput): TmuxSessionStatusDto
     return status("waiting");
   }
 
-  if (looksLikeQuestion(signalText)) {
-    return status("question");
-  }
-
   return status("idle");
+}
+
+export function mergeTmuxSessionStatus(
+  visibleStatus: TmuxSessionStatusDto,
+  harnessStatus?: TmuxSessionStatusDto
+): TmuxSessionStatusDto {
+  if (!harnessStatus || visibleStatus.kind === "needs-permission" || visibleStatus.kind === "question" || visibleStatus.kind === "error") {
+    return visibleStatus;
+  }
+  return harnessStatus;
 }
 
 function isActiveRecently(input: TmuxStatusInput): boolean {
@@ -65,7 +75,10 @@ function healthForKind(kind: TmuxSessionStatusKind): TmuxSessionStatusHealth {
   if (kind === "error") {
     return "red";
   }
-  return "yellow";
+  if (kind === "idle" || kind === "waiting") {
+    return "gray";
+  }
+  return "amber";
 }
 
 function titleForKind(kind: TmuxSessionStatusKind): string {
@@ -73,11 +86,11 @@ function titleForKind(kind: TmuxSessionStatusKind): string {
     case "needs-permission":
       return "Needs permission";
     case "question":
-      return "Question waiting";
+      return "Choice required";
     case "error":
       return "Error";
     case "waiting":
-      return "Waiting for input";
+      return "Idle";
     case "running":
       return "Running";
     case "idle":
@@ -97,15 +110,33 @@ function cleanText(text: string): string {
 }
 
 function looksLikePermissionPrompt(text: string): boolean {
-  return text.split(/\r?\n/).some((line) => (
-    /\b(allow|approve|permission|permissions|authorize|confirm|proceed|continue)\b/i.test(line)
+  return actionablePromptLines(text).some((line) => (
+    /\b(allow|approve|permission|permissions|authorize|proceed|continue)\b/i.test(line)
     && /(\?|\[[yY]\/[nN]\]|press enter|\byes\b|\bno\b|esc to go back)/i.test(line)
   ));
 }
 
 function looksLikeQuestion(text: string): boolean {
-  return /(?:\?|which\s+\w+|what\s+\w+|should i|do you want|please choose)/i.test(text)
-    && !looksLikePermissionPrompt(text);
+  const lines = actionablePromptLines(text);
+  const hasSelectedChoice = lines.some((line) => /^(?:(?:[>›❯]\s+)(?:\d+[.)]|[a-z][.)])|[●◉])\s+\S/i.test(line));
+  const choiceLines = lines.filter((line) => /^(?:[>›❯]\s*)?(?:\d+[.)]|[a-z][.)]|[○●◉])\s+\S/i.test(line));
+  const hasChoiceControlHint = /(?:press enter to confirm|enter to select|esc to go back|use (?:the )?(?:arrow|up|down) keys)/i.test(text);
+  return hasSelectedChoice && choiceLines.length >= 2 && hasChoiceControlHint && !looksLikePermissionPrompt(text);
+}
+
+function actionablePromptLines(text: string): string[] {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  let latestReadyFooter = -1;
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    if (/\bctrl\+p\s+commands\b/i.test(lines[index])) {
+      latestReadyFooter = index;
+      break;
+    }
+  }
+  return lines.slice(latestReadyFooter + 1);
 }
 
 function looksLikeError(text: string): boolean {

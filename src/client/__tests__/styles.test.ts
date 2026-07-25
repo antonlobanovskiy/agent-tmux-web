@@ -39,7 +39,7 @@ describe("responsive mobile CSS", () => {
     expect(mobileBlock).toContain("flex: 1 1 auto");
   });
 
-  it("keeps the mobile tmux toolbar stable with compact view controls and a bell notify button", () => {
+  it("keeps the mobile tmux toolbar stable with a direct view toggle and bell notify button", () => {
     const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");
     const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
     const mobileBlock = css.slice(css.indexOf("@media (max-width: 760px)"));
@@ -48,14 +48,16 @@ describe("responsive mobile CSS", () => {
     expect(css).toContain(".tmux-view-menu-content");
     expect(css).toContain(".tmux-view-menu-caret");
     expect(css).toContain(".tmux-notify-button");
-    expect(app).toContain("<Monitor aria-hidden=\"true\"");
+    expect(app).toContain("Switch to ${terminalActive ? \"TTY\" : \"Raw\"} view");
+    expect(app).toContain('className="tmux-view-toggle"');
+    expect(app).not.toContain("tmux-view-picker-content");
     expect(app).toContain('raw: "Raw"');
     expect(app).toContain("hasAndroidConnectionSettings");
     expect(app).toContain("openAndroidConnectionSettings");
     expect(app).toContain(">App</span>");
     expect(app).toContain(">Connection settings</span>");
     expect(mobileBlock).toContain("max-width: 150px");
-    expect(mobileBlock).toContain("grid-template-columns: minmax(0, auto) 36px 36px 36px minmax(0, 1fr) 36px");
+    expect(mobileBlock).toContain("grid-template-columns: minmax(0, auto) 36px 36px minmax(0, 1fr) 36px");
     expect(mobileBlock).not.toContain("grid-template-columns: 36px 36px 36px 36px 36px 36px 36px minmax(0, 1fr)");
   });
 
@@ -84,12 +86,13 @@ describe("responsive mobile CSS", () => {
     expect(app).toContain("rememberTmuxViewMode(selectedTmux, mode)");
     expect(app).toContain("Remember per session");
     expect(app).toContain("Use default");
-    expect(app).toContain("Reconnect");
+    expect(app).toContain('onClick={refreshTmux}');
     expect(app).toContain("shouldShowRawTerminalShortcuts");
     expect(app).toContain("WebLinksAddon");
     expect(app).toContain("createRawTerminalSelectionHandler");
     expect(app).toContain("installRawTerminalGestureGuard(node)");
     expect(app).toContain("removeRawTerminalGestureGuard()");
+    expect(app).toContain("installRawTerminalInputGuard(terminal.textarea, terminal)");
     expect(app).toContain('role="menuitemradio"');
     expect(css).toContain(".tmux-opencode-tabs");
   });
@@ -122,6 +125,8 @@ describe("responsive mobile CSS", () => {
     expect(app.match(/clientWidth: String\(resolveTmuxCaptureClientWidth\(\)\)/g)).toHaveLength(2);
     expect(app).toContain('ref={tmuxCaptureWidthRef}');
     expect(app).toContain("tmuxCaptureWidthRef.current?.clientWidth");
+    expect(app).toContain("TMUX_CAPTURE_HISTORY_LINES");
+    expect(app).not.toContain("const TMUX_CAPTURE_HISTORY_LINES = 1000");
   });
 
   it("invalidates delayed session and launcher work when navigation changes", () => {
@@ -140,8 +145,8 @@ describe("responsive mobile CSS", () => {
     const captureStart = app.indexOf("const captureTmux");
     const captureEnd = app.indexOf("useEffect(() => {", captureStart);
     const captureBlock = app.slice(captureStart, captureEnd);
-    const syncStart = app.indexOf("function syncOrReconnectTmux");
-    const syncEnd = app.indexOf("function showTmuxCopyNotice", syncStart);
+    const syncStart = app.indexOf("function refreshTmux");
+    const syncEnd = app.indexOf("function closeTmuxSettingsMenu", syncStart);
     const syncBlock = app.slice(syncStart, syncEnd);
     const requestAllocation = "const requestId = ++tmuxCaptureRequestIdRef.current";
 
@@ -168,7 +173,7 @@ describe("responsive mobile CSS", () => {
     expect(app).toContain("!selectedTmux ? (");
     expect(app).toContain('className="tmux-empty-session"');
     expect(app).toContain("No tmux session selected");
-    expect(app).toContain("disabled={!selectedTmux || manualCaptureActive}");
+    expect(app).toContain("disabled={manualCaptureActive}");
     expect(app).toContain("const sessionSelected = Boolean(selectedTmux)");
     expect(app).toContain("showTmuxJumpToLatest");
     expect(app).toContain("{showTmuxJumpToLatest && (");
@@ -183,11 +188,14 @@ describe("responsive mobile CSS", () => {
     expect(app).toContain("rawTerminalEffectActive = false;");
   });
 
-  it("avoids redundant GUI state and retains TTY output sources", () => {
+  it("removes GUI and Focus runtime state while retaining TTY output sources", () => {
     const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
 
     expect(app).not.toContain("tmuxGuiActive");
     expect(app).not.toContain("setTmuxGuiActive");
+    expect(app).not.toContain("tmuxFocusActive");
+    expect(app).not.toContain("TmuxChatView");
+    expect(app).not.toContain("TmuxFocusView");
     expect(existsSync(join(process.cwd(), "src/client/tmuxOutputLines.tsx"))).toBe(true);
     expect(existsSync(join(process.cwd(), "src/client/__tests__/tmuxOutputLines.test.tsx"))).toBe(true);
   });
@@ -200,17 +208,19 @@ describe("responsive mobile CSS", () => {
     expect(app).not.toContain("TmuxAgentSummaryStrip");
   });
 
-  it("defines green yellow and red tmux session status dots", () => {
+  it("defines semantic tmux session status lights", () => {
     const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");
 
     expect(css).toContain(".tmux-session-status-dot.green");
-    expect(css).toContain(".tmux-session-status-dot.yellow");
+    expect(css).toContain(".tmux-session-status-dot.amber");
     expect(css).toContain(".tmux-session-status-dot.red");
+    expect(css).toContain(".tmux-session-status-dot.gray");
   });
 
   it("builds a dense desktop workbench while retaining the mobile terminal layout", () => {
     const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");
     const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
+    const desktopBlock = extractBalancedCssBlock(css, "@media (min-width: 761px)");
     const mobileBlock = css.slice(css.indexOf("@media (max-width: 760px)"));
 
     expect(app).toContain('className="tmux-app-toolbar"');
@@ -221,8 +231,10 @@ describe("responsive mobile CSS", () => {
     expect(css).toContain(".tmux-app-toolbar");
     expect(css).toContain("grid-template-columns: 260px minmax(0, 1fr)");
     expect(css).toContain("border-radius: 2px");
+    expect(desktopBlock.text).toContain(".tmux-compact-bar .tmux-session-menu-button");
+    expect(desktopBlock.text).toContain("display: none");
     expect(mobileBlock).toContain(".tmux-app-toolbar");
-    expect(mobileBlock).toContain("grid-template-columns: minmax(0, auto) 36px 36px 36px minmax(0, 1fr) 36px");
+    expect(mobileBlock).toContain("grid-template-columns: minmax(0, auto) 36px 36px minmax(0, 1fr) 36px");
     expect(mobileBlock).toContain(".tmux-menu.open");
   });
 
@@ -230,7 +242,7 @@ describe("responsive mobile CSS", () => {
     const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");
     const workspaceRule = css.match(/(?:^|})\s*\.tmux-workspace\s*\{([^}]*)\}/)?.[1] ?? "";
     const outputFrameRule = css.match(
-      /(?:^|})\s*\.tmux-empty-session\s*,\s*\.tmux-output-shell\s*>\s*\.tmux-output\s*,\s*\.tmux-output-shell\s*>\s*\.tmux-chat\s*,\s*\.tmux-output-shell\s*>\s*\.tmux-focus\s*,\s*\.tmux-output-shell\s*>\s*\.tmux-terminal\s*\{([^}]*)\}/
+      /(?:^|})\s*\.tmux-empty-session\s*,\s*\.tmux-output-shell\s*>\s*\.tmux-output\s*,\s*\.tmux-output-shell\s*>\s*\.tmux-terminal\s*\{([^}]*)\}/
     )?.[1] ?? "";
 
     expect(workspaceRule).toMatch(/padding:\s*0\s*;/);
@@ -275,15 +287,12 @@ describe("responsive mobile CSS", () => {
 });
 
 describe("current user guidance", () => {
-  it("selects GUI before capturing mobile GUI marketing media", () => {
+  it("captures only TTY and Raw product views", () => {
     const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
-    const navigation = marketingCapture.indexOf("await page.goto(demoUrl");
-    const guiSelection = marketingCapture.indexOf('await chooseView(page, "GUI", signal);', navigation);
-    const mobileGuiCapture = marketingCapture.indexOf('await capture(page, path.join(assetsDir, "mobile-gui.png"), signal);');
-
-    expect(navigation).toBeGreaterThanOrEqual(0);
-    expect(guiSelection).toBeGreaterThan(navigation);
-    expect(mobileGuiCapture).toBeGreaterThan(guiSelection);
+    expect(marketingCapture).toContain('await chooseView(page, "TTY", signal);');
+    expect(marketingCapture).toContain('await chooseView(page, "Raw", signal);');
+    expect(marketingCapture).not.toContain("mobile-gui.png");
+    expect(marketingCapture).not.toContain("mobile-focus.png");
   });
 
   it("ships only the approved current marketing assets", () => {
@@ -293,8 +302,6 @@ describe("current user guidance", () => {
       "desktop-tty.png",
       "mobile-tty.png",
       "mobile-raw.png",
-      "mobile-gui.png",
-      "mobile-focus.png",
       "modes-overview.png",
       "agent-tmux-web-showcase-poster.png",
       "agent-tmux-web-showcase.mp4"
@@ -324,23 +331,6 @@ describe("current user guidance", () => {
     expect(marketingCapture).toMatch(/\.finally\(\(\) => \{\s*window\.assetsReady = true;\s*\}\)/);
     expect(showcaseRenderer).toContain("const assetsError = await page.evaluate(() => window.assetsError);");
     expect(showcaseRenderer).toContain("Showcase asset preload failed");
-  });
-
-  it("resets Focus to its status and attention summary before capture", () => {
-    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
-    const focusSelection = marketingCapture.indexOf('await chooseView(page, "Focus", signal);');
-    const focusReset = marketingCapture.indexOf(
-      "document.querySelector('.tmux-focus')?.scrollTo({ top: 0 })",
-      focusSelection
-    );
-    const focusCapture = marketingCapture.indexOf(
-      'await capture(page, path.join(assetsDir, "mobile-focus.png"), signal);',
-      focusSelection
-    );
-
-    expect(focusSelection).toBeGreaterThanOrEqual(0);
-    expect(focusReset).toBeGreaterThan(focusSelection);
-    expect(focusCapture).toBeGreaterThan(focusReset);
   });
 
   it("owns and monitors the loopback capture server", () => {
@@ -448,7 +438,7 @@ describe("current user guidance", () => {
     const readAttribute = (image: string, name: string) =>
       image.match(new RegExp(`\\b${name}\\s*=\\s*["']([^"']+)["']`, "i"))?.[1];
 
-    expect(mobileImages).toHaveLength(4);
+    expect(mobileImages).toHaveLength(2);
     expect(
       mobileImages.map((image) => ({
         src: readAttribute(image, "src"),
@@ -456,9 +446,7 @@ describe("current user guidance", () => {
       }))
     ).toEqual([
       { src: "./docs/assets/mobile-tty.png", alt: "Mobile TTY stream view" },
-      { src: "./docs/assets/mobile-raw.png", alt: "Mobile Raw terminal session" },
-      { src: "./docs/assets/mobile-gui.png", alt: "Mobile GUI transcript view" },
-      { src: "./docs/assets/mobile-focus.png", alt: "Mobile Focus conversation view" }
+      { src: "./docs/assets/mobile-raw.png", alt: "Mobile Raw terminal session" }
     ]);
     expect(readme).not.toMatch(/<video\b[^>]*\bautoplay(?:\s|=|>)/i);
     expect(readme).not.toMatch(/View: TTY/);

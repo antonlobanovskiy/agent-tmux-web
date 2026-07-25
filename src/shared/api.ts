@@ -9,6 +9,8 @@ export type CodexModel = {
   isDefault: boolean;
 };
 
+export const TMUX_CAPTURE_HISTORY_LINES = 5000;
+
 export type CodexSkill = {
   name: string;
   description: string;
@@ -23,6 +25,7 @@ export type TmuxSessionDto = {
   created: string;
   createdAtMs?: number;
   attached: boolean;
+  viewerCount?: number;
   activityAtMs?: number;
   currentCommand?: string;
   status?: TmuxSessionStatusDto;
@@ -30,7 +33,7 @@ export type TmuxSessionDto = {
 
 export type TmuxSessionStatusKind = "needs-permission" | "question" | "error" | "waiting" | "running" | "idle";
 
-export type TmuxSessionStatusHealth = "green" | "yellow" | "red";
+export type TmuxSessionStatusHealth = "green" | "amber" | "red" | "gray";
 
 export type TmuxSessionStatusDto = {
   kind: TmuxSessionStatusKind;
@@ -82,6 +85,8 @@ export type TmuxWatchEvent = {
   id: number;
   session: string;
   label: string;
+  state: "waiting-for-input" | "idle";
+  revision: number;
   startedAt: string;
   finishedAt: string;
 };

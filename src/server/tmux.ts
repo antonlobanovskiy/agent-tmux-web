@@ -1,8 +1,10 @@
 import { execFile } from "node:child_process";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { promisify } from "node:util";
 import stringWidth from "string-width";
 
-import type { TmuxToolDto } from "../shared/api.js";
+import { TMUX_CAPTURE_HISTORY_LINES, type TmuxSessionStatusDto, type TmuxToolDto } from "../shared/api.js";
 import { buildTmuxToolCommand, DEFAULT_TMUX_TOOLS } from "../shared/tmuxTools.js";
 import type { TerminalSize } from "./terminal.js";
 
@@ -16,6 +18,9 @@ export type TmuxSession = {
   created: string;
   createdAtMs?: number;
   attached: boolean;
+  clientCount: number;
+  panePid?: number;
+  currentPath?: string;
   activityAtMs?: number;
   currentCommand?: string;
 };
@@ -50,6 +55,8 @@ export type TmuxInterruptKey = "escape" | "ctrl-c";
 const DEFAULT_DETACHED_TMUX_COLS = 160;
 const DEFAULT_DETACHED_TMUX_ROWS = 40;
 export const TMUX_LITERAL_SEND_CHUNK_SIZE = 16_000;
+const MIN_TMUX_CAPTURE_LINES = 20;
+const TMUX_CAPTURE_MAX_BUFFER_BYTES = 8 * 1024 * 1024;
 
 export function normalizeTmuxSessionName(name: string): string {
   const normalized = name
@@ -159,6 +166,22 @@ export function buildTmuxNewSessionArgs(name: string, cwd?: string | null): stri
   return args;
 }
 
+export function buildTmuxCreateSessionArgs(name: string, cwd: string | null | undefined, currentHistoryLimit: number | null): string[] {
+  const newSessionArgs = buildTmuxNewSessionArgs(name, cwd);
+  if (currentHistoryLimit !== null && currentHistoryLimit >= TMUX_CAPTURE_HISTORY_LINES) {
+    return newSessionArgs;
+  }
+  return [
+    ...(currentHistoryLimit === null ? ["start-server", ";"] : []),
+    "set-option",
+    "-g",
+    "history-limit",
+    String(TMUX_CAPTURE_HISTORY_LINES),
+    ";",
+    ...newSessionArgs
+  ];
+}
+
 export function buildTmuxKillSessionArgs(session: string): string[] {
   return ["kill-session", "-t", session];
 }
@@ -237,7 +260,8 @@ export function parseTmuxSessions(output: string): TmuxSession[] {
           name: match[1],
           windows: Number(match[2]),
           created: match[3],
-          attached: line.includes("(attached)")
+          attached: line.includes("(attached)"),
+          clientCount: line.includes("(attached)") ? 1 : 0
         }
       ];
     });
@@ -248,11 +272,13 @@ function parseFormattedTmuxSession(line: string): TmuxSession | null {
   if (parts.length < 6) {
     return null;
   }
-  const [name, windows, created, attached, activity, currentCommand] = parts;
+  const [name, windows, created, attached, activity, currentCommand, panePidValue, currentPath] = parts;
   const windowCount = Number(windows);
+  const clientCount = Number(attached);
+  const panePid = Number(panePidValue);
   const createdAtMs = unixSecondsToMs(created);
   const activityAtMs = unixSecondsToMs(activity);
-  if (!name || !Number.isFinite(windowCount) || !createdAtMs) {
+  if (!name || !Number.isFinite(windowCount) || !Number.isFinite(clientCount) || !createdAtMs) {
     return null;
   }
 
@@ -261,7 +287,10 @@ function parseFormattedTmuxSession(line: string): TmuxSession | null {
     windows: windowCount,
     created: new Date(createdAtMs).toISOString(),
     createdAtMs,
-    attached: attached === "1",
+    attached: clientCount > 0,
+    clientCount: Math.max(0, clientCount),
+    ...(Number.isInteger(panePid) && panePid > 0 ? { panePid } : {}),
+    ...(currentPath ? { currentPath } : {}),
     ...(activityAtMs ? { activityAtMs } : {}),
     ...(currentCommand ? { currentCommand } : {})
   };
@@ -273,7 +302,8 @@ function unixSecondsToMs(value: string): number | undefined {
 }
 
 export async function createTmuxSession(name: string, cwd?: string | null): Promise<TmuxSession[]> {
-  await execFileAsync("tmux", buildTmuxNewSessionArgs(name, cwd));
+  const currentHistoryLimit = await readTmuxHistoryLimit();
+  await execFileAsync("tmux", buildTmuxCreateSessionArgs(name, cwd, currentHistoryLimit));
   return listTmuxSessions();
 }
 
@@ -287,7 +317,7 @@ export async function listTmuxSessions(): Promise<TmuxSession[]> {
     const { stdout } = await execFileAsync("tmux", [
       "list-sessions",
       "-F",
-      "#{session_name}\t#{session_windows}\t#{session_created}\t#{session_attached}\t#{window_activity}\t#{pane_current_command}"
+      "#{session_name}\t#{session_windows}\t#{session_created}\t#{session_attached}\t#{window_activity}\t#{pane_current_command}\t#{pane_pid}\t#{pane_current_path}"
     ]);
     return parseTmuxSessions(stdout);
   } catch (error) {
@@ -307,8 +337,8 @@ export async function openTmuxTool(session: string, tool: Pick<TmuxToolConfig, "
   await sendTmuxText(session, buildTmuxToolCommand(tool, modeIds), true);
 }
 
-export async function captureTmuxPane(session: string, lines = 1000): Promise<string> {
-  const safeLines = Math.max(20, Math.min(lines, 5000));
+export async function captureTmuxPane(session: string, lines = TMUX_CAPTURE_HISTORY_LINES): Promise<string> {
+  const safeLines = normalizeTmuxCaptureLines(lines);
   const { stdout } = await execFileAsync("tmux", [
     "capture-pane",
     "-p",
@@ -316,11 +346,135 @@ export async function captureTmuxPane(session: string, lines = 1000): Promise<st
     session,
     "-S",
     `-${safeLines}`
-  ]);
+  ], { maxBuffer: TMUX_CAPTURE_MAX_BUFFER_BYTES });
   return trimTmuxCapture(stdout);
 }
 
-export async function captureTmuxPaneView(session: string, lines = 1000): Promise<TmuxPaneCapture> {
+export async function captureTmuxVisiblePane(session: string): Promise<string> {
+  const { stdout } = await execFileAsync("tmux", ["capture-pane", "-p", "-t", session], {
+    maxBuffer: TMUX_CAPTURE_MAX_BUFFER_BYTES
+  });
+  return trimTmuxCapture(stdout);
+}
+
+type OpenCodeSessionStateRow = {
+  sessionId?: unknown;
+  messageId?: unknown;
+  completedAt?: unknown;
+  choicePending?: unknown;
+};
+
+export function parseOpenCodeSessionStates(serialized: string): Map<string, TmuxSessionStatusDto> {
+  let rows: unknown;
+  try {
+    rows = JSON.parse(serialized);
+  } catch {
+    return new Map();
+  }
+  if (!Array.isArray(rows)) {
+    return new Map();
+  }
+  const states = new Map<string, TmuxSessionStatusDto>();
+  for (const value of rows) {
+    if (!value || typeof value !== "object") {
+      continue;
+    }
+    const row = value as OpenCodeSessionStateRow;
+    if (typeof row.sessionId !== "string" || !row.sessionId) {
+      continue;
+    }
+    if (Number(row.choicePending) > 0) {
+      states.set(row.sessionId, { kind: "question", health: "amber", title: "Choice required" });
+      continue;
+    }
+    if (typeof row.messageId === "string" && row.messageId && row.completedAt == null) {
+      states.set(row.sessionId, { kind: "running", health: "green", title: "Running" });
+      continue;
+    }
+    states.set(row.sessionId, { kind: "idle", health: "gray", title: "Idle" });
+  }
+  return states;
+}
+
+export function extractOpenCodeSessionId(args: string[]): string | null {
+  const sessionIndex = args.findIndex((arg) => arg === "-s" || arg === "--session");
+  const sessionId = sessionIndex === -1 ? "" : args[sessionIndex + 1] ?? "";
+  return /^ses_[A-Za-z0-9]+$/.test(sessionId) ? sessionId : null;
+}
+
+export async function readTmuxHarnessStatuses(sessions: TmuxSession[]): Promise<Map<string, TmuxSessionStatusDto>> {
+  const identified = (await Promise.all(sessions.map(async (session) => ({
+    name: session.name,
+    sessionId: await readOpenCodeSessionIdForPane(session).catch(() => null)
+  })))).filter((entry): entry is { name: string; sessionId: string } => Boolean(entry.sessionId));
+  if (identified.length === 0) {
+    return new Map();
+  }
+
+  const sessionIds = [...new Set(identified.map(({ sessionId }) => sessionId))];
+  const quotedIds = sessionIds.map((sessionId) => `'${sessionId}'`).join(",");
+  const query = `
+    SELECT
+      s.id AS sessionId,
+      m.id AS messageId,
+      json_extract(m.data, '$.time.completed') AS completedAt,
+      EXISTS(
+        SELECT 1 FROM part p
+        WHERE p.message_id = m.id
+          AND json_extract(p.data, '$.type') = 'tool'
+          AND json_extract(p.data, '$.tool') = 'question'
+          AND json_extract(p.data, '$.state.status') = 'running'
+      ) AS choicePending
+    FROM session s
+    LEFT JOIN message m ON m.id = (
+      SELECT latest.id FROM message latest
+      WHERE latest.session_id = s.id
+        AND json_extract(latest.data, '$.role') = 'assistant'
+      ORDER BY latest.time_created DESC
+      LIMIT 1
+    )
+    WHERE s.id IN (${quotedIds})
+  `;
+  const databasePath = path.join(
+    process.env.XDG_DATA_HOME ?? path.join(process.env.HOME ?? "", ".local", "share"),
+    "opencode",
+    "opencode.db"
+  );
+  let stdout: string;
+  try {
+    ({ stdout } = await execFileAsync("sqlite3", ["-json", databasePath, query], {
+      maxBuffer: 1024 * 1024
+    }));
+  } catch {
+    return new Map();
+  }
+  const statesBySessionId = parseOpenCodeSessionStates(stdout);
+  return new Map(identified.flatMap(({ name, sessionId }) => {
+    const status = statesBySessionId.get(sessionId);
+    return status ? [[name, status] as const] : [];
+  }));
+}
+
+async function readOpenCodeSessionIdForPane(session: TmuxSession): Promise<string | null> {
+  if (session.currentCommand !== "opencode" || !session.panePid) {
+    return null;
+  }
+  const childrenPath = `/proc/${session.panePid}/task/${session.panePid}/children`;
+  const childPids = (await readFile(childrenPath, "utf8")).trim().split(/\s+/).filter(Boolean);
+  for (const childPid of childPids) {
+    const command = await readFile(`/proc/${childPid}/comm`, "utf8").catch(() => "");
+    if (command.trim() !== "opencode") {
+      continue;
+    }
+    const args = (await readFile(`/proc/${childPid}/cmdline`, "utf8"))
+      .split("\0")
+      .filter(Boolean);
+    return extractOpenCodeSessionId(args);
+  }
+  return null;
+}
+
+export async function captureTmuxPaneView(session: string, lines = TMUX_CAPTURE_HISTORY_LINES): Promise<TmuxPaneCapture> {
   const [output, metadata] = await Promise.all([
     captureTmuxPane(session, lines),
     inspectTmuxPane(session).catch(() => null)
@@ -331,6 +485,23 @@ export async function captureTmuxPaneView(session: string, lines = 1000): Promis
   }
 
   return splitOpenCodeTuiCapture(output, metadata.width, metadata.height) ?? { output };
+}
+
+export function normalizeTmuxCaptureLines(lines: number): number {
+  if (!Number.isFinite(lines)) {
+    return TMUX_CAPTURE_HISTORY_LINES;
+  }
+  return Math.max(MIN_TMUX_CAPTURE_LINES, Math.min(Math.floor(lines), TMUX_CAPTURE_HISTORY_LINES));
+}
+
+async function readTmuxHistoryLimit(): Promise<number | null> {
+  try {
+    const { stdout } = await execFileAsync("tmux", ["show-options", "-gv", "history-limit"]);
+    const historyLimit = Number(stdout.trim());
+    return Number.isInteger(historyLimit) && historyLimit > 0 ? historyLimit : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function inspectTmuxPane(session: string): Promise<TmuxPaneMetadata> {

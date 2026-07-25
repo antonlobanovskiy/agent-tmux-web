@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildCodexTmuxCommand,
   buildTmuxCancelModeArgs,
+  buildTmuxCreateSessionArgs,
   buildTmuxKillSessionArgs,
   buildTmuxInterruptKeysArgs,
   buildTmuxPaneInModeArgs,
@@ -12,18 +13,22 @@ import {
   buildTmuxNewSessionArgs,
   detectTmuxInterruptKey,
   detectTmuxSubmitKey,
+  extractOpenCodeSessionId,
   fitTmuxCaptureSizeForPane,
   tmuxSubmitDelayMs,
   normalizeTmuxSessionName,
+  normalizeTmuxCaptureLines,
   normalizeTmuxToolId,
   isOpenCodeFullTuiPane,
   parseTmuxPaneMetadata,
+  parseOpenCodeSessionStates,
   parseTmuxSessions,
   parseTmuxTools,
   splitDisplayLineAtColumn,
   splitOpenCodeTuiCapture,
   trimTmuxCapture
 } from "../tmux.js";
+import { TMUX_CAPTURE_HISTORY_LINES } from "../../shared/api.js";
 
 describe("parseTmuxSessions", () => {
   it("parses session names, window counts, timestamps, and attached state", () => {
@@ -38,27 +43,30 @@ describe("parseTmuxSessions", () => {
         name: "chat-interface",
         windows: 1,
         created: "Tue May 12 20:10:22 2026",
-        attached: true
+        attached: true,
+        clientCount: 1
       },
       {
         name: "kartbite",
         windows: 3,
         created: "Sun May 10 15:10:14 2026",
-        attached: false
+        attached: false,
+        clientCount: 0
       },
       {
         name: "dev:api",
         windows: 2,
         created: "Wed May 13 00:02:01 2026",
-        attached: false
+        attached: false,
+        clientCount: 0
       }
     ]);
   });
 
   it("parses formatted session rows with activity metadata", () => {
     const output = [
-      "agent-tmux-web\t1\t1779925303\t0\t1779925303\tnode",
-      "radchenko-business\t2\t1780351746\t1\t1782255086\tzsh"
+      "agent-tmux-web\t1\t1779925303\t0\t1779925303\topencode\t1517\t/home/dev/codex-web",
+      "radchenko-business\t2\t1780351746\t2\t1782255086\tzsh\t2001\t/home/dev"
     ].join("\n");
 
     expect(parseTmuxSessions(output)).toEqual([
@@ -68,8 +76,11 @@ describe("parseTmuxSessions", () => {
         created: "2026-05-27T23:41:43.000Z",
         createdAtMs: 1779925303000,
         attached: false,
+        clientCount: 0,
+        panePid: 1517,
+        currentPath: "/home/dev/codex-web",
         activityAtMs: 1779925303000,
-        currentCommand: "node"
+        currentCommand: "opencode"
       },
       {
         name: "radchenko-business",
@@ -77,6 +88,9 @@ describe("parseTmuxSessions", () => {
         created: "2026-06-01T22:09:06.000Z",
         createdAtMs: 1780351746000,
         attached: true,
+        clientCount: 2,
+        panePid: 2001,
+        currentPath: "/home/dev",
         activityAtMs: 1782255086000,
         currentCommand: "zsh"
       }
@@ -86,6 +100,30 @@ describe("parseTmuxSessions", () => {
   it("returns an empty list for no server output", () => {
     expect(parseTmuxSessions("no server running on /tmp/tmux-1000/default")).toEqual([]);
     expect(parseTmuxSessions("")).toEqual([]);
+  });
+});
+
+describe("OpenCode harness status", () => {
+  it("extracts only valid explicit session ids from process arguments", () => {
+    expect(extractOpenCodeSessionId(["opencode", "-s", "ses_06e992681ffewzWD1b0KC1mDa9", "--auto"]))
+      .toBe("ses_06e992681ffewzWD1b0KC1mDa9");
+    expect(extractOpenCodeSessionId(["opencode", "--session", "ses_abc123"])).toBe("ses_abc123");
+    expect(extractOpenCodeSessionId(["opencode", "--auto"])).toBeNull();
+    expect(extractOpenCodeSessionId(["opencode", "-s", "unsafe id"])).toBeNull();
+  });
+
+  it("maps native question, running, and completed states to status lights", () => {
+    const states = parseOpenCodeSessionStates(JSON.stringify([
+      { sessionId: "ses_choice", messageId: "msg_1", completedAt: null, choicePending: 1 },
+      { sessionId: "ses_running", messageId: "msg_2", completedAt: null, choicePending: 0 },
+      { sessionId: "ses_idle", messageId: "msg_3", completedAt: 123, choicePending: 0 },
+      { sessionId: "ses_empty", messageId: null, completedAt: null, choicePending: 0 }
+    ]));
+
+    expect(states.get("ses_choice")).toEqual({ kind: "question", health: "amber", title: "Choice required" });
+    expect(states.get("ses_running")).toEqual({ kind: "running", health: "green", title: "Running" });
+    expect(states.get("ses_idle")).toEqual({ kind: "idle", health: "gray", title: "Idle" });
+    expect(states.get("ses_empty")).toEqual({ kind: "idle", health: "gray", title: "Idle" });
   });
 });
 
@@ -113,6 +151,27 @@ describe("tmux command builders", () => {
       "-c",
       "/workspace/agent-tmux-web"
     ]);
+  });
+
+  it("gives app-created panes enough history without lowering a larger tmux setting", () => {
+    expect(buildTmuxCreateSessionArgs("agent-ui", "/workspace", 2000)).toEqual([
+      "set-option", "-g", "history-limit", String(TMUX_CAPTURE_HISTORY_LINES), ";",
+      "new-session", "-d", "-x", "160", "-y", "40", "-s", "agent-ui", "-c", "/workspace"
+    ]);
+    expect(buildTmuxCreateSessionArgs("agent-ui", null, null).slice(0, 7)).toEqual([
+      "start-server", ";", "set-option", "-g", "history-limit", String(TMUX_CAPTURE_HISTORY_LINES), ";"
+    ]);
+    expect(buildTmuxCreateSessionArgs("agent-ui", null, 10_000)).toEqual(
+      buildTmuxNewSessionArgs("agent-ui")
+    );
+  });
+
+  it("normalizes deep capture requests to finite bounded whole rows", () => {
+    expect(normalizeTmuxCaptureLines(Number.NaN)).toBe(TMUX_CAPTURE_HISTORY_LINES);
+    expect(normalizeTmuxCaptureLines(Number.POSITIVE_INFINITY)).toBe(TMUX_CAPTURE_HISTORY_LINES);
+    expect(normalizeTmuxCaptureLines(-10)).toBe(20);
+    expect(normalizeTmuxCaptureLines(250.9)).toBe(250);
+    expect(normalizeTmuxCaptureLines(50_000)).toBe(TMUX_CAPTURE_HISTORY_LINES);
   });
 
   it("provides generic default agent CLI launchers", () => {

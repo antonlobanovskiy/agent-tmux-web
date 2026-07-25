@@ -24,7 +24,7 @@ Registry items:
 - `vps-deploy`: installer, systemd templates, environment example, and setup docs.
 - `android-wrapper`: Android WebView wrapper, sideload APK, AAB, upload bridge,
   and notification watcher source.
-- `notifications`: notification routing and waiting-tab source slice.
+- `notifications`: confirmed input-needed and idle notification routing source slice.
 
 The registry intentionally focuses on editable source, docs, scripts, and config.
 Clone the repository when you need binary media assets, launcher images, or the

@@ -21,10 +21,8 @@ tabs without killing the work.
 ![Desktop TTY session with OpenCode stream and details](./docs/assets/desktop-tty.png)
 
 <p>
-  <img src="./docs/assets/mobile-tty.png" alt="Mobile TTY stream view" width="24%">
-  <img src="./docs/assets/mobile-raw.png" alt="Mobile Raw terminal session" width="24%">
-  <img src="./docs/assets/mobile-gui.png" alt="Mobile GUI transcript view" width="24%">
-  <img src="./docs/assets/mobile-focus.png" alt="Mobile Focus conversation view" width="24%">
+  <img src="./docs/assets/mobile-tty.png" alt="Mobile TTY stream view" width="48%">
+  <img src="./docs/assets/mobile-raw.png" alt="Mobile Raw terminal session" width="48%">
 </p>
 
 ### Professional showcase
@@ -46,15 +44,13 @@ tabs without killing the work.
   stream is separated from its details panel, with mobile tabs and a desktop
   side panel.
 - Raw mode for direct interactive tmux control, including shell and TUI work.
-- GUI mode for readable chat-style agent output.
-- Focus mode for quick phone check-ins with detailed status and recent-attention
-  summaries.
-- Green/yellow/red status dots for running, waiting/idle, and error sessions.
+- Green, amber, red, and gray status dots for running, actionable prompts,
+  errors, and idle sessions.
 - Stable scrollback while new tmux output continues arriving.
 - File uploads and pasted clipboard images from Android, iOS, or desktop
   browsers, including direct Raw terminal paste with safe
   `~/.agent-tmux/attachments/...` prompt references.
-- Browser and Android notifications when watched tasks return to a prompt.
+- Browser and Android notifications when sessions need input or become idle.
 - Light and dark themes.
 - Generic public Android APK plus optional private APK builds for your own
   server URL.
@@ -73,7 +69,8 @@ tmux sessions running coding agents, shells, or custom CLIs
 ```
 
 The web UI does not host an AI service. It sends keys to tmux, captures pane
-output, uploads temporary files, and watches for task-complete prompts. Your
+output, uploads temporary files, and watches for confirmed input-needed and idle
+transitions. Your
 agent CLIs and credentials stay on your server.
 
 ## Requirements
@@ -155,14 +152,13 @@ mode, and notifications.
 2. Choose a launcher, pin favorites to the top, or use `+` to save a named
    custom command on that device.
 3. Press `Run`, or type directly into the tmux input.
-4. TTY opens by default. Open `View` and use `Raw` for exact terminal input,
-   `GUI` for readable agent output, or `Focus` for status and recent-attention
-   summaries. With session memory enabled, each tmux session returns to its
-   last selected view.
+4. TTY opens by default. Use the view toggle for Raw when exact terminal input
+   matters. With session memory enabled, each tmux session returns to its last
+   selected view.
 5. Open `Settings` to choose the default view, remember each session or always
    return to the default, change the theme, copy the server URL, or update
    Android connection settings.
-6. Use the bell button when you want task-done alerts.
+6. Use the bell button for alerts when a session needs input or becomes idle.
 7. Use the paperclip button to upload files, or paste clipboard images into a
    captured-view prompt or directly into Raw with `Ctrl+V`/`Cmd+V`.
    `Ctrl+Shift+V` can recover images when the browser permits async clipboard
@@ -175,12 +171,16 @@ mode, and notifications.
 Status dots:
 
 - Green: the selected tmux pane looks actively running.
-- Yellow: idle, waiting for input, asking a question, or needing permission.
+- Amber: the visible pane is asking a question or needs permission.
 - Red: recent captured output looks like an error.
+- Gray: the pane is idle or waiting at its normal prompt.
 
-The terminal output now starts directly below the toolbar without a separate
-state viewer. Session health remains visible through the sidebar status dots,
-and Focus view provides the detailed status and recent-attention overview.
+The terminal output starts directly below the toolbar. Session health remains
+visible through the sidebar status dots.
+
+TTY captures up to 5,000 rows of tmux history. Sessions created in the app are
+configured with at least that much history; recreate older sessions to raise
+their pane limit because tmux cannot restore rows it already discarded.
 
 ## Android App
 
