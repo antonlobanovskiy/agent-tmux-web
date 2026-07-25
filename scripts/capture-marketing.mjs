@@ -189,6 +189,7 @@ async function generateAndPublishAssets(signal) {
     const page = await captureContext.newPage();
     await page.goto(demoUrl, { waitUntil: "domcontentloaded" });
     await delay(1200, signal);
+    await selectDarkTheme(page, signal);
     await chooseView(page, "TTY", signal);
     await capture(page, path.join(assetsDir, "mobile-tty.png"), signal);
     await chooseView(page, "Raw", signal);
@@ -196,6 +197,7 @@ async function generateAndPublishAssets(signal) {
     await chooseView(page, "TTY", signal);
     await setViewport(page, DESKTOP_WIDTH, DESKTOP_HEIGHT);
     await delay(500, signal);
+    await openSettingsMenu(page, signal);
     await capture(page, path.join(assetsDir, "desktop-tty.png"), signal);
   } finally {
     await captureContext.close().catch(() => {});
@@ -920,6 +922,28 @@ async function chooseView(page, label, signal) {
     await toggle.click();
   }
   await delay(350, signal);
+}
+
+async function selectDarkTheme(page, signal) {
+  signal.throwIfAborted();
+  await page.getByLabel("Open settings").click();
+  await page.getByRole("menuitemradio", { name: "Dark", exact: true }).click();
+  await page.waitForFunction(() => document.documentElement.dataset.theme === "dark");
+  await delay(200, signal);
+}
+
+async function openSettingsMenu(page, signal) {
+  signal.throwIfAborted();
+  const menu = page.locator("details.tmux-settings-menu");
+  if (await menu.getAttribute("open") === null) {
+    await page.getByLabel("Open settings").click();
+  }
+  const darkOption = page.getByRole("menuitemradio", { name: "Dark", exact: true });
+  await darkOption.waitFor({ state: "visible" });
+  if (await darkOption.getAttribute("aria-checked") !== "true") {
+    throw new Error("Dark theme is not selected for the marketing capture");
+  }
+  await delay(200, signal);
 }
 
 async function waitForHttp(url, signal) {

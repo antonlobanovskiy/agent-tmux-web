@@ -73,10 +73,12 @@ pnpm build
 pnpm capture:marketing
 ```
 
-Run capture only against loopback demo mode, never real tmux sessions. The
-product UI must come from that demo; image generation may be used only for the
-non-product backdrop. The opt-in capture script writes candidates under
-`docs/assets/` using Playwright Chromium and `ffmpeg`. On a fresh machine, run
+Run capture only against loopback demo mode, never real tmux sessions. Capture
+the product UI only from that demo, use the dark theme for every product image,
+and leave Settings open in the desktop capture so the available options remain
+visible. Image generation may be used only for the non-product backdrop. The
+opt-in capture script writes candidates under `docs/assets/` using Playwright
+Chromium and `ffmpeg`. On a fresh machine, run
 `pnpm exec playwright install chromium` if Playwright reports a missing browser.
 Before commit, visually inspect every output, scan its metadata, and complete a
 privacy and copy review for private data, current UI accuracy, and supportable

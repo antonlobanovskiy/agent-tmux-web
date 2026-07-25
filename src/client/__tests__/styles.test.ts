@@ -295,6 +295,31 @@ describe("current user guidance", () => {
     expect(marketingCapture).not.toContain("mobile-focus.png");
   });
 
+  it("captures the dark theme and leaves Settings open in the desktop visual", () => {
+    const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+    const captureStart = marketingCapture.indexOf("const page = await captureContext.newPage()");
+    const captureEnd = marketingCapture.indexOf("await captureContext.close()", captureStart);
+
+    expect(captureStart).toBeGreaterThanOrEqual(0);
+    expect(captureEnd).toBeGreaterThan(captureStart);
+    const captureFlow = marketingCapture.slice(
+      captureStart,
+      captureEnd
+    );
+    const darkThemeSelection = captureFlow.indexOf("await selectDarkTheme(page, signal);");
+    const mobileTtyCapture = captureFlow.indexOf('await capture(page, path.join(assetsDir, "mobile-tty.png"), signal);');
+    const settingsOpen = captureFlow.indexOf("await openSettingsMenu(page, signal);");
+    const desktopTtyCapture = captureFlow.indexOf('await capture(page, path.join(assetsDir, "desktop-tty.png"), signal);');
+
+    expect(darkThemeSelection).toBeGreaterThanOrEqual(0);
+    expect(mobileTtyCapture).toBeGreaterThan(darkThemeSelection);
+    expect(settingsOpen).toBeGreaterThanOrEqual(0);
+    expect(desktopTtyCapture).toBeGreaterThan(settingsOpen);
+    expect(marketingCapture).toContain('document.documentElement.dataset.theme === "dark"');
+    expect(marketingCapture).toContain('name: "Dark", exact: true');
+    expect(marketingCapture).toContain('if (await menu.getAttribute("open") === null)');
+  });
+
   it("ships only the approved current marketing assets", () => {
     const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
     const approved = [
@@ -418,13 +443,13 @@ describe("current user guidance", () => {
 
     expect(introductionEnd).toBeGreaterThanOrEqual(0);
     expect(readme.slice(introductionEnd + introductionClosing.length)).toMatch(
-      /^\s*\[!\[Agent Tmux Web hero with desktop TTY session\]\(\.\/docs\/assets\/agent-tmux-web-hero\.png\)\]\(\.\/docs\/assets\/agent-tmux-web-showcase\.mp4\)/
+      /^\s*\[!\[Agent Tmux Web dark-mode hero with desktop Settings open\]\(\.\/docs\/assets\/agent-tmux-web-hero\.png\)\]\(\.\/docs\/assets\/agent-tmux-web-showcase\.mp4\)/
     );
     expect(readme).toMatch(
-      /!\[Desktop TTY session with OpenCode stream and details\]\(\.\/docs\/assets\/desktop-tty\.png\)/
+      /!\[Dark desktop TTY session with the Settings menu open\]\(\.\/docs\/assets\/desktop-tty\.png\)/
     );
     expect(readme).toMatch(
-      /\[!\[Agent Tmux Web showcase poster with desktop TTY session\]\(\.\/docs\/assets\/agent-tmux-web-showcase-poster\.png\)\]\(\.\/docs\/assets\/agent-tmux-web-showcase\.mp4\)/
+      /\[!\[Agent Tmux Web dark-mode showcase poster with desktop Settings open\]\(\.\/docs\/assets\/agent-tmux-web-showcase-poster\.png\)\]\(\.\/docs\/assets\/agent-tmux-web-showcase\.mp4\)/
     );
 
     const productViewsStart = readme.indexOf("## Product Views");
@@ -445,8 +470,8 @@ describe("current user guidance", () => {
         alt: readAttribute(image, "alt")
       }))
     ).toEqual([
-      { src: "./docs/assets/mobile-tty.png", alt: "Mobile TTY stream view" },
-      { src: "./docs/assets/mobile-raw.png", alt: "Mobile Raw terminal session" }
+      { src: "./docs/assets/mobile-tty.png", alt: "Dark mobile TTY stream view" },
+      { src: "./docs/assets/mobile-raw.png", alt: "Dark mobile Raw terminal session" }
     ]);
     expect(readme).not.toMatch(/<video\b[^>]*\bautoplay(?:\s|=|>)/i);
     expect(readme).not.toMatch(/View: TTY/);

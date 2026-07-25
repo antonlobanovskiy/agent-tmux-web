@@ -12,22 +12,22 @@ sessions. It is useful when SSH on a phone is too cramped, when mobile browsers
 disconnect, or when you want one place to switch between several terminal-agent
 tabs without killing the work.
 
-[![Agent Tmux Web hero with desktop TTY session](./docs/assets/agent-tmux-web-hero.png)](./docs/assets/agent-tmux-web-showcase.mp4)
+[![Agent Tmux Web dark-mode hero with desktop Settings open](./docs/assets/agent-tmux-web-hero.png)](./docs/assets/agent-tmux-web-showcase.mp4)
 
 *TTY-first monitoring with exact Raw control available whenever the terminal itself matters.*
 
 ## Product Views
 
-![Desktop TTY session with OpenCode stream and details](./docs/assets/desktop-tty.png)
+![Dark desktop TTY session with the Settings menu open](./docs/assets/desktop-tty.png)
 
 <p>
-  <img src="./docs/assets/mobile-tty.png" alt="Mobile TTY stream view" width="48%">
-  <img src="./docs/assets/mobile-raw.png" alt="Mobile Raw terminal session" width="48%">
+  <img src="./docs/assets/mobile-tty.png" alt="Dark mobile TTY stream view" width="48%">
+  <img src="./docs/assets/mobile-raw.png" alt="Dark mobile Raw terminal session" width="48%">
 </p>
 
 ### Professional showcase
 
-[![Agent Tmux Web showcase poster with desktop TTY session](./docs/assets/agent-tmux-web-showcase-poster.png)](./docs/assets/agent-tmux-web-showcase.mp4)
+[![Agent Tmux Web dark-mode showcase poster with desktop Settings open](./docs/assets/agent-tmux-web-showcase-poster.png)](./docs/assets/agent-tmux-web-showcase.mp4)
 
 ## What You Get
 
