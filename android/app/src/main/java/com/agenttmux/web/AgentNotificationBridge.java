@@ -58,7 +58,7 @@ public final class AgentNotificationBridge {
 
         activity.runOnUiThread(() -> postNotification(
             clean(title, "Agent Tmux"),
-            clean(body, "Task is waiting for input."),
+            clean(body, "A tmux session needs input."),
             clean(tag, "agent-tmux-web"),
             clean(tmuxSession, "")
         ));
@@ -67,10 +67,10 @@ public final class AgentNotificationBridge {
     @JavascriptInterface
     public void setWatchPollingEnabled(boolean enabled) {
         activity.runOnUiThread(() -> {
-            if (enabled && notificationsEnabled()) {
-                WatchPollingService.setEnabled(activity, true);
-            } else {
+            if (!enabled) {
                 WatchPollingService.setEnabled(activity, false);
+            } else if (notificationsEnabled()) {
+                WatchPollingService.setEnabled(activity, true);
             }
         });
     }

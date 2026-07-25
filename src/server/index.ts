@@ -7,9 +7,9 @@ import { promisify } from "node:util";
 import express, { type Request, type Response, type NextFunction } from "express";
 import { WebSocketServer, type RawData, type WebSocket } from "ws";
 
-import { type AppStatus, type TmuxCaptureDto, type TmuxSessionDto } from "../shared/api.js";
+import { TMUX_CAPTURE_HISTORY_LINES, type AppStatus, type TmuxCaptureDto, type TmuxSessionDto } from "../shared/api.js";
 import { describeCodexNotification } from "../shared/codexEvents.js";
-import { classifyTmuxStatus } from "../shared/tmuxStatus.js";
+import { classifyTmuxStatus, mergeTmuxSessionStatus } from "../shared/tmuxStatus.js";
 import { CodexBridge } from "./codexBridge.js";
 import {
   buildBrowserRawTerminalPolicy,
@@ -28,6 +28,7 @@ import {
 import {
   captureTmuxPane,
   captureTmuxPaneView,
+  captureTmuxVisiblePane,
   createTmuxSession,
   detectTmuxInterruptKey,
   detectTmuxSubmitKey,
@@ -39,6 +40,7 @@ import {
   listTmuxTools,
   openCodexInTmux,
   openTmuxTool,
+  readTmuxHarnessStatuses,
   sendTmuxText,
   type TmuxInterruptKey,
   type TmuxSubmitKey
@@ -61,12 +63,12 @@ const codexAppServerAutostart = process.env.CODEX_APP_SERVER_AUTOSTART === "1";
 const authToken = process.env.AGENT_TMUX_WEB_AUTH_TOKEN ?? process.env.CODEX_WEB_AUTH_TOKEN ?? "";
 const defaultCwd = process.env.CLI_WEB_DEFAULT_CWD ?? process.env.HOME ?? process.cwd();
 const jsonBodyLimit = process.env.AGENT_TMUX_WEB_JSON_LIMIT ?? "25mb";
-const tmuxCaptureHistoryLines = 1000;
 
 const app = express();
 const server = http.createServer(app);
 const bridge = new CodexBridge({ port: codexAppServerPort });
 const sockets = new Set<WebSocket>();
+const rawTerminalClients = new Map<string, Map<string, number>>();
 const recentEvents: unknown[] = [];
 const watchPollers = new Map<string, {
   id: string;
@@ -77,6 +79,7 @@ const watchPollers = new Map<string, {
 }>();
 const tmuxWatch = new TmuxWatchStore({
   capture: captureTmuxPane,
+  listSessions: listTmuxSessions,
   onEvent: (event) => broadcast({ type: "tmux-watch-done", event }),
   onError: (error, session) => {
     if ((process.env.AGENT_TMUX_WEB_VERBOSE ?? process.env.CODEX_WEB_VERBOSE) === "1") {
@@ -231,8 +234,8 @@ app.post("/api/turn/interrupt", asyncHandler(async (req, res) => {
   res.json(result);
 }));
 
-app.get("/api/tmux/sessions", asyncHandler(async (_req, res) => {
-  res.json({ data: await listTmuxSessionsWithStatus() });
+app.get("/api/tmux/sessions", asyncHandler(async (req, res) => {
+  res.json({ data: await listTmuxSessionsWithStatus(stringOrNull(req.query.clientId)) });
 }));
 
 app.get("/api/tmux/tools", asyncHandler(async (_req, res) => {
@@ -241,7 +244,7 @@ app.get("/api/tmux/tools", asyncHandler(async (_req, res) => {
 
 app.get("/api/tmux/capture", asyncHandler(async (req, res) => {
   const session = requireString(req.query.session, "session");
-  const lines = typeof req.query.lines === "string" ? Number(req.query.lines) : tmuxCaptureHistoryLines;
+  const lines = typeof req.query.lines === "string" ? Number(req.query.lines) : TMUX_CAPTURE_HISTORY_LINES;
   const [preserveExistingClientSize, paneMetadata] = await Promise.all([
     hasAttachedTmuxClients(session).catch(() => false),
     inspectTmuxPane(session).catch(() => null)
@@ -290,7 +293,7 @@ app.post("/api/tmux/open-codex", asyncHandler(async (req, res) => {
   tmuxWatch.startWatch(session, "Codex");
   res.json({
     ok: true,
-    output: await captureTmuxPane(session, tmuxCaptureHistoryLines)
+    output: await captureTmuxPane(session, TMUX_CAPTURE_HISTORY_LINES)
   });
 }));
 
@@ -307,7 +310,7 @@ app.post("/api/tmux/open-tool", asyncHandler(async (req, res) => {
   tmuxWatch.startWatch(session, configuredTool?.label ?? command);
   res.json({
     ok: true,
-    output: await captureTmuxPane(session, tmuxCaptureHistoryLines)
+    output: await captureTmuxPane(session, TMUX_CAPTURE_HISTORY_LINES)
   });
 }));
 
@@ -334,7 +337,7 @@ app.post("/api/tmux/interrupt", asyncHandler(async (req, res) => {
   tmuxWatch.cancelWatch(session);
   res.json({
     ok: true,
-    output: await captureTmuxPane(session, tmuxCaptureHistoryLines)
+    output: await captureTmuxPane(session, TMUX_CAPTURE_HISTORY_LINES)
   });
 }));
 
@@ -359,6 +362,7 @@ app.get("/api/tmux/watch/events", asyncHandler(async (req, res) => {
   res.json({
     data: tmuxWatch.getEventsSince(cursor),
     latestEventId: tmuxWatch.latestEventId(),
+    baselineEventId: tmuxWatch.latestBaselineEventId(),
     watches: tmuxWatch.listWatches()
   });
 }));
@@ -366,26 +370,51 @@ app.get("/api/tmux/watch/events", asyncHandler(async (req, res) => {
 app.get("/api/tmux/watch/status", asyncHandler(async (_req, res) => {
   res.json({
     latestEventId: tmuxWatch.latestEventId(),
+    baselineEventId: tmuxWatch.latestBaselineEventId(),
     watches: tmuxWatch.listWatches(),
     recentEvents: tmuxWatch.getEventsSince(Math.max(0, tmuxWatch.latestEventId() - 10)),
     pollers: listRecentWatchPollers()
   });
 }));
 
-async function listTmuxSessionsWithStatus(): Promise<TmuxSessionDto[]> {
+async function listTmuxSessionsWithStatus(excludedBrowserClientId?: string | null): Promise<TmuxSessionDto[]> {
   const sessions = await listTmuxSessions();
+  const harnessStatuses = await readTmuxHarnessStatuses(sessions);
   const nowMs = Date.now();
   return Promise.all(sessions.map(async (session) => {
-    const output = await captureTmuxPane(session.name, 220).catch(() => "");
+    const { clientCount, panePid: _panePid, currentPath: _currentPath, ...sessionData } = session;
+    const output = await captureTmuxVisiblePane(session.name).catch(() => "");
+    const visibleStatus = classifyTmuxStatus({
+      activityAtMs: session.activityAtMs,
+      nowMs,
+      output
+    });
+    const harnessStatus = harnessStatuses.get(session.name);
+    const status = mergeTmuxSessionStatus(visibleStatus, harnessStatus);
     return {
-      ...session,
-      status: classifyTmuxStatus({
-        activityAtMs: session.activityAtMs,
-        nowMs,
-        output
-      })
+      ...sessionData,
+      viewerCount: Math.max(0, clientCount - rawTerminalClientCount(excludedBrowserClientId, session.name)),
+      status
     };
   }));
+}
+
+function rawTerminalClientCount(browserClientId: string | null | undefined, session: string): number {
+  return browserClientId ? rawTerminalClients.get(browserClientId)?.get(session) ?? 0 : 0;
+}
+
+function updateRawTerminalClientCount(browserClientId: string, session: string, delta: 1 | -1): void {
+  const sessions = rawTerminalClients.get(browserClientId) ?? new Map<string, number>();
+  const nextCount = Math.max(0, (sessions.get(session) ?? 0) + delta);
+  if (nextCount > 0) {
+    sessions.set(session, nextCount);
+    rawTerminalClients.set(browserClientId, sessions);
+    return;
+  }
+  sessions.delete(session);
+  if (sessions.size === 0) {
+    rawTerminalClients.delete(browserClientId);
+  }
 }
 
 app.post("/api/uploads", asyncHandler(async (req, res) => {
@@ -424,8 +453,7 @@ wss.on("connection", async (socket, req) => {
   socket.on("close", () => sockets.delete(socket));
   socket.send(JSON.stringify({
     type: "hello",
-    status: await getStatus(),
-    tmuxWatchEvents: tmuxWatch.getEventsSince(Math.max(0, tmuxWatch.latestEventId() - 10))
+    status: await getStatus()
   }));
 });
 
@@ -442,6 +470,11 @@ tmuxWss.on("connection", async (socket, req) => {
     sendTerminalMessage(socket, { type: "error", message: "Missing tmux session" });
     socket.close(1008, "Missing tmux session");
     return;
+  }
+  const browserClientId = stringOrNull(url.searchParams.get("clientId"));
+  if (browserClientId) {
+    updateRawTerminalClientCount(browserClientId, session, 1);
+    socket.once("close", () => updateRawTerminalClientCount(browserClientId, session, -1));
   }
 
   const size = normalizeTerminalSize(url.searchParams.get("cols"), url.searchParams.get("rows"));
@@ -504,6 +537,9 @@ tmuxWss.on("connection", async (socket, req) => {
 
     if (message.type === "input" && typeof message.data === "string") {
       child.stdin.write(message.data);
+      if (/[\r\n]/.test(message.data)) {
+        tmuxWatch.startWatch(session, "Tmux task");
+      }
       return;
     }
 

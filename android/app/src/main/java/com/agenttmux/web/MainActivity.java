@@ -338,16 +338,13 @@ public final class MainActivity extends Activity {
                 return;
             }
 
-            preferences.edit()
-                .putString(PREF_SERVER_URL, nextServer)
-                .putString(PREF_AUTH_TOKEN, tokenField.getText().toString().trim())
-                .apply();
+            WatchPollingService.updateConnection(this, nextServer, tokenField.getText().toString().trim());
             hideSetup();
             loadConfiguredServer();
             WatchPollingService.startIfEnabled(this);
         });
 
-        TextView note = label("The Android app does not run tmux locally. It loads your private server and keeps the same GUI, Raw, TTY, uploads, and launchers. Press Back from the root page to reopen these settings.", 13, "#87918D");
+        TextView note = label("The Android app does not run tmux locally. It loads your private server with the same TTY, Raw, uploads, and launchers. Press Back from the root page to reopen these settings.", 13, "#87918D");
         note.setPadding(0, dp(16), 0, 0);
 
         panel.addView(title);

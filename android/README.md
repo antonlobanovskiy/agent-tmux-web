@@ -196,8 +196,8 @@ cd android
   private server URL and optional auth token.
 - File inputs in the web UI open the Android file picker.
 - Notifications use a native Android bridge. When enabled, the app runs a
-  low-importance foreground watcher that polls the server for completed tmux
-  tasks.
+  low-importance foreground watcher that polls the server for confirmed
+  input-needed and idle transitions.
 - Release APKs use the standard Android debug key unless local release signing
   properties are configured. Use your own signing key before publishing through
   an app store or distributing updates from multiple machines.

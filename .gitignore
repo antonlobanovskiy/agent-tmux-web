@@ -22,6 +22,7 @@ android/app/*.keystore
 android/app/build/
 .DS_Store
 .worktrees/
+.playwright-mcp/
 docs/.assets-staging-*
 docs/.assets-backup-*
 OPENCODE_UI_HANDOFF.md

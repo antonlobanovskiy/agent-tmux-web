@@ -1,4 +1,4 @@
-export const TMUX_CAPTURE_POLL_INTERVAL_MS = 1000;
+export const TMUX_CAPTURE_POLL_INTERVAL_MS = 1500;
 export const TMUX_SEND_FOLLOW_DELAYS_MS = [150, 700, 1600, 3200, 6500];
 
 export type TmuxFollowState = {

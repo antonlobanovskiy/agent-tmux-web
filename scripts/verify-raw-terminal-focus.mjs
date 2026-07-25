@@ -71,17 +71,16 @@ async function verifyMobileFocus(browser, url) {
     await dragTouch(cdp, points.output, points.screen);
     await expectXtermFocus(page, false, "drag starting on output");
 
-    await page.getByLabel(/Change view\. Current view:/).click();
-    await page.getByRole("menuitemradio", { name: "GUI" }).click();
+    await page.getByLabel("Switch to TTY view").click();
     const visibleInput = page.locator('.tmux-send textarea[placeholder="send keys + Enter"]');
     await visibleInput.tap();
     await visibleInput.fill("visible-entry-check");
     if (await visibleInput.evaluate((node) => document.activeElement !== node)) {
-      throw new Error("GUI visible input did not retain focus");
+      throw new Error("TTY visible input did not retain focus");
     }
     await page.getByLabel("Send to tmux").tap();
     if (await visibleInput.inputValue() !== "") {
-      throw new Error("GUI visible input did not submit and clear");
+      throw new Error("TTY visible input did not submit and clear");
     }
 
     if (errors.length > 0) {
@@ -109,8 +108,7 @@ async function verifyDesktopFocus(browser, url) {
 async function loadRaw(page, url) {
   await page.goto(url, { waitUntil: "networkidle" });
   if (await page.locator(".xterm-helper-textarea").count() === 0) {
-    await page.getByLabel(/Change view\. Current view:/).click();
-    await page.getByRole("menuitemradio", { name: "Raw" }).click();
+    await page.getByLabel("Switch to Raw view").click();
   }
   await page.locator(".xterm-helper-textarea").waitFor({ state: "attached" });
   await page.locator(".xterm-screen").waitFor({ state: "visible" });

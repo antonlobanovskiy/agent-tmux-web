@@ -1,6 +1,25 @@
 import { describe, expect, it } from "vitest";
 
-import { cleanTmuxAssistantCopyText } from "../tmuxCopy.js";
+import { cleanTmuxAssistantCopyText, extractLatestTmuxAssistantText } from "../tmuxCopy.js";
+
+describe("extractLatestTmuxAssistantText", () => {
+  it("returns the latest assistant block from captured terminal output", () => {
+    expect(extractLatestTmuxAssistantText([
+      "› First prompt",
+      "",
+      "• First response",
+      "",
+      "› Second prompt",
+      "",
+      "• Latest response",
+      "  continued"
+    ].join("\n"))).toBe("• Latest response\n  continued");
+  });
+
+  it("ignores terminal chrome", () => {
+    expect(extractLatestTmuxAssistantText("› Prompt\nAnswer\nWorked for 12s\nGoal achieved")).toBe("Answer");
+  });
+});
 
 describe("cleanTmuxAssistantCopyText", () => {
   it("extracts a draft reply and removes terminal quote wrapping", () => {

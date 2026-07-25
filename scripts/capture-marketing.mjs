@@ -15,7 +15,7 @@ import {
 const SHOWCASE_WIDTH = 1920;
 const SHOWCASE_HEIGHT = 1080;
 const SHOWCASE_FPS = 30;
-const FRAMES_PER_SCENE = 64;
+const FRAMES_PER_SCENE = 80;
 const TRANSITION_FRAMES = 14;
 const HERO_WIDTH = 1600;
 const HERO_HEIGHT = 900;
@@ -39,8 +39,6 @@ const APPROVED_ASSETS = [
   "agent-tmux-web-showcase-poster.png",
   "agent-tmux-web-showcase.mp4",
   "desktop-tty.png",
-  "mobile-focus.png",
-  "mobile-gui.png",
   "mobile-raw.png",
   "mobile-tty.png",
   "modes-overview.png"
@@ -49,8 +47,6 @@ const EXPECTED_PNG_DIMENSIONS = new Map([
   ["agent-tmux-web-hero.png", [HERO_WIDTH, HERO_HEIGHT]],
   ["agent-tmux-web-showcase-poster.png", [SHOWCASE_WIDTH, SHOWCASE_HEIGHT]],
   ["desktop-tty.png", [DESKTOP_WIDTH, DESKTOP_HEIGHT]],
-  ["mobile-focus.png", [MOBILE_WIDTH, MOBILE_HEIGHT]],
-  ["mobile-gui.png", [MOBILE_WIDTH, MOBILE_HEIGHT]],
   ["mobile-raw.png", [MOBILE_WIDTH, MOBILE_HEIGHT]],
   ["mobile-tty.png", [MOBILE_WIDTH, MOBILE_HEIGHT]],
   ["modes-overview.png", [SHOWCASE_WIDTH, SHOWCASE_HEIGHT]]
@@ -94,20 +90,6 @@ const showcaseScenes = [
     title: "Direct terminal control from your phone.",
     body: "Use the authentic terminal surface and soft keys when exact CLI behavior matters.",
     media: "../mobile-raw.png",
-    layout: "phone"
-  },
-  {
-    eyebrow: "Mobile GUI",
-    title: "Scan agent output as a readable thread.",
-    body: "Switch to the normalized view for prompts, command output, and summaries.",
-    media: "../mobile-gui.png",
-    layout: "phone"
-  },
-  {
-    eyebrow: "Mobile Focus",
-    title: "See which session needs attention.",
-    body: "Triage running, waiting, and error states without leaving the current workspace.",
-    media: "../mobile-focus.png",
     layout: "phone"
   },
   {
@@ -198,7 +180,9 @@ async function generateAndPublishAssets(signal) {
 
   const captureContext = await browser.newContext({
     deviceScaleFactor: 1,
+    hasTouch: true,
     isMobile: true,
+    userAgent: "Mozilla/5.0 (Linux; Android 15; Agent Tmux Demo) AppleWebKit/537.36 Chrome/138.0 Mobile Safari/537.36",
     viewport: { width: MOBILE_WIDTH, height: MOBILE_HEIGHT }
   });
   try {
@@ -209,12 +193,6 @@ async function generateAndPublishAssets(signal) {
     await capture(page, path.join(assetsDir, "mobile-tty.png"), signal);
     await chooseView(page, "Raw", signal);
     await capture(page, path.join(assetsDir, "mobile-raw.png"), signal);
-    await chooseView(page, "GUI", signal);
-    await capture(page, path.join(assetsDir, "mobile-gui.png"), signal);
-    await chooseView(page, "Focus", signal);
-    await evaluate(page, "document.querySelector('.tmux-focus')?.scrollTo({ top: 0 })");
-    await delay(100, signal);
-    await capture(page, path.join(assetsDir, "mobile-focus.png"), signal);
     await chooseView(page, "TTY", signal);
     await setViewport(page, DESKTOP_WIDTH, DESKTOP_HEIGHT);
     await delay(500, signal);
@@ -406,9 +384,7 @@ function buildHeroHtml() {
 function buildModesOverviewHtml() {
   const modes = [
     { label: "TTY", description: "Selectable stream", image: "../mobile-tty.png" },
-    { label: "Raw", description: "Direct terminal", image: "../mobile-raw.png" },
-    { label: "GUI", description: "Readable transcript", image: "../mobile-gui.png" },
-    { label: "Focus", description: "Attention triage", image: "../mobile-focus.png" }
+    { label: "Raw", description: "Direct terminal", image: "../mobile-raw.png" }
   ];
 
   return `<!doctype html>
@@ -452,7 +428,7 @@ function buildModesOverviewHtml() {
       position: relative;
       z-index: 2;
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 24px;
       margin-top: 36px;
     }
@@ -504,8 +480,8 @@ function buildModesOverviewHtml() {
   <main>
     ${backdropMarkup()}
     <header>
-      <h1>Four views. One persistent tmux session.</h1>
-      <p>Move between selectable TTY output, exact terminal control, a readable transcript, and focused triage.</p>
+      <h1>Two views. One persistent tmux session.</h1>
+      <p>Toggle between selectable TTY output and exact Raw terminal control.</p>
     </header>
     <section class="modes">
       ${modes.map((mode) => `<article>
@@ -939,8 +915,10 @@ async function evaluate(page, expression) {
 
 async function chooseView(page, label, signal) {
   signal.throwIfAborted();
-  await page.getByLabel(/Change view\. Current view:/).click();
-  await page.getByRole("menuitemradio", { name: label }).click();
+  const toggle = page.getByLabel(`Switch to ${label} view`);
+  if (await toggle.count()) {
+    await toggle.click();
+  }
   await delay(350, signal);
 }
 

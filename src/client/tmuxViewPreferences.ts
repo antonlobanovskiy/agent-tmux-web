@@ -1,4 +1,4 @@
-export type TmuxViewMode = "tty" | "gui" | "focus" | "raw";
+export type TmuxViewMode = "tty" | "raw";
 export type TmuxViewSwitchPolicy = "remember" | "default";
 
 export const DEFAULT_TMUX_VIEW_STORAGE_KEY = "agent-tmux-web.default-view";
@@ -8,7 +8,13 @@ export const FALLBACK_TMUX_VIEW_MODE: TmuxViewMode = "tty";
 export const FALLBACK_TMUX_VIEW_SWITCH_POLICY: TmuxViewSwitchPolicy = "remember";
 
 export function normalizeTmuxViewMode(value: unknown): TmuxViewMode | null {
-  return value === "tty" || value === "gui" || value === "focus" || value === "raw" ? value : null;
+  if (value === "raw") {
+    return "raw";
+  }
+  if (value === "tty" || value === "gui" || value === "focus") {
+    return "tty";
+  }
+  return null;
 }
 
 export function normalizeTmuxViewSwitchPolicy(value: unknown): TmuxViewSwitchPolicy | null {
