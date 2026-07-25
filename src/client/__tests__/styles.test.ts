@@ -297,9 +297,14 @@ describe("current user guidance", () => {
 
   it("captures the dark theme and leaves Settings open in the desktop visual", () => {
     const marketingCapture = readFileSync(join(process.cwd(), "scripts/capture-marketing.mjs"), "utf8");
+    const captureStart = marketingCapture.indexOf("const page = await captureContext.newPage()");
+    const captureEnd = marketingCapture.indexOf("await captureContext.close()", captureStart);
+
+    expect(captureStart).toBeGreaterThanOrEqual(0);
+    expect(captureEnd).toBeGreaterThan(captureStart);
     const captureFlow = marketingCapture.slice(
-      marketingCapture.indexOf("const page = await captureContext.newPage()"),
-      marketingCapture.indexOf("await captureContext.close()")
+      captureStart,
+      captureEnd
     );
     const darkThemeSelection = captureFlow.indexOf("await selectDarkTheme(page, signal);");
     const mobileTtyCapture = captureFlow.indexOf('await capture(page, path.join(assetsDir, "mobile-tty.png"), signal);');
@@ -312,6 +317,7 @@ describe("current user guidance", () => {
     expect(desktopTtyCapture).toBeGreaterThan(settingsOpen);
     expect(marketingCapture).toContain('document.documentElement.dataset.theme === "dark"');
     expect(marketingCapture).toContain('name: "Dark", exact: true');
+    expect(marketingCapture).toContain('if (await menu.getAttribute("open") === null)');
   });
 
   it("ships only the approved current marketing assets", () => {

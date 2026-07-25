@@ -935,7 +935,7 @@ async function selectDarkTheme(page, signal) {
 async function openSettingsMenu(page, signal) {
   signal.throwIfAborted();
   const menu = page.locator("details.tmux-settings-menu");
-  if (!(await menu.getAttribute("open"))) {
+  if (await menu.getAttribute("open") === null) {
     await page.getByLabel("Open settings").click();
   }
   const darkOption = page.getByRole("menuitemradio", { name: "Dark", exact: true });
