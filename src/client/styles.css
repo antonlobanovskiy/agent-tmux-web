@@ -798,7 +798,16 @@ textarea:focus {
   font-size: 13px;
 }
 
-.timeline-card pre,
+.timeline-card pre {
+  margin: 0;
+  overflow-anchor: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .tmux-output {
   margin: 0;
   overflow-anchor: none;
@@ -1263,6 +1272,17 @@ textarea:focus {
   white-space: pre;
   word-break: normal;
   overflow-wrap: normal;
+}
+
+.tmux-output.harness-history,
+.tmux-opencode-terminal.harness-history {
+  white-space: pre;
+  word-break: normal;
+  overflow-wrap: normal;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior: contain;
+  touch-action: pan-x;
 }
 
 .tmux-opencode-sidebar {

@@ -46,7 +46,8 @@ tabs without killing the work.
 - Raw mode for direct interactive tmux control, including shell and TUI work.
 - Green, amber, red, and gray status dots for running, actionable prompts,
   errors, and idle sessions.
-- Stable scrollback while new tmux output continues arriving.
+- Stable tmux scrollback for shells, with swipe, wheel, and Page keys delegated
+  to an active full-screen harness so its own conversation history stays authoritative.
 - File uploads and pasted clipboard images from Android, iOS, or desktop
   browsers, including direct Raw terminal paste with safe
   `~/.agent-tmux/attachments/...` prompt references.
@@ -167,6 +168,8 @@ mode, and notifications.
 8. In Raw, modified keys pass through tmux like a local terminal. OpenCode can
    distinguish `Shift+Enter` for a newline while browser clipboard shortcuts
    stay on the viewing device.
+9. In TTY, swipe or scroll an active full-screen harness to move through that
+   harness's own history. Shell sessions continue to use normal browser scrollback.
 
 Status dots:
 
@@ -178,9 +181,12 @@ Status dots:
 The terminal output starts directly below the toolbar. Session health remains
 visible through the sidebar status dots.
 
-TTY captures up to 5,000 rows of tmux history. Sessions created in the app are
-configured with at least that much history; recreate older sessions to raise
-their pane limit because tmux cannot restore rows it already discarded.
+TTY captures up to 5,000 rows of tmux history for normal shell panes. Sessions
+created in the app are configured with at least that much history; recreate
+older sessions to raise their pane limit because tmux cannot restore rows it
+already discarded. Full-screen harnesses use their own Page Up/Page Down
+history because alternate-screen applications do not expose that history as
+tmux scrollback.
 
 ## Android App
 

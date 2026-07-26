@@ -44,6 +44,7 @@ export type TmuxSessionStatusDto = {
 export type TmuxCaptureDto = {
   session: string;
   output: string;
+  historyOwner: "tmux" | "harness";
   sidebar?: {
     kind: "opencode";
     output: string;

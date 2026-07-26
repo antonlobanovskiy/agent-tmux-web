@@ -4,7 +4,7 @@ import {
   buildBrowserRawTerminalPolicy,
   buildScriptArgsForTmuxAttach,
   buildTmuxAttachShellCommand,
-  buildTmuxCaptureSizeFromClientWidth,
+  buildTmuxCaptureSizeFromClientDimensions,
   buildTmuxDisplayWindowSizeArgs,
   buildTmuxRestoreManualSizeArgs,
   buildTmuxRestoreWindowStateCommandSequence,
@@ -66,12 +66,12 @@ describe("browser tmux terminal helpers", () => {
     expect(isSameTerminalSize({ cols: 132, rows: 36 }, { cols: 132, rows: 37 })).toBe(false);
   });
 
-  it("maps wide GUI/TTY capture surfaces to tmux columns", () => {
-    expect(buildTmuxCaptureSizeFromClientWidth(320)).toEqual({ cols: 80, rows: 40 });
-    expect(buildTmuxCaptureSizeFromClientWidth(390)).toEqual({ cols: 80, rows: 40 });
-    expect(buildTmuxCaptureSizeFromClientWidth(640)).toEqual({ cols: 80, rows: 40 });
-    expect(buildTmuxCaptureSizeFromClientWidth(1280)).toEqual({ cols: 154, rows: 40 });
-    expect(buildTmuxCaptureSizeFromClientWidth(2200)).toEqual({ cols: 240, rows: 40 });
+  it("maps the complete TTY viewport to tmux rows and columns", () => {
+    expect(buildTmuxCaptureSizeFromClientDimensions(320, 744)).toEqual({ cols: 36, rows: 40 });
+    expect(buildTmuxCaptureSizeFromClientDimensions(390, 744)).toEqual({ cols: 44, rows: 40 });
+    expect(buildTmuxCaptureSizeFromClientDimensions(640, 420)).toEqual({ cols: 75, rows: 22 });
+    expect(buildTmuxCaptureSizeFromClientDimensions(1280, 960)).toEqual({ cols: 154, rows: 52 });
+    expect(buildTmuxCaptureSizeFromClientDimensions(2200, 2200)).toEqual({ cols: 240, rows: 80 });
   });
 
   it("builds commands for restoring tmux window size state after detach", () => {

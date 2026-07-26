@@ -9,6 +9,7 @@ export type TmuxCaptureSource = "follow" | "manual" | "poll" | "session" | "view
 
 type TmuxCaptureAdmission = {
   activeManualOwner: number | null;
+  historySession: string;
   owner?: number;
   session: string;
   source: TmuxCaptureSource;
@@ -27,12 +28,16 @@ export function isCurrentTmuxCaptureOwner({
 
 export function shouldAdmitTmuxCapture({
   activeManualOwner,
+  historySession,
   owner,
   session,
   source,
   terminalActive
 }: TmuxCaptureAdmission): boolean {
   if (!session || terminalActive) {
+    return false;
+  }
+  if (historySession === session) {
     return false;
   }
   if (source === "manual") {
@@ -55,4 +60,20 @@ export function shouldApplyTmuxCapture({
   ...operation
 }: TmuxOperationGuard & { terminalActive: boolean }): boolean {
   return !terminalActive && shouldApplyTmuxToolLaunch(operation);
+}
+
+export function shouldApplyTmuxPrefetch({
+  currentEpoch,
+  requestEpoch,
+  selectedSession,
+  targetSession,
+  terminalActive
+}: {
+  currentEpoch: number;
+  requestEpoch: number;
+  selectedSession: string;
+  targetSession: string;
+  terminalActive: boolean;
+}): boolean {
+  return terminalActive && currentEpoch === requestEpoch && selectedSession === targetSession;
 }
