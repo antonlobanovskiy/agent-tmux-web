@@ -70,6 +70,7 @@ import {
   isCurrentTmuxCaptureOwner,
   shouldAdmitTmuxCapture,
   shouldApplyTmuxCapture,
+  shouldApplyTmuxPrefetch,
   shouldApplyTmuxToolLaunch,
   type TmuxCaptureSource
 } from "./tmuxOperationGuards.js";
@@ -132,7 +133,7 @@ type TmuxCaptureOptions = {
   source: TmuxCaptureSource;
 };
 
-type CachedTmuxCapture = Pick<TmuxCaptureDto, "output" | "sidebar">;
+type CachedTmuxCapture = Pick<TmuxCaptureDto, "output" | "sidebar" | "historyOwner">;
 
 const TMUX_VIEW_MODE_LABELS: Record<TmuxViewMode, string> = {
   tty: "TTY",
@@ -289,6 +290,7 @@ export function App() {
   const [selectedTmux, setSelectedTmux] = useState(demoMode ? "agent-demo" : "");
   const [tmuxOutput, setTmuxOutput] = useState(demoMode ? DEMO_TMUX_OUTPUT : "");
   const [tmuxSidebar, setTmuxSidebar] = useState<TmuxCaptureDto["sidebar"]>(demoMode ? DEMO_TMUX_SIDEBAR : undefined);
+  const [tmuxHistoryOwner, setTmuxHistoryOwner] = useState<TmuxCaptureDto["historyOwner"]>("tmux");
   const [tmuxInput, setTmuxInput] = useState(demoMode ? "Check the mobile layout and summarize risks" : "");
   const [threadId, setThreadId] = useState("");
   const [activeTurnId, setActiveTurnId] = useState("");
@@ -355,6 +357,8 @@ export function App() {
   const tmuxCaptureCacheRef = useRef<Record<string, CachedTmuxCapture>>({});
   const tmuxAutomaticCaptureInFlightRef = useRef(new Set<string>());
   const tmuxCapturePrefetchRef = useRef(new Set<string>());
+  const tmuxHarnessHistorySessionRef = useRef("");
+  const tmuxViewEpochRef = useRef(0);
   const androidConnectionSettingsAvailable = hasAndroidConnectionSettings();
 
   const modelEfforts = useMemo(() => {
@@ -472,6 +476,7 @@ export function App() {
   const captureTmux = useCallback(async (session: string, options: TmuxCaptureOptions): Promise<boolean> => {
     const captureIsAdmitted = () => shouldAdmitTmuxCapture({
       activeManualOwner: manualCaptureOwnerRef.current,
+      historySession: tmuxHarnessHistorySessionRef.current,
       owner: options.owner,
       session,
       source: options.source,
@@ -500,14 +505,19 @@ export function App() {
         if (!applied) {
           return false;
         }
-        tmuxCaptureCacheRef.current[session] = { output: DEMO_TMUX_OUTPUT, sidebar: DEMO_TMUX_SIDEBAR };
-        setCapturedTmuxOutput(DEMO_TMUX_OUTPUT, DEMO_TMUX_SIDEBAR);
+        tmuxCaptureCacheRef.current[session] = {
+          output: DEMO_TMUX_OUTPUT,
+          sidebar: DEMO_TMUX_SIDEBAR,
+          historyOwner: "tmux"
+        };
+        setCapturedTmuxOutput(DEMO_TMUX_OUTPUT, DEMO_TMUX_SIDEBAR, "tmux");
         return true;
       }
       const params = new URLSearchParams({
         session,
         lines: String(TMUX_CAPTURE_HISTORY_LINES),
-        clientWidth: String(resolveTmuxCaptureClientWidth())
+        clientWidth: String(resolveTmuxCaptureClientWidth()),
+        clientHeight: String(resolveTmuxCaptureClientHeight())
       });
       const result = await api<TmuxCaptureDto>(`/api/tmux/capture?${params.toString()}`, {
         signal: options.signal
@@ -522,8 +532,12 @@ export function App() {
       if (!applied) {
         return false;
       }
-      tmuxCaptureCacheRef.current[session] = { output: result.output, sidebar: result.sidebar };
-      setCapturedTmuxOutput(result.output, result.sidebar);
+      tmuxCaptureCacheRef.current[session] = {
+        output: result.output,
+        sidebar: result.sidebar,
+        historyOwner: result.historyOwner
+      };
+      setCapturedTmuxOutput(result.output, result.sidebar, result.historyOwner);
       return true;
     } finally {
       if (automatic) {
@@ -537,18 +551,38 @@ export function App() {
       return;
     }
     if (demoMode) {
-      tmuxCaptureCacheRef.current[session] = { output: DEMO_TMUX_OUTPUT, sidebar: DEMO_TMUX_SIDEBAR };
+      tmuxCaptureCacheRef.current[session] = {
+        output: DEMO_TMUX_OUTPUT,
+        sidebar: DEMO_TMUX_SIDEBAR,
+        historyOwner: "tmux"
+      };
       return;
     }
+    const viewEpoch = tmuxViewEpochRef.current;
     tmuxCapturePrefetchRef.current.add(session);
     try {
       const params = new URLSearchParams({
         session,
         lines: String(TMUX_CAPTURE_HISTORY_LINES),
-        clientWidth: String(resolveTmuxCaptureClientWidth())
+        clientWidth: String(resolveTmuxCaptureClientWidth()),
+        clientHeight: String(resolveTmuxCaptureClientHeight()),
+        resize: "false"
       });
       const result = await api<TmuxCaptureDto>(`/api/tmux/capture?${params.toString()}`);
-      tmuxCaptureCacheRef.current[session] = { output: result.output, sidebar: result.sidebar };
+      if (!shouldApplyTmuxPrefetch({
+        currentEpoch: tmuxViewEpochRef.current,
+        requestEpoch: viewEpoch,
+        selectedSession: selectedTmuxRef.current,
+        targetSession: session,
+        terminalActive: terminalActiveRef.current
+      })) {
+        return;
+      }
+      tmuxCaptureCacheRef.current[session] = {
+        output: result.output,
+        sidebar: result.sidebar,
+        historyOwner: result.historyOwner
+      };
     } finally {
       tmuxCapturePrefetchRef.current.delete(session);
     }
@@ -1168,11 +1202,11 @@ export function App() {
       setTerminalStatus(`stop sent to ${selectedTmux}`);
       return;
     }
-    const result = await api<{ output: string }>("/api/tmux/interrupt", {
+    const result = await api<TmuxCaptureDto & { ok: true }>("/api/tmux/interrupt", {
       method: "POST",
       body: JSON.stringify({ session: selectedTmux })
     });
-    setCapturedTmuxOutput(result.output);
+    setCapturedTmuxOutput(result.output, result.sidebar, result.historyOwner);
     setTerminalStatus(`stop sent to ${selectedTmux}`);
     scheduleTmuxFollow(selectedTmux);
   }
@@ -1353,6 +1387,7 @@ export function App() {
 
   function setTerminalActive(active: boolean) {
     cancelManualCapture();
+    tmuxViewEpochRef.current += 1;
     terminalActiveRef.current = active;
     setTerminalActiveState(active);
   }
@@ -1390,6 +1425,10 @@ export function App() {
 
   function refreshTmux() {
     if (manualCaptureOwnerRef.current !== null) {
+      return;
+    }
+    if (selectedTmux && tmuxHarnessHistorySessionRef.current === selectedTmux) {
+      setTerminalStatus(`browsing ${selectedTmux} history`);
       return;
     }
     void loadTmuxSessions().catch(reportError(setError));
@@ -1673,16 +1712,13 @@ export function App() {
       queueTmuxOutputBottomScroll();
       setCapturedTmuxOutput(`${DEMO_TMUX_OUTPUT}\n\n› ${command}\n\n• Started ${toolLabel} in ${targetSession}.`, DEMO_TMUX_SIDEBAR);
       const mode = preferredTmuxViewMode(targetSession);
-      if (mode !== "raw") {
-        applyCachedTmuxSidebar(targetSession);
-      }
       applyTmuxViewMode(mode);
       setTmuxMenuOpen(false);
       setTerminalStatus(`started ${toolLabel} in ${targetSession}`);
       return;
     }
 
-    const result = await api<{ output: string }>("/api/tmux/open-tool", {
+    const result = await api<TmuxCaptureDto & { ok: true }>("/api/tmux/open-tool", {
       method: "POST",
       body: JSON.stringify({
         session: targetSession,
@@ -1700,11 +1736,8 @@ export function App() {
       return;
     }
     queueTmuxOutputBottomScroll();
-    setCapturedTmuxOutput(result.output);
+    setCapturedTmuxOutput(result.output, result.sidebar, result.historyOwner);
     const mode = preferredTmuxViewMode(targetSession);
-    if (mode !== "raw") {
-      applyCachedTmuxSidebar(targetSession);
-    }
     applyTmuxViewMode(mode);
     setTmuxMenuOpen(false);
     setTerminalStatus(`started ${toolLabel} in ${targetSession}`);
@@ -2029,10 +2062,15 @@ export function App() {
     }
   }
 
-  function setCapturedTmuxOutput(output: string, sidebar?: TmuxCaptureDto["sidebar"]) {
+  function setCapturedTmuxOutput(
+    output: string,
+    sidebar?: TmuxCaptureDto["sidebar"],
+    historyOwner: TmuxCaptureDto["historyOwner"] = "tmux"
+  ) {
     rememberTmuxScrollPosition();
     setTmuxOutput(output);
     setTmuxSidebar(sidebar);
+    setTmuxHistoryOwner(historyOwner);
   }
 
   function applyCachedTmuxCapture(session: string): boolean {
@@ -2040,7 +2078,7 @@ export function App() {
     if (!cached) {
       return false;
     }
-    setCapturedTmuxOutput(cached.output, cached.sidebar);
+    setCapturedTmuxOutput(cached.output, cached.sidebar, cached.historyOwner);
     return true;
   }
 
@@ -2052,21 +2090,56 @@ export function App() {
     return false;
   }
 
-  function applyCachedTmuxSidebar(session: string): boolean {
-    const cached = tmuxCaptureCacheRef.current[session];
-    if (!cached?.sidebar) {
-      return false;
-    }
-    setTmuxSidebar(cached.sidebar);
-    return true;
-  }
-
   function currentTmuxScrollNode() {
     return tmuxOutputRef.current;
   }
 
   function resolveTmuxCaptureClientWidth(): number {
     return tmuxCaptureWidthRef.current?.clientWidth || currentTmuxScrollNode()?.clientWidth || window.innerWidth || 1280;
+  }
+
+  function resolveTmuxCaptureClientHeight(): number {
+    return tmuxCaptureWidthRef.current?.clientHeight || currentTmuxScrollNode()?.clientHeight || window.innerHeight || 744;
+  }
+
+  async function navigateTmuxHarnessHistory(direction: "up" | "down") {
+    const session = selectedTmuxRef.current;
+    if (!session || terminalActiveRef.current || tmuxHistoryOwner !== "harness" || tmuxHarnessHistorySessionRef.current) {
+      return;
+    }
+
+    tmuxHarnessHistorySessionRef.current = session;
+    const requestId = ++tmuxCaptureRequestIdRef.current;
+    try {
+      const result = await api<TmuxCaptureDto>("/api/tmux/history", {
+        method: "POST",
+        body: JSON.stringify({
+          session,
+          direction,
+          clientWidth: resolveTmuxCaptureClientWidth(),
+          clientHeight: resolveTmuxCaptureClientHeight()
+        })
+      });
+      if (!shouldApplyTmuxCapture({
+        requestId,
+        latestRequestId: tmuxCaptureRequestIdRef.current,
+        targetSession: session,
+        selectedSession: selectedTmuxRef.current,
+        terminalActive: terminalActiveRef.current
+      })) {
+        return;
+      }
+      tmuxCaptureCacheRef.current[session] = {
+        output: result.output,
+        sidebar: result.sidebar,
+        historyOwner: result.historyOwner
+      };
+      setCapturedTmuxOutput(result.output, result.sidebar, result.historyOwner);
+    } finally {
+      if (tmuxHarnessHistorySessionRef.current === session) {
+        tmuxHarnessHistorySessionRef.current = "";
+      }
+    }
   }
 
   function rememberTmuxScrollPosition() {
@@ -2529,6 +2602,10 @@ export function App() {
               <TmuxTtyView
                 key={`${selectedTmux}-${tmuxSidebar?.kind ?? "terminal"}`}
                 ref={tmuxOutputRef}
+                historyOwner={tmuxHistoryOwner}
+                onHarnessHistory={(direction) => {
+                  void navigateTmuxHarnessHistory(direction).catch(reportError(setError));
+                }}
                 onScroll={handleTmuxOutputScroll}
                 output={tmuxOutput}
                 sidebar={tmuxSidebar}

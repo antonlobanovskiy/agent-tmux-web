@@ -50,10 +50,12 @@ export function buildTmuxResizeWindowArgs(session: string, size: TerminalSize): 
   ];
 }
 
-export function buildTmuxCaptureSizeFromClientWidth(clientWidth: unknown): TerminalSize {
+export function buildTmuxCaptureSizeFromClientDimensions(clientWidth: unknown, clientHeight: unknown): TerminalSize {
   const width = toInteger(clientWidth, 1280);
-  const cols = Math.max(80, Math.floor((Math.max(320, width) - 24) / 8.15));
-  return normalizeTerminalSize(cols, 40);
+  const height = toInteger(clientHeight, 744);
+  const cols = Math.floor((width - 24) / 8.15);
+  const rows = Math.floor((height - 24) / 18);
+  return normalizeTerminalSize(cols, rows);
 }
 
 export function buildTmuxDisplayWindowSizeArgs(session: string): string[] {

@@ -4,6 +4,7 @@ import {
   isCurrentTmuxCaptureOwner,
   shouldAdmitTmuxCapture,
   shouldApplyTmuxCapture,
+  shouldApplyTmuxPrefetch,
   shouldApplyTmuxToolLaunch
 } from "../tmuxOperationGuards.js";
 
@@ -66,6 +67,7 @@ describe("tmux operation guards", () => {
   describe("capture admission", () => {
     const ordinaryCapture = {
       activeManualOwner: null,
+      historySession: "",
       session: "agent-a",
       source: "poll" as const,
       terminalActive: false
@@ -81,6 +83,11 @@ describe("tmux operation guards", () => {
 
     it("rejects non-manual capture while a manual owner is active", () => {
       expect(shouldAdmitTmuxCapture({ ...ordinaryCapture, activeManualOwner: 4 })).toBe(false);
+    });
+
+    it("blocks only the session whose harness history request is active", () => {
+      expect(shouldAdmitTmuxCapture({ ...ordinaryCapture, historySession: "agent-a" })).toBe(false);
+      expect(shouldAdmitTmuxCapture({ ...ordinaryCapture, historySession: "agent-b" })).toBe(true);
     });
 
     it("accepts capture from the matching manual owner", () => {
@@ -103,6 +110,23 @@ describe("tmux operation guards", () => {
 
     it("accepts ordinary capture without a manual owner", () => {
       expect(shouldAdmitTmuxCapture(ordinaryCapture)).toBe(true);
+    });
+  });
+
+  describe("Raw capture prefetch", () => {
+    const currentPrefetch = {
+      currentEpoch: 4,
+      requestEpoch: 4,
+      selectedSession: "agent-a",
+      targetSession: "agent-a",
+      terminalActive: true
+    };
+
+    it("accepts only the current Raw view epoch and session", () => {
+      expect(shouldApplyTmuxPrefetch(currentPrefetch)).toBe(true);
+      expect(shouldApplyTmuxPrefetch({ ...currentPrefetch, currentEpoch: 5 })).toBe(false);
+      expect(shouldApplyTmuxPrefetch({ ...currentPrefetch, selectedSession: "agent-b" })).toBe(false);
+      expect(shouldApplyTmuxPrefetch({ ...currentPrefetch, terminalActive: false })).toBe(false);
     });
   });
 

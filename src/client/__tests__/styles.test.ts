@@ -110,7 +110,11 @@ describe("responsive mobile CSS", () => {
     const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
 
     expect(app).toContain("shouldApplyTmuxCapture({");
+    expect(app).toContain("shouldApplyTmuxPrefetch({");
     expect(app).toContain("shouldApplyTmuxToolLaunch({");
+    expect(app).toContain("historySession: tmuxHarnessHistorySessionRef.current");
+    expect(app).toContain("tmuxHarnessHistorySessionRef.current === selectedTmux");
+    expect(app).not.toContain("applyCachedTmuxSidebar");
     expect(app).toContain("Promise<boolean>");
     expect(app).toMatch(/\.then\(\(applied\) => \{\s+if \(applied && isCurrentManualCaptureOwner\(owner\)\) \{\s+setTerminalStatus\(`synced \$\{session\}`\)/);
   });

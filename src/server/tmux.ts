@@ -4,7 +4,12 @@ import path from "node:path";
 import { promisify } from "node:util";
 import stringWidth from "string-width";
 
-import { TMUX_CAPTURE_HISTORY_LINES, type TmuxSessionStatusDto, type TmuxToolDto } from "../shared/api.js";
+import {
+  TMUX_CAPTURE_HISTORY_LINES,
+  type TmuxCaptureDto,
+  type TmuxSessionStatusDto,
+  type TmuxToolDto
+} from "../shared/api.js";
 import { buildTmuxToolCommand, DEFAULT_TMUX_TOOLS } from "../shared/tmuxTools.js";
 import type { TerminalSize } from "./terminal.js";
 
@@ -39,7 +44,7 @@ export type TmuxPaneMetadata = {
   alternateScreen: boolean;
 };
 
-export type TmuxPaneCapture = {
+type TmuxPaneView = {
   output: string;
   sidebar?: {
     kind: "opencode";
@@ -47,10 +52,15 @@ export type TmuxPaneCapture = {
   };
 };
 
-export const MIN_OPENCODE_TUI_CAPTURE_COLS = 150;
+export type TmuxPaneCapture = TmuxPaneView & {
+  historyOwner: TmuxCaptureDto["historyOwner"];
+};
+
+export const MIN_OPENCODE_TUI_CAPTURE_COLS = 126;
 
 export type TmuxSubmitKey = "enter" | "codex-enter" | "tab";
 export type TmuxInterruptKey = "escape" | "ctrl-c";
+export type TmuxHistoryDirection = "up" | "down";
 
 const DEFAULT_DETACHED_TMUX_COLS = 160;
 const DEFAULT_DETACHED_TMUX_ROWS = 40;
@@ -202,6 +212,10 @@ export function buildTmuxInterruptKeysArgs(session: string, interruptKey: TmuxIn
   return ["send-keys", "-t", session, interruptKey === "escape" ? "Escape" : "C-c"];
 }
 
+export function buildTmuxHistoryKeysArgs(session: string, direction: TmuxHistoryDirection): string[] {
+  return ["send-keys", "-t", session, direction === "up" ? "PageUp" : "PageDown"];
+}
+
 export function detectTmuxSubmitKey(output: string): TmuxSubmitKey {
   return isCodexTmuxOutput(output) ? "codex-enter" : "enter";
 }
@@ -337,16 +351,29 @@ export async function openTmuxTool(session: string, tool: Pick<TmuxToolConfig, "
   await sendTmuxText(session, buildTmuxToolCommand(tool, modeIds), true);
 }
 
-export async function captureTmuxPane(session: string, lines = TMUX_CAPTURE_HISTORY_LINES): Promise<string> {
-  const safeLines = normalizeTmuxCaptureLines(lines);
-  const { stdout } = await execFileAsync("tmux", [
+export function buildTmuxCapturePaneArgs(session: string, lines: number, joinWrappedLines = false): string[] {
+  return [
     "capture-pane",
     "-p",
+    ...(joinWrappedLines ? ["-J"] : []),
     "-t",
     session,
     "-S",
-    `-${safeLines}`
-  ], { maxBuffer: TMUX_CAPTURE_MAX_BUFFER_BYTES });
+    `-${lines}`
+  ];
+}
+
+export async function captureTmuxPane(
+  session: string,
+  lines = TMUX_CAPTURE_HISTORY_LINES,
+  joinWrappedLines = false
+): Promise<string> {
+  const safeLines = normalizeTmuxCaptureLines(lines);
+  const { stdout } = await execFileAsync(
+    "tmux",
+    buildTmuxCapturePaneArgs(session, safeLines, joinWrappedLines),
+    { maxBuffer: TMUX_CAPTURE_MAX_BUFFER_BYTES }
+  );
   return trimTmuxCapture(stdout);
 }
 
@@ -475,16 +502,16 @@ async function readOpenCodeSessionIdForPane(session: TmuxSession): Promise<strin
 }
 
 export async function captureTmuxPaneView(session: string, lines = TMUX_CAPTURE_HISTORY_LINES): Promise<TmuxPaneCapture> {
-  const [output, metadata] = await Promise.all([
-    captureTmuxPane(session, lines),
-    inspectTmuxPane(session).catch(() => null)
-  ]);
+  const metadata = await inspectTmuxPane(session).catch(() => null);
+  const output = await captureTmuxPane(session, lines, Boolean(metadata && !metadata.alternateScreen));
+  const view = metadata && isOpenCodeFullTuiPane(metadata)
+    ? splitOpenCodeTuiCapture(output, metadata.width, metadata.height) ?? { output }
+    : { output };
+  return { ...view, historyOwner: tmuxHistoryOwnerForPane(metadata) };
+}
 
-  if (!metadata || !isOpenCodeFullTuiPane(metadata)) {
-    return { output };
-  }
-
-  return splitOpenCodeTuiCapture(output, metadata.width, metadata.height) ?? { output };
+export function tmuxHistoryOwnerForPane(metadata: TmuxPaneMetadata | null): TmuxCaptureDto["historyOwner"] {
+  return metadata?.alternateScreen ? "harness" : "tmux";
 }
 
 export function normalizeTmuxCaptureLines(lines: number): number {
@@ -513,6 +540,10 @@ export async function inspectTmuxPane(session: string): Promise<TmuxPaneMetadata
     "#{pane_current_command}\t#{pane_width}\t#{pane_height}\t#{alternate_on}"
   ]);
   return parseTmuxPaneMetadata(stdout);
+}
+
+export async function scrollTmuxHarnessHistory(session: string, direction: TmuxHistoryDirection): Promise<void> {
+  await execFileAsync("tmux", buildTmuxHistoryKeysArgs(session, direction));
 }
 
 export function parseTmuxPaneMetadata(output: string): TmuxPaneMetadata {
@@ -548,7 +579,7 @@ export function fitTmuxCaptureSizeForPane(size: TerminalSize, metadata: TmuxPane
   };
 }
 
-export function splitOpenCodeTuiCapture(output: string, paneWidth: number, paneHeight?: number): TmuxPaneCapture | null {
+export function splitOpenCodeTuiCapture(output: string, paneWidth: number, paneHeight?: number): TmuxPaneView | null {
   const sidebarWidth = 42;
   if (!Number.isInteger(paneWidth) || paneWidth <= 120 || paneWidth <= sidebarWidth) {
     return null;

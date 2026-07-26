@@ -13,7 +13,7 @@ import { classifyTmuxStatus, mergeTmuxSessionStatus } from "../shared/tmuxStatus
 import { CodexBridge } from "./codexBridge.js";
 import {
   buildBrowserRawTerminalPolicy,
-  buildTmuxCaptureSizeFromClientWidth,
+  buildTmuxCaptureSizeFromClientDimensions,
   buildScriptArgsForTmuxAttach,
   buildTmuxDisplayWindowSizeArgs,
   buildTmuxResizeWindowArgs,
@@ -41,7 +41,9 @@ import {
   openCodexInTmux,
   openTmuxTool,
   readTmuxHarnessStatuses,
+  scrollTmuxHarnessHistory,
   sendTmuxText,
+  type TmuxHistoryDirection,
   type TmuxInterruptKey,
   type TmuxSubmitKey
 } from "./tmux.js";
@@ -250,15 +252,51 @@ app.get("/api/tmux/capture", asyncHandler(async (req, res) => {
     inspectTmuxPane(session).catch(() => null)
   ]);
   const captureSize = fitTmuxCaptureSizeForPane(
-    buildTmuxCaptureSizeFromClientWidth(req.query.clientWidth),
+    buildTmuxCaptureSizeFromClientDimensions(req.query.clientWidth, req.query.clientHeight),
     paneMetadata
   );
-  if (!preserveExistingClientSize) {
-    await resizeTmuxWindowIfNeeded(session, captureSize).catch(() => {
+  let resized = false;
+  if (req.query.resize !== "false" && !preserveExistingClientSize) {
+    resized = await resizeTmuxWindowIfNeeded(session, captureSize).catch(() => {
       // Best-effort: capture remains useful even if tmux rejects a resize.
+      return false;
     });
   }
+  if (resized) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
   const capture = await captureTmuxPaneView(session, lines);
+  res.json({ session, ...capture } satisfies TmuxCaptureDto);
+}));
+
+app.post("/api/tmux/history", asyncHandler(async (req, res) => {
+  const body = req.body as Record<string, unknown>;
+  const session = requireString(body.session, "session");
+  const direction = requireTmuxHistoryDirection(body.direction);
+  const metadata = await inspectTmuxPane(session);
+  if (!metadata.alternateScreen) {
+    res.status(409).json({ error: "The selected pane uses tmux scrollback, not harness history." });
+    return;
+  }
+
+  const preserveExistingClientSize = await hasAttachedTmuxClients(session).catch(() => false);
+  if (!preserveExistingClientSize) {
+    const captureSize = fitTmuxCaptureSizeForPane(
+      buildTmuxCaptureSizeFromClientDimensions(body.clientWidth, body.clientHeight),
+      metadata
+    );
+    const resized = await resizeTmuxWindowIfNeeded(session, captureSize).catch(() => {
+      // The harness can still handle the history key if tmux rejects a resize.
+      return false;
+    });
+    if (resized) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+
+  await scrollTmuxHarnessHistory(session, direction);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  const capture = await captureTmuxPaneView(session, TMUX_CAPTURE_HISTORY_LINES);
   res.json({ session, ...capture } satisfies TmuxCaptureDto);
 }));
 
@@ -291,10 +329,8 @@ app.post("/api/tmux/open-codex", asyncHandler(async (req, res) => {
     model: stringOrNull(body.model)
   });
   tmuxWatch.startWatch(session, "Codex");
-  res.json({
-    ok: true,
-    output: await captureTmuxPane(session, TMUX_CAPTURE_HISTORY_LINES)
-  });
+  const capture = await captureTmuxPaneView(session, TMUX_CAPTURE_HISTORY_LINES);
+  res.json({ ok: true, session, ...capture } satisfies TmuxCaptureDto & { ok: true });
 }));
 
 app.post("/api/tmux/open-tool", asyncHandler(async (req, res) => {
@@ -308,10 +344,8 @@ app.post("/api/tmux/open-tool", asyncHandler(async (req, res) => {
   const command = configuredTool?.command ?? requireString(body.command, "command");
   await openTmuxTool(session, configuredTool ?? { command }, configuredTool ? modeIds : []);
   tmuxWatch.startWatch(session, configuredTool?.label ?? command);
-  res.json({
-    ok: true,
-    output: await captureTmuxPane(session, TMUX_CAPTURE_HISTORY_LINES)
-  });
+  const capture = await captureTmuxPaneView(session, TMUX_CAPTURE_HISTORY_LINES);
+  res.json({ ok: true, session, ...capture } satisfies TmuxCaptureDto & { ok: true });
 }));
 
 app.post("/api/tmux/send", asyncHandler(async (req, res) => {
@@ -335,10 +369,8 @@ app.post("/api/tmux/interrupt", asyncHandler(async (req, res) => {
   const session = requireString(body.session, "session");
   await interruptTmuxPane(session, await resolveTmuxInterruptKey(session, body.interruptKey));
   tmuxWatch.cancelWatch(session);
-  res.json({
-    ok: true,
-    output: await captureTmuxPane(session, TMUX_CAPTURE_HISTORY_LINES)
-  });
+  const capture = await captureTmuxPaneView(session, TMUX_CAPTURE_HISTORY_LINES);
+  res.json({ ok: true, session, ...capture } satisfies TmuxCaptureDto & { ok: true });
 }));
 
 app.post("/api/tmux/watch", asyncHandler(async (req, res) => {
@@ -670,12 +702,13 @@ async function readTmuxWindowSize(session: string): Promise<TerminalSize> {
   return parseTmuxWindowSize(stdout);
 }
 
-async function resizeTmuxWindowIfNeeded(session: string, nextSize: TerminalSize): Promise<void> {
+async function resizeTmuxWindowIfNeeded(session: string, nextSize: TerminalSize): Promise<boolean> {
   const currentSize = await readTmuxWindowSize(session);
   if (isSameTerminalSize(currentSize, nextSize)) {
-    return;
+    return false;
   }
   await execFileAsync("tmux", buildTmuxResizeWindowArgs(session, nextSize));
+  return true;
 }
 
 async function hasAttachedTmuxClients(session: string): Promise<boolean> {
@@ -830,6 +863,13 @@ function requireString(value: unknown, name: string): string {
     throw new Error(`Missing required field: ${name}`);
   }
   return result;
+}
+
+function requireTmuxHistoryDirection(value: unknown): TmuxHistoryDirection {
+  if (value !== "up" && value !== "down") {
+    throw new Error("Missing required field: direction");
+  }
+  return value;
 }
 
 function stringArray(value: unknown): string[] {

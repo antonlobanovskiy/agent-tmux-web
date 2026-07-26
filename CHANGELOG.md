@@ -8,6 +8,13 @@ uploads, machine-specific service edits, or private signing material.
 
 ## Unreleased
 
+- Sized TTY captures to the actual browser viewport so harnesses wrap their own
+  output once instead of being wrapped a second time on mobile.
+- Routed TTY swipe, wheel, and Page key history navigation through active
+  alternate-screen harnesses while retaining tmux scrollback for shell panes.
+- Prevented speculative Raw capture caching from resizing live tmux panes and
+  preserved wide OpenCode Stream/Details row structure.
+
 ## 0.1.26 - 2026-07-25
 
 - Fixed Android Raw swipe-typing and deletion corruption by resetting stale xterm IME state and translating semantic delete operations safely.

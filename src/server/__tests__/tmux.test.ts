@@ -4,7 +4,9 @@ import {
   buildCodexTmuxCommand,
   buildTmuxCancelModeArgs,
   buildTmuxCreateSessionArgs,
+  buildTmuxCapturePaneArgs,
   buildTmuxKillSessionArgs,
+  buildTmuxHistoryKeysArgs,
   buildTmuxInterruptKeysArgs,
   buildTmuxPaneInModeArgs,
   buildTmuxSubmitKeysArgs,
@@ -26,6 +28,7 @@ import {
   parseTmuxTools,
   splitDisplayLineAtColumn,
   splitOpenCodeTuiCapture,
+  tmuxHistoryOwnerForPane,
   trimTmuxCapture
 } from "../tmux.js";
 import { TMUX_CAPTURE_HISTORY_LINES } from "../../shared/api.js";
@@ -328,6 +331,11 @@ describe("tmux command builders", () => {
     expect(buildTmuxInterruptKeysArgs("codex-ui", "ctrl-c")).toEqual(["send-keys", "-t", "codex-ui", "C-c"]);
   });
 
+  it("uses page keys for harness-owned history", () => {
+    expect(buildTmuxHistoryKeysArgs("codex-ui", "up")).toEqual(["send-keys", "-t", "codex-ui", "PageUp"]);
+    expect(buildTmuxHistoryKeysArgs("codex-ui", "down")).toEqual(["send-keys", "-t", "codex-ui", "PageDown"]);
+  });
+
   it("delays tmux submission so panes process pasted text before Enter", () => {
     expect(tmuxSubmitDelayMs("tab", "Test")).toBeGreaterThanOrEqual(250);
     expect(tmuxSubmitDelayMs("codex-enter", "Test")).toBeGreaterThanOrEqual(250);
@@ -350,6 +358,15 @@ describe("tmux command builders", () => {
     expect(trimTmuxCapture("\n \t\n")).toBe("");
   });
 
+  it("joins soft-wrapped shell history without joining alternate-screen TUI rows", () => {
+    expect(buildTmuxCapturePaneArgs("shell", 5000, true)).toEqual([
+      "capture-pane", "-p", "-J", "-t", "shell", "-S", "-5000"
+    ]);
+    expect(buildTmuxCapturePaneArgs("harness", 5000, false)).toEqual([
+      "capture-pane", "-p", "-t", "harness", "-S", "-5000"
+    ]);
+  });
+
   it("recognizes wide OpenCode alternate-screen panes", () => {
     expect(parseTmuxPaneMetadata("opencode\t172\t48\t1\n")).toEqual({
       currentCommand: "opencode",
@@ -368,11 +385,31 @@ describe("tmux command builders", () => {
     expect(fitTmuxCaptureSizeForPane(
       { cols: 135, rows: 40 },
       { currentCommand: "opencode", width: 135, height: 40, alternateScreen: true }
-    )).toEqual({ cols: 150, rows: 40 });
+    )).toEqual({ cols: 135, rows: 40 });
+    expect(fitTmuxCaptureSizeForPane(
+      { cols: 122, rows: 40 },
+      { currentCommand: "opencode", width: 122, height: 40, alternateScreen: true }
+    )).toEqual({ cols: 126, rows: 40 });
     expect(fitTmuxCaptureSizeForPane(
       { cols: 44, rows: 40 },
       { currentCommand: "opencode", width: 44, height: 40, alternateScreen: false }
     )).toEqual({ cols: 44, rows: 40 });
+  });
+
+  it("derives history ownership from the same pane metadata used for capture", () => {
+    expect(tmuxHistoryOwnerForPane(null)).toBe("tmux");
+    expect(tmuxHistoryOwnerForPane({
+      currentCommand: "zsh",
+      width: 80,
+      height: 24,
+      alternateScreen: false
+    })).toBe("tmux");
+    expect(tmuxHistoryOwnerForPane({
+      currentCommand: "opencode",
+      width: 80,
+      height: 24,
+      alternateScreen: true
+    })).toBe("harness");
   });
 
   it("splits display columns without breaking wide glyphs", () => {
