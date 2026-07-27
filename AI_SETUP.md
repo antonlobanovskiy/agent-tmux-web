@@ -135,7 +135,7 @@ deployment is separate. Keep user-specific runtime config out of git.
 9. Final verification.
    - Open the app from the target device.
    - Create or select a tmux session.
-   - Send a short prompt through the input.
+   - Send a short prompt through the TTY input.
    - Attach Raw mode, then detach and confirm tmux size is restored.
    - Enable notifications with the bell button if the user wants input-needed and idle alerts.
      Browser installs need HTTPS or localhost; the Android wrapper can use its

@@ -6,7 +6,6 @@ import stringWidth from "string-width";
 
 import {
   TMUX_CAPTURE_HISTORY_LINES,
-  type TmuxCaptureDto,
   type TmuxSessionStatusDto,
   type TmuxToolDto
 } from "../shared/api.js";
@@ -28,6 +27,7 @@ export type TmuxSession = {
   currentPath?: string;
   activityAtMs?: number;
   currentCommand?: string;
+  paneTitle?: string;
 };
 
 export type CodexTmuxCommandOptions = {
@@ -42,31 +42,55 @@ export type TmuxPaneMetadata = {
   width: number;
   height: number;
   alternateScreen: boolean;
+  panePid?: number;
+  currentPath?: string;
+  paneTitle?: string;
 };
 
 type TmuxPaneView = {
   output: string;
+  outputAppend?: true;
+  outputRevision?: string;
+  outputUnchanged?: true;
   sidebar?: {
     kind: "opencode";
     output: string;
   };
 };
 
-export type TmuxPaneCapture = TmuxPaneView & {
-  historyOwner: TmuxCaptureDto["historyOwner"];
-};
+export type TmuxPaneCapture = TmuxPaneView;
 
 export const MIN_OPENCODE_TUI_CAPTURE_COLS = 126;
 
 export type TmuxSubmitKey = "enter" | "codex-enter" | "tab";
 export type TmuxInterruptKey = "escape" | "ctrl-c";
-export type TmuxHistoryDirection = "up" | "down";
 
 const DEFAULT_DETACHED_TMUX_COLS = 160;
 const DEFAULT_DETACHED_TMUX_ROWS = 40;
 export const TMUX_LITERAL_SEND_CHUNK_SIZE = 16_000;
 const MIN_TMUX_CAPTURE_LINES = 20;
 const TMUX_CAPTURE_MAX_BUFFER_BYTES = 8 * 1024 * 1024;
+const OPENCODE_SESSION_CACHE_MS = 30_000;
+const OPENCODE_TEXT_CACHE_LIMIT = 100;
+const OPENCODE_TEXT_CACHE_MAX_BYTES = 8 * 1024 * 1024;
+
+type OpenCodePaneSessionCacheEntry = {
+  currentPath?: string;
+  expiresAt: number;
+  panePid: number;
+  paneTitle?: string;
+  sessionId: string;
+};
+
+type OpenCodeTextCacheEntry = {
+  output: string | null;
+  revision: string;
+  sizeBytes: number;
+};
+
+const openCodePaneSessionCache = new Map<string, OpenCodePaneSessionCacheEntry>();
+const openCodeTextCache = new Map<string, OpenCodeTextCacheEntry>();
+let openCodeTextCacheBytes = 0;
 
 export function normalizeTmuxSessionName(name: string): string {
   const normalized = name
@@ -212,10 +236,6 @@ export function buildTmuxInterruptKeysArgs(session: string, interruptKey: TmuxIn
   return ["send-keys", "-t", session, interruptKey === "escape" ? "Escape" : "C-c"];
 }
 
-export function buildTmuxHistoryKeysArgs(session: string, direction: TmuxHistoryDirection): string[] {
-  return ["send-keys", "-t", session, direction === "up" ? "PageUp" : "PageDown"];
-}
-
 export function detectTmuxSubmitKey(output: string): TmuxSubmitKey {
   return isCodexTmuxOutput(output) ? "codex-enter" : "enter";
 }
@@ -286,7 +306,7 @@ function parseFormattedTmuxSession(line: string): TmuxSession | null {
   if (parts.length < 6) {
     return null;
   }
-  const [name, windows, created, attached, activity, currentCommand, panePidValue, currentPath] = parts;
+  const [name, windows, created, attached, activity, currentCommand, panePidValue, currentPath, paneTitle] = parts;
   const windowCount = Number(windows);
   const clientCount = Number(attached);
   const panePid = Number(panePidValue);
@@ -306,7 +326,8 @@ function parseFormattedTmuxSession(line: string): TmuxSession | null {
     ...(Number.isInteger(panePid) && panePid > 0 ? { panePid } : {}),
     ...(currentPath ? { currentPath } : {}),
     ...(activityAtMs ? { activityAtMs } : {}),
-    ...(currentCommand ? { currentCommand } : {})
+    ...(currentCommand ? { currentCommand } : {}),
+    ...(paneTitle ? { paneTitle } : {})
   };
 }
 
@@ -331,7 +352,7 @@ export async function listTmuxSessions(): Promise<TmuxSession[]> {
     const { stdout } = await execFileAsync("tmux", [
       "list-sessions",
       "-F",
-      "#{session_name}\t#{session_windows}\t#{session_created}\t#{session_attached}\t#{window_activity}\t#{pane_current_command}\t#{pane_pid}\t#{pane_current_path}"
+      "#{session_name}\t#{session_windows}\t#{session_created}\t#{session_attached}\t#{window_activity}\t#{pane_current_command}\t#{pane_pid}\t#{pane_current_path}\t#{pane_title}"
     ]);
     return parseTmuxSessions(stdout);
   } catch (error) {
@@ -391,6 +412,18 @@ type OpenCodeSessionStateRow = {
   choicePending?: unknown;
 };
 
+type OpenCodeRootSession = {
+  id: string;
+  directory: string;
+  title: string;
+};
+
+type OpenCodeTextRow = {
+  messageId?: unknown;
+  role?: unknown;
+  text?: unknown;
+};
+
 export function parseOpenCodeSessionStates(serialized: string): Map<string, TmuxSessionStatusDto> {
   let rows: unknown;
   try {
@@ -429,11 +462,76 @@ export function extractOpenCodeSessionId(args: string[]): string | null {
   return /^ses_[A-Za-z0-9]+$/.test(sessionId) ? sessionId : null;
 }
 
+export function matchOpenCodePaneSession(
+  sessions: OpenCodeRootSession[],
+  directory: string | undefined,
+  paneTitle: string | undefined
+): string | null {
+  if (!directory || !paneTitle?.startsWith("OC | ")) {
+    return null;
+  }
+  const displayedTitle = paneTitle.slice("OC | ".length).trim();
+  const truncated = displayedTitle.endsWith("...") || displayedTitle.endsWith("\u2026");
+  const title = truncated
+    ? displayedTitle.replace(/(?:\.\.\.|\u2026)$/u, "").trimEnd()
+    : displayedTitle;
+  if (!title) {
+    return null;
+  }
+  const matches = sessions.filter((session) => session.directory === directory && (
+    truncated ? session.title.startsWith(title) : session.title === title
+  ));
+  return matches.length === 1 ? matches[0].id : null;
+}
+
+export function renderOpenCodeTextStream(serialized: string): string | null {
+  let rows: unknown;
+  try {
+    rows = JSON.parse(serialized);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(rows)) {
+    return null;
+  }
+
+  const output: string[] = [];
+  let currentRole = "";
+  let currentMessageId = "";
+  for (const value of rows) {
+    if (!value || typeof value !== "object") {
+      continue;
+    }
+    const row = value as OpenCodeTextRow;
+    if ((row.role !== "user" && row.role !== "assistant") || typeof row.text !== "string" || !row.text.trim()) {
+      continue;
+    }
+    const messageId = typeof row.messageId === "string" ? row.messageId : "";
+    if (row.role !== currentRole) {
+      if (output.length > 0 && output.at(-1) !== "") {
+        output.push("");
+      }
+      output.push(row.role === "user" ? "You" : "Assistant", "");
+      currentRole = row.role;
+    } else if (messageId && messageId !== currentMessageId && output.at(-1) !== "") {
+      output.push("");
+    }
+    output.push(row.text, "");
+    currentMessageId = messageId;
+  }
+  while (output.at(-1) === "") {
+    output.pop();
+  }
+  return output.length > 0 ? output.join("\n") : null;
+}
+
+export function buildOpenCodeSqliteArgs(databasePath: string, query: string, json = true): string[] {
+  return ["-readonly", ...(json ? ["-json"] : []), databasePath, query];
+}
+
 export async function readTmuxHarnessStatuses(sessions: TmuxSession[]): Promise<Map<string, TmuxSessionStatusDto>> {
-  const identified = (await Promise.all(sessions.map(async (session) => ({
-    name: session.name,
-    sessionId: await readOpenCodeSessionIdForPane(session).catch(() => null)
-  })))).filter((entry): entry is { name: string; sessionId: string } => Boolean(entry.sessionId));
+  const identified = [...(await identifyOpenCodeSessions(sessions)).entries()]
+    .map(([name, sessionId]) => ({ name, sessionId }));
   if (identified.length === 0) {
     return new Map();
   }
@@ -457,21 +555,14 @@ export async function readTmuxHarnessStatuses(sessions: TmuxSession[]): Promise<
       SELECT latest.id FROM message latest
       WHERE latest.session_id = s.id
         AND json_extract(latest.data, '$.role') = 'assistant'
-      ORDER BY latest.time_created DESC
+      ORDER BY latest.time_created DESC, latest.id DESC
       LIMIT 1
     )
     WHERE s.id IN (${quotedIds})
   `;
-  const databasePath = path.join(
-    process.env.XDG_DATA_HOME ?? path.join(process.env.HOME ?? "", ".local", "share"),
-    "opencode",
-    "opencode.db"
-  );
   let stdout: string;
   try {
-    ({ stdout } = await execFileAsync("sqlite3", ["-json", databasePath, query], {
-      maxBuffer: 1024 * 1024
-    }));
+    ({ stdout } = await queryOpenCodeDatabase(query, 1024 * 1024));
   } catch {
     return new Map();
   }
@@ -482,7 +573,63 @@ export async function readTmuxHarnessStatuses(sessions: TmuxSession[]): Promise<
   }));
 }
 
-async function readOpenCodeSessionIdForPane(session: TmuxSession): Promise<string | null> {
+async function identifyOpenCodeSessions(sessions: TmuxSession[]): Promise<Map<string, string>> {
+  const openCodeSessions = sessions.filter((session) => session.currentCommand === "opencode" && session.panePid);
+  const now = Date.now();
+  const identified = new Map<string, string>();
+  const uncached = openCodeSessions.filter((session) => {
+    const cached = openCodePaneSessionCache.get(session.name);
+    if (cached
+      && cached.expiresAt > now
+      && cached.panePid === session.panePid
+      && cached.currentPath === session.currentPath
+      && cached.paneTitle === session.paneTitle) {
+      identified.set(session.name, cached.sessionId);
+      return false;
+    }
+    openCodePaneSessionCache.delete(session.name);
+    return true;
+  });
+  const explicit = await Promise.all(uncached.map(async (session) => ({
+    session,
+    sessionId: await readExplicitOpenCodeSessionIdForPane(session).catch(() => null)
+  })));
+  for (const { session, sessionId } of explicit) {
+    if (sessionId) {
+      identified.set(session.name, sessionId);
+      cacheOpenCodePaneSession(session, sessionId, now);
+    }
+  }
+  const unresolved = explicit.filter(({ sessionId }) => !sessionId);
+  if (unresolved.length === 0) {
+    return identified;
+  }
+
+  const rootSessions = await readOpenCodeRootSessions().catch(() => []);
+  for (const { session } of unresolved) {
+    const sessionId = matchOpenCodePaneSession(rootSessions, session.currentPath, session.paneTitle);
+    if (sessionId) {
+      identified.set(session.name, sessionId);
+      cacheOpenCodePaneSession(session, sessionId, now);
+    }
+  }
+  return identified;
+}
+
+function cacheOpenCodePaneSession(session: TmuxSession, sessionId: string, now: number): void {
+  if (!session.panePid) {
+    return;
+  }
+  openCodePaneSessionCache.set(session.name, {
+    currentPath: session.currentPath,
+    expiresAt: now + OPENCODE_SESSION_CACHE_MS,
+    panePid: session.panePid,
+    paneTitle: session.paneTitle,
+    sessionId
+  });
+}
+
+async function readExplicitOpenCodeSessionIdForPane(session: Pick<TmuxSession, "currentCommand" | "panePid">): Promise<string | null> {
   if (session.currentCommand !== "opencode" || !session.panePid) {
     return null;
   }
@@ -496,22 +643,198 @@ async function readOpenCodeSessionIdForPane(session: TmuxSession): Promise<strin
     const args = (await readFile(`/proc/${childPid}/cmdline`, "utf8"))
       .split("\0")
       .filter(Boolean);
-    return extractOpenCodeSessionId(args);
+    const sessionId = extractOpenCodeSessionId(args);
+    if (sessionId) {
+      return sessionId;
+    }
   }
   return null;
 }
 
-export async function captureTmuxPaneView(session: string, lines = TMUX_CAPTURE_HISTORY_LINES): Promise<TmuxPaneCapture> {
+async function readOpenCodeRootSessions(): Promise<OpenCodeRootSession[]> {
+  const query = `
+    SELECT id, directory, title
+    FROM session
+    WHERE parent_id IS NULL
+      AND time_archived IS NULL
+  `;
+  const { stdout } = await queryOpenCodeDatabase(query, 4 * 1024 * 1024);
+  let rows: unknown;
+  try {
+    rows = JSON.parse(stdout);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+  return rows.flatMap((value) => {
+    if (!value || typeof value !== "object") {
+      return [];
+    }
+    const row = value as Record<string, unknown>;
+    return typeof row.id === "string" && typeof row.directory === "string" && typeof row.title === "string"
+      ? [{ id: row.id, directory: row.directory, title: row.title }]
+      : [];
+  });
+}
+
+export async function readOpenCodeTextStream(
+  sessionId: string,
+  knownRevision?: string
+): Promise<{ output: string | null; outputAppend: boolean; outputUnchanged: boolean; revision: string } | null> {
+  if (!/^ses_[A-Za-z0-9]+$/.test(sessionId)) {
+    return null;
+  }
+  const revisionQuery = `
+    SELECT
+      COALESCE(MAX(p.time_updated), 0) || ':' ||
+      COUNT(*) || ':' ||
+      COALESCE(SUM(p.time_updated), 0)
+    FROM message m
+    JOIN part p ON p.message_id = m.id
+    WHERE m.session_id = '${sessionId}'
+      AND json_extract(m.data, '$.role') IN ('user', 'assistant')
+      AND json_extract(p.data, '$.type') = 'text'
+      AND json_type(p.data, '$.text') = 'text'
+      AND TRIM(json_extract(p.data, '$.text')) <> ''
+  `;
+  const { stdout: revisionOutput } = await queryOpenCodeDatabase(revisionQuery, 1024, false);
+  const revision = revisionOutput.trim();
+  if (!/^\d+:\d+:\d+$/.test(revision)) {
+    return null;
+  }
+  if (knownRevision === revision) {
+    return { output: null, outputAppend: false, outputUnchanged: true, revision };
+  }
+  const cached = getCachedOpenCodeText(sessionId);
+  if (cached?.revision === revision) {
+    return { output: cached.output, outputAppend: false, outputUnchanged: false, revision };
+  }
+  const query = `
+    SELECT
+      m.id AS messageId,
+      json_extract(m.data, '$.role') AS role,
+      json_extract(p.data, '$.text') AS text
+    FROM message m
+    JOIN part p ON p.message_id = m.id
+    WHERE m.session_id = '${sessionId}'
+      AND json_extract(p.data, '$.type') = 'text'
+    ORDER BY m.time_created, m.id, p.time_created, p.id
+  `;
+  const { stdout } = await queryOpenCodeDatabase(query, TMUX_CAPTURE_MAX_BUFFER_BYTES);
+  const output = renderOpenCodeTextStream(stdout);
+  const appendOutput = Boolean(
+    output
+    && cached?.output
+    && cached.revision === knownRevision
+    && output.startsWith(cached.output)
+  );
+  setCachedOpenCodeText(sessionId, output, revision);
+  return {
+    output: appendOutput && cached?.output ? output?.slice(cached.output.length) ?? null : output,
+    outputAppend: appendOutput,
+    outputUnchanged: false,
+    revision
+  };
+}
+
+function getCachedOpenCodeText(sessionId: string): OpenCodeTextCacheEntry | undefined {
+  const cached = openCodeTextCache.get(sessionId);
+  if (cached) {
+    openCodeTextCache.delete(sessionId);
+    openCodeTextCache.set(sessionId, cached);
+  }
+  return cached;
+}
+
+function setCachedOpenCodeText(sessionId: string, output: string | null, revision: string): void {
+  const existing = openCodeTextCache.get(sessionId);
+  if (existing) {
+    openCodeTextCacheBytes -= existing.sizeBytes;
+    openCodeTextCache.delete(sessionId);
+  }
+  const sizeBytes = output ? Buffer.byteLength(output) : 0;
+  if (sizeBytes > OPENCODE_TEXT_CACHE_MAX_BYTES) {
+    return;
+  }
+  while (openCodeTextCache.size >= OPENCODE_TEXT_CACHE_LIMIT
+    || openCodeTextCacheBytes + sizeBytes > OPENCODE_TEXT_CACHE_MAX_BYTES) {
+    const oldestSessionId = openCodeTextCache.keys().next().value;
+    if (!oldestSessionId) {
+      break;
+    }
+    const oldest = openCodeTextCache.get(oldestSessionId);
+    openCodeTextCache.delete(oldestSessionId);
+    openCodeTextCacheBytes -= oldest?.sizeBytes ?? 0;
+  }
+  openCodeTextCache.set(sessionId, { output, revision, sizeBytes });
+  openCodeTextCacheBytes += sizeBytes;
+}
+
+function openCodeDatabasePath(): string {
+  return path.join(
+    process.env.XDG_DATA_HOME ?? path.join(process.env.HOME ?? "", ".local", "share"),
+    "opencode",
+    "opencode.db"
+  );
+}
+
+async function queryOpenCodeDatabase(query: string, maxBuffer: number, json = true) {
+  return execFileAsync("sqlite3", buildOpenCodeSqliteArgs(openCodeDatabasePath(), query, json), { maxBuffer });
+}
+
+export async function captureTmuxPaneView(
+  session: string,
+  lines = TMUX_CAPTURE_HISTORY_LINES,
+  knownOutputRevision?: string
+): Promise<TmuxPaneCapture> {
   const metadata = await inspectTmuxPane(session).catch(() => null);
   const output = await captureTmuxPane(session, lines, Boolean(metadata && !metadata.alternateScreen));
   const view = metadata && isOpenCodeFullTuiPane(metadata)
     ? splitOpenCodeTuiCapture(output, metadata.width, metadata.height) ?? { output }
     : { output };
-  return { ...view, historyOwner: tmuxHistoryOwnerForPane(metadata) };
-}
-
-export function tmuxHistoryOwnerForPane(metadata: TmuxPaneMetadata | null): TmuxCaptureDto["historyOwner"] {
-  return metadata?.alternateScreen ? "harness" : "tmux";
+  if (!metadata || !isOpenCodeTuiPane(metadata)) {
+    return view;
+  }
+  const identified = await identifyOpenCodeSessions([{
+    name: session,
+    windows: 1,
+    created: "",
+    attached: false,
+    clientCount: 0,
+    currentCommand: metadata.currentCommand,
+    panePid: metadata.panePid,
+    currentPath: metadata.currentPath,
+    paneTitle: metadata.paneTitle
+  }]).catch(() => new Map());
+  const sessionId = identified.get(session);
+  const persistedOutput = sessionId
+    ? await readOpenCodeTextStream(sessionId, knownOutputRevision).catch(() => null)
+    : null;
+  if (persistedOutput?.outputUnchanged) {
+    return {
+      ...view,
+      output: "",
+      outputRevision: persistedOutput.revision,
+      outputUnchanged: true
+    };
+  }
+  if (persistedOutput?.outputAppend) {
+    return {
+      ...view,
+      output: persistedOutput.output ?? "",
+      outputAppend: true,
+      outputRevision: persistedOutput.revision
+    };
+  }
+  return persistedOutput?.output
+    ? {
+        ...view,
+        output: persistedOutput.output,
+        outputRevision: persistedOutput.revision
+      }
+    : view;
 }
 
 export function normalizeTmuxCaptureLines(lines: number): number {
@@ -537,19 +860,17 @@ export async function inspectTmuxPane(session: string): Promise<TmuxPaneMetadata
     "-p",
     "-t",
     session,
-    "#{pane_current_command}\t#{pane_width}\t#{pane_height}\t#{alternate_on}"
+    "#{pane_current_command}\t#{pane_width}\t#{pane_height}\t#{alternate_on}\t#{pane_pid}\t#{pane_current_path}\t#{pane_title}"
   ]);
   return parseTmuxPaneMetadata(stdout);
 }
 
-export async function scrollTmuxHarnessHistory(session: string, direction: TmuxHistoryDirection): Promise<void> {
-  await execFileAsync("tmux", buildTmuxHistoryKeysArgs(session, direction));
-}
-
 export function parseTmuxPaneMetadata(output: string): TmuxPaneMetadata {
-  const [currentCommand = "", widthValue = "", heightValue = "", alternateValue = ""] = output.trim().split("\t");
+  const [currentCommand = "", widthValue = "", heightValue = "", alternateValue = "", panePidValue = "", currentPath = "", ...paneTitleParts] = output.trim().split("\t");
   const width = Number(widthValue);
   const height = Number(heightValue);
+  const panePid = Number(panePidValue);
+  const paneTitle = paneTitleParts.join("\t");
   if (!currentCommand || !Number.isInteger(width) || width < 1 || !Number.isInteger(height) || height < 1 || !/^[01]$/.test(alternateValue)) {
     throw new Error("Invalid tmux pane metadata");
   }
@@ -557,7 +878,10 @@ export function parseTmuxPaneMetadata(output: string): TmuxPaneMetadata {
     currentCommand,
     width,
     height,
-    alternateScreen: alternateValue === "1"
+    alternateScreen: alternateValue === "1",
+    ...(Number.isInteger(panePid) && panePid > 0 ? { panePid } : {}),
+    ...(currentPath ? { currentPath } : {}),
+    ...(paneTitle ? { paneTitle } : {})
   };
 }
 
@@ -570,7 +894,7 @@ export function isOpenCodeTuiPane(metadata: TmuxPaneMetadata): boolean {
 }
 
 export function fitTmuxCaptureSizeForPane(size: TerminalSize, metadata: TmuxPaneMetadata | null): TerminalSize {
-  if (!metadata || !isOpenCodeTuiPane(metadata) || size.cols <= 120) {
+  if (!metadata || !isOpenCodeTuiPane(metadata)) {
     return size;
   }
   return {

@@ -4,6 +4,24 @@ Public releases must be built from a reviewed commit on `main`. Never publish a
 private server URL, token, upload, local `.env`, signing secret, staged private
 APK, or machine-specific service file.
 
+## Development And Production
+
+Use `pnpm dev` for the continuously running private development environment.
+It serves the client through Vite middleware, supports HMR, reports
+`environment: development` from `/api/status`, and shows a `DEV` badge in the
+UI. The example `ops/systemd/codex-web.service` unit uses this mode. Server
+source changes require an intentional service restart; client changes continue
+to update through Vite HMR. App or Raw transport edits can reconnect an open
+Raw view, so switch active work to TTY first. Vite source modules are
+public to the private development listener even when control APIs require an
+auth token.
+
+Use `pnpm build && pnpm start` when validating or publishing production. It
+serves only the built `dist/client` assets, reports `environment: production`,
+and shows a `PROD` badge. The example `ops/systemd/agent-tmux-web.service` unit
+uses this mode. Never expose the development server directly to the public
+internet.
+
 ## Prepare
 
 1. Choose the next semantic version and increment the Android version code.
@@ -36,6 +54,10 @@ ANDROID_HOME=/usr/lib/android-sdk ANDROID_SDK_ROOT=/usr/lib/android-sdk \
 pnpm android:verify-public-apk
 pnpm android:verify-public-apk android/app/build/outputs/bundle/release/app-release.aab
 ```
+
+Open the production server and confirm `/api/status` reports
+`"environment":"production"`, the UI shows `PROD`, and no `/@vite/client`
+script is present before publishing.
 
 Verify the APK package/version, inspect APK and AAB signer identities, and
 calculate SHA-256 checksums for both Android artifacts and the showcase MP4.

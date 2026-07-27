@@ -20,15 +20,25 @@ export function parseOpenCodeSidebar(output: string): OpenCodeSidebarDetails {
   const titleLines: string[] = [];
 
   for (const group of groups) {
-    const heading = normalizeSidebarHeading(group[0] ?? "");
-    if (SECTION_TITLES.has(heading)) {
-      sections.push({
-        id: heading.toLowerCase(),
-        title: heading,
-        lines: group.slice(1)
-      });
-    } else if (sections.length === 0) {
-      titleLines.push(...group);
+    let currentSection: OpenCodeSidebarSection | null = null;
+    for (const line of group) {
+      if (isSidebarFooterLine(line)) {
+        currentSection = null;
+        continue;
+      }
+      const heading = normalizeSidebarHeading(line);
+      if (SECTION_TITLES.has(heading)) {
+        currentSection = {
+          id: heading.toLowerCase(),
+          title: heading,
+          lines: []
+        };
+        sections.push(currentSection);
+      } else if (currentSection) {
+        currentSection.lines.push(line);
+      } else if (sections.length === 0) {
+        titleLines.push(line);
+      }
     }
   }
 
@@ -40,4 +50,8 @@ export function parseOpenCodeSidebar(output: string): OpenCodeSidebarDetails {
 
 function normalizeSidebarHeading(line: string): string {
   return line.replace(/^[▼▶▾▸]\s*/u, "").trim();
+}
+
+function isSidebarFooterLine(line: string): boolean {
+  return /^~(?:[/\\]|$)/u.test(line) || /^[•·]\s*OpenCode\s+\d/u.test(line);
 }

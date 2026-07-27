@@ -1,6 +1,8 @@
+import { memo } from "react";
+
 import { LinkifiedText } from "./LinkifiedText.js";
 
-export function TmuxOutputLines({ output, anchors = true }: { output: string; anchors?: boolean }) {
+export const TmuxOutputLines = memo(function TmuxOutputLines({ output, anchors = true }: { output: string; anchors?: boolean }) {
   return output.split(/\r?\n/).map((line, index) => (
     <span
       className="tmux-output-line"
@@ -11,4 +13,4 @@ export function TmuxOutputLines({ output, anchors = true }: { output: string; an
       <LinkifiedText text={line || "\u00a0"} />
     </span>
   ));
-}
+});

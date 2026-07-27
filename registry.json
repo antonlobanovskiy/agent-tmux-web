@@ -70,7 +70,6 @@
         { "path": "src/client/tmuxActivity.ts", "type": "registry:file", "target": "~/src/client/tmuxActivity.ts" },
         { "path": "src/client/tmuxCopy.ts", "type": "registry:file", "target": "~/src/client/tmuxCopy.ts" },
         { "path": "src/client/tmuxFollow.ts", "type": "registry:file", "target": "~/src/client/tmuxFollow.ts" },
-        { "path": "src/client/tmuxHarnessHistory.ts", "type": "registry:file", "target": "~/src/client/tmuxHarnessHistory.ts" },
         { "path": "src/client/tmuxNotifications.ts", "type": "registry:file", "target": "~/src/client/tmuxNotifications.ts" },
         { "path": "src/client/tmuxOutputLines.tsx", "type": "registry:file", "target": "~/src/client/tmuxOutputLines.tsx" },
         { "path": "src/client/tmuxOperationGuards.ts", "type": "registry:file", "target": "~/src/client/tmuxOperationGuards.ts" },
@@ -93,7 +92,6 @@
         { "path": "src/client/__tests__/tmuxActivity.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/tmuxActivity.test.ts" },
         { "path": "src/client/__tests__/tmuxCopy.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/tmuxCopy.test.ts" },
         { "path": "src/client/__tests__/tmuxFollow.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/tmuxFollow.test.ts" },
-        { "path": "src/client/__tests__/tmuxHarnessHistory.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/tmuxHarnessHistory.test.ts" },
         { "path": "src/client/__tests__/tmuxNotifications.test.ts", "type": "registry:file", "target": "~/src/client/__tests__/tmuxNotifications.test.ts" },
         { "path": "src/client/__tests__/TmuxTtyView.test.tsx", "type": "registry:file", "target": "~/src/client/__tests__/TmuxTtyView.test.tsx" },
         { "path": "src/client/__tests__/tmuxOutputLines.test.tsx", "type": "registry:file", "target": "~/src/client/__tests__/tmuxOutputLines.test.tsx" },
@@ -336,11 +334,6 @@
           "target": "~/src/client/tmuxFollow.ts"
         },
         {
-          "path": "src/client/tmuxHarnessHistory.ts",
-          "type": "registry:file",
-          "target": "~/src/client/tmuxHarnessHistory.ts"
-        },
-        {
           "path": "src/client/tmuxNotifications.ts",
           "type": "registry:file",
           "target": "~/src/client/tmuxNotifications.ts"
@@ -449,11 +442,6 @@
           "path": "src/client/__tests__/tmuxFollow.test.ts",
           "type": "registry:file",
           "target": "~/src/client/__tests__/tmuxFollow.test.ts"
-        },
-        {
-          "path": "src/client/__tests__/tmuxHarnessHistory.test.ts",
-          "type": "registry:file",
-          "target": "~/src/client/__tests__/tmuxHarnessHistory.test.ts"
         },
         {
           "path": "src/client/__tests__/tmuxNotifications.test.ts",

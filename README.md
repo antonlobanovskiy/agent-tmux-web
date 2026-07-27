@@ -40,14 +40,14 @@ tabs without killing the work.
   control for saving named custom CLI commands.
 - Harness-specific Default, Plan, Auto, Auto Edit, Autopilot, and Yolo controls
   with incompatible permission modes kept mutually exclusive.
-- TTY mode by default for selectable text and clickable links. OpenCode's conversation
-  stream is separated from its details panel, with mobile tabs and a desktop
-  side panel.
+- TTY mode by default for selectable text and clickable links. Wide OpenCode
+  captures use the original Terminal/Details split with mobile tabs and a
+  desktop side panel.
 - Raw mode for direct interactive tmux control, including shell and TUI work.
 - Green, amber, red, and gray status dots for running, actionable prompts,
   errors, and idle sessions.
-- Stable tmux scrollback for shells, with swipe, wheel, and Page keys delegated
-  to an active full-screen harness so its own conversation history stays authoritative.
+- Native browser scrolling through captured tmux output without translating
+  wheel or swipe gestures into harness input.
 - File uploads and pasted clipboard images from Android, iOS, or desktop
   browsers, including direct Raw terminal paste with safe
   `~/.agent-tmux/attachments/...` prompt references.
@@ -80,6 +80,8 @@ agent CLIs and credentials stay on your server.
 - Node.js 22+
 - `pnpm`
 - `git`
+- `sqlite3` for full persisted OpenCode conversation history; tmux capture
+  remains the fallback when SQLite or the OpenCode database is unavailable
 - At least one terminal agent command, such as `opencode`, `codex`, `claude`,
   `gemini`, `copilot`, `agent`, or your own script
 - Optional but recommended for phone use: Tailscale, a VPN, an SSH tunnel, LAN
@@ -129,6 +131,21 @@ HOST=127.0.0.1 PORT=6174 pnpm start
 
 Open `http://127.0.0.1:6174`.
 
+For day-to-day development, run the source server with Vite HMR instead of
+rebuilding after every client edit:
+
+```bash
+HOST=127.0.0.1 PORT=6174 pnpm dev
+```
+
+Development mode shows a `DEV` badge beside the Agent Tmux title. Keep this
+server on loopback or a private network; use `pnpm build && pnpm start` for a
+production or release deployment. Client edits update through Vite HMR; restart
+the development service intentionally after server edits so active Raw tmux
+attachments are not interrupted by a file watcher. Fast Refresh changes to the
+App or Raw transport can still reconnect an open Raw view, so use TTY
+while editing those files.
+
 For another device, set `HOST` to a private reachable address and set an auth
 token:
 
@@ -153,23 +170,23 @@ mode, and notifications.
 2. Choose a launcher, pin favorites to the top, or use `+` to save a named
    custom command on that device.
 3. Press `Run`, or type directly into the tmux input.
-4. TTY opens by default. Use the view toggle for Raw when exact terminal input
-   matters. With session memory enabled, each tmux session returns to its last
-   selected view.
+4. TTY opens by default. Use the direct view toggle for Raw when exact terminal
+   input matters. With session memory enabled, each
+   tmux session returns to its last selected view.
 5. Open `Settings` to choose the default view, remember each session or always
    return to the default, change the theme, copy the server URL, or update
    Android connection settings.
 6. Use the bell button for alerts when a session needs input or becomes idle.
 7. Use the paperclip button to upload files, or paste clipboard images into a
-   captured-view prompt or directly into Raw with `Ctrl+V`/`Cmd+V`.
+   TTY prompt or directly into Raw with `Ctrl+V`/`Cmd+V`.
    `Ctrl+Shift+V` can recover images when the browser permits async clipboard
    reads. Uploads remain temporary on the server, while prompts receive safe
    `~/.agent-tmux/attachments/...` references readable by local CLIs.
 8. In Raw, modified keys pass through tmux like a local terminal. OpenCode can
    distinguish `Shift+Enter` for a newline while browser clipboard shortcuts
    stay on the viewing device.
-9. In TTY, swipe or scroll an active full-screen harness to move through that
-   harness's own history. Shell sessions continue to use normal browser scrollback.
+9. In TTY, swipe or scroll the captured output directly in the browser. TTY does
+   not translate those gestures into input for the running harness.
 
 Status dots:
 
@@ -184,9 +201,14 @@ visible through the sidebar status dots.
 TTY captures up to 5,000 rows of tmux history for normal shell panes. Sessions
 created in the app are configured with at least that much history; recreate
 older sessions to raise their pane limit because tmux cannot restore rows it
-already discarded. Full-screen harnesses use their own Page Up/Page Down
-history because alternate-screen applications do not expose that history as
-tmux scrollback.
+already discarded. For OpenCode, TTY reads user and assistant text parts from
+OpenCode's local SQLite database in read-only mode so the browser can show the
+full persisted conversation without loading tool payloads or image data.
+Explicit sessions are matched by process arguments; automatic sessions are
+matched conservatively by pane path and title. Ambiguous mappings, unavailable
+SQLite, database errors, and malformed data fall back to tmux capture. TTY
+scrolling remains browser-local and does not send navigation keys to the
+harness.
 
 ## Android App
 
@@ -238,6 +260,11 @@ Common variables:
 
 - `HOST`: HTTP bind host. Defaults to `127.0.0.1`.
 - `PORT`: HTTP port. Defaults to `6174`.
+- `AGENT_TMUX_WEB_ENV`: `development` enables Vite middleware and HMR;
+  otherwise the server serves the production bundle from `dist/client`.
+- `AGENT_TMUX_WEB_DEV_ALLOWED_HOSTS`: optional comma-separated private
+  hostnames accepted by Vite in development, in addition to the bind host and
+  detected Tailscale DNS name.
 - `CLI_WEB_DEFAULT_CWD`: working directory for new tmux sessions.
 - `CLI_WEB_TOOLS`: JSON launcher list.
 - `AGENT_TMUX_WEB_AUTH_TOKEN`: optional shared token for browser access.
@@ -315,9 +342,11 @@ codex -C /workspace/project -m gpt-5.5
 
 ## systemd
 
-`ops/systemd/agent-tmux-web.service` is an example user service. Before
-installing it, edit `WorkingDirectory`, `HOST`, `PORT`, and any environment
-values for your machine.
+`ops/systemd/agent-tmux-web.service` is an example production user service.
+`ops/systemd/codex-web.service` is the development variant and runs Vite HMR.
+Before installing either one, edit `WorkingDirectory`, `HOST`, `PORT`, and any
+environment values for your machine. Keep the development service on loopback
+or a private network.
 
 ```bash
 mkdir -p ~/.config/systemd/user
@@ -371,7 +400,7 @@ pnpm build
 Run locally:
 
 ```bash
-HOST=127.0.0.1 PORT=6174 pnpm start
+HOST=127.0.0.1 PORT=6174 pnpm dev
 ```
 
 Open demo mode without touching real tmux sessions:
@@ -414,10 +443,14 @@ Release notes: [CHANGELOG.md](./CHANGELOG.md)
 ## Security Notes
 
 - Treat access to this UI as terminal access to the server user running it.
+- OpenCode TTY access also exposes persisted user and assistant conversation
+  text from that server user's local OpenCode database.
 - Do not expose it directly to the public internet.
 - Use localhost, SSH tunnel, LAN, VPN, Tailscale, or an authenticated reverse
   proxy.
 - Set `AGENT_TMUX_WEB_AUTH_TOKEN` when anyone else can reach the bind address.
+- Keep development mode private: Vite source modules are available from the
+  development listener even when control APIs require an auth token.
 - Uploads are temporary by default and are cleaned on startup and hourly.
 - Public Android builds must be created with `pnpm android:build:public` or
   `pnpm android:build:play` so no private URL/token is embedded.

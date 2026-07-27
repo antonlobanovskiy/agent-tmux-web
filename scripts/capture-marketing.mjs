@@ -81,7 +81,7 @@ const showcaseScenes = [
   {
     eyebrow: "Mobile TTY",
     title: "Check the stream, then inspect details.",
-    body: "Use compact Stream and Details tabs while the agent keeps running on your server.",
+    body: "Use compact Terminal and Details tabs while the agent keeps running on your server.",
     media: "../mobile-tty.png",
     layout: "phone"
   },

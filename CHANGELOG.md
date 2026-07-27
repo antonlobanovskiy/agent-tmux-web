@@ -8,12 +8,14 @@ uploads, machine-specific service edits, or private signing material.
 
 ## Unreleased
 
-- Sized TTY captures to the actual browser viewport so harnesses wrap their own
-  output once instead of being wrapped a second time on mobile.
-- Routed TTY swipe, wheel, and Page key history navigation through active
-  alternate-screen harnesses while retaining tmux scrollback for shell panes.
+- Restored the original July 18 TTY renderer with one native browser scroll
+  surface and the original OpenCode Terminal/Details panes.
+- Added full persisted OpenCode user/assistant conversation history through
+  read-only SQLite access, with conservative pane mapping and tmux fallback.
+- Added an integrated Vite development server with HMR and visible `DEV`/`PROD`
+  environment badges while retaining built assets for production releases.
 - Prevented speculative Raw capture caching from resizing live tmux panes and
-  preserved wide OpenCode Stream/Details row structure.
+  preserved the wide OpenCode Terminal/Details split.
 
 ## 0.1.26 - 2026-07-25
 

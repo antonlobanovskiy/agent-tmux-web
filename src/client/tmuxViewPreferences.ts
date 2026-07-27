@@ -11,7 +11,7 @@ export function normalizeTmuxViewMode(value: unknown): TmuxViewMode | null {
   if (value === "raw") {
     return "raw";
   }
-  if (value === "tty" || value === "gui" || value === "focus") {
+  if (value === "text" || value === "tty" || value === "gui" || value === "focus") {
     return "tty";
   }
   return null;
