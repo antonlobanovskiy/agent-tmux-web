@@ -639,7 +639,10 @@ function isPublicAssetRequest(req: Request): boolean {
   const normalizedPath = req.path.toLowerCase();
   return req.method === "GET" && (
     req.path.startsWith("/assets/")
+    || req.path === "/agent-tmux-logo.png"
+    || req.path === "/apple-touch-icon.png"
     || req.path === "/favicon.ico"
+    || req.path === "/favicon.png"
     || (developmentMode && req.path !== "/" && !normalizedPath.startsWith("/api/"))
   );
 }
