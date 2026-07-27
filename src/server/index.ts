@@ -41,9 +41,7 @@ import {
   openCodexInTmux,
   openTmuxTool,
   readTmuxHarnessStatuses,
-  scrollTmuxHarnessHistory,
   sendTmuxText,
-  type TmuxHistoryDirection,
   type TmuxInterruptKey,
   type TmuxSubmitKey
 } from "./tmux.js";
@@ -65,6 +63,10 @@ const codexAppServerAutostart = process.env.CODEX_APP_SERVER_AUTOSTART === "1";
 const authToken = process.env.AGENT_TMUX_WEB_AUTH_TOKEN ?? process.env.CODEX_WEB_AUTH_TOKEN ?? "";
 const defaultCwd = process.env.CLI_WEB_DEFAULT_CWD ?? process.env.HOME ?? process.cwd();
 const jsonBodyLimit = process.env.AGENT_TMUX_WEB_JSON_LIMIT ?? "25mb";
+const runtimeEnvironment = process.env.AGENT_TMUX_WEB_ENV === "development"
+  ? "development"
+  : "production";
+const developmentMode = runtimeEnvironment === "development";
 
 const app = express();
 const server = http.createServer(app);
@@ -99,7 +101,8 @@ app.use((_req, res, next) => {
     "connect-src 'self' ws: wss:",
     "img-src 'self' data: blob:",
     "style-src 'self' 'unsafe-inline'",
-    "script-src 'self'",
+    `script-src 'self'${developmentMode ? " 'unsafe-inline'" : ""}`,
+    `worker-src 'self'${developmentMode ? " blob:" : ""}`,
     "base-uri 'none'",
     "form-action 'self'",
     "frame-ancestors 'none'",
@@ -247,56 +250,25 @@ app.get("/api/tmux/tools", asyncHandler(async (_req, res) => {
 app.get("/api/tmux/capture", asyncHandler(async (req, res) => {
   const session = requireString(req.query.session, "session");
   const lines = typeof req.query.lines === "string" ? Number(req.query.lines) : TMUX_CAPTURE_HISTORY_LINES;
-  const [preserveExistingClientSize, paneMetadata] = await Promise.all([
-    hasAttachedTmuxClients(session).catch(() => false),
-    inspectTmuxPane(session).catch(() => null)
-  ]);
-  const captureSize = fitTmuxCaptureSizeForPane(
-    buildTmuxCaptureSizeFromClientDimensions(req.query.clientWidth, req.query.clientHeight),
-    paneMetadata
-  );
-  let resized = false;
-  if (req.query.resize !== "false" && !preserveExistingClientSize) {
-    resized = await resizeTmuxWindowIfNeeded(session, captureSize).catch(() => {
-      // Best-effort: capture remains useful even if tmux rejects a resize.
-      return false;
-    });
-  }
-  if (resized) {
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
-  const capture = await captureTmuxPaneView(session, lines);
-  res.json({ session, ...capture } satisfies TmuxCaptureDto);
-}));
-
-app.post("/api/tmux/history", asyncHandler(async (req, res) => {
-  const body = req.body as Record<string, unknown>;
-  const session = requireString(body.session, "session");
-  const direction = requireTmuxHistoryDirection(body.direction);
-  const metadata = await inspectTmuxPane(session);
-  if (!metadata.alternateScreen) {
-    res.status(409).json({ error: "The selected pane uses tmux scrollback, not harness history." });
-    return;
-  }
-
-  const preserveExistingClientSize = await hasAttachedTmuxClients(session).catch(() => false);
-  if (!preserveExistingClientSize) {
+  const outputRevision = stringOrNull(req.query.outputRevision);
+  if (req.query.resize === "true") {
+    const [preserveExistingClientSize, paneMetadata] = await Promise.all([
+      hasAttachedTmuxClients(session).catch(() => false),
+      inspectTmuxPane(session).catch(() => null)
+    ]);
     const captureSize = fitTmuxCaptureSizeForPane(
-      buildTmuxCaptureSizeFromClientDimensions(body.clientWidth, body.clientHeight),
-      metadata
+      buildTmuxCaptureSizeFromClientDimensions(req.query.clientWidth, req.query.clientHeight),
+      paneMetadata
     );
-    const resized = await resizeTmuxWindowIfNeeded(session, captureSize).catch(() => {
-      // The harness can still handle the history key if tmux rejects a resize.
+    const resized = !preserveExistingClientSize && await resizeTmuxWindowIfNeeded(session, captureSize).catch(() => {
+      // Best-effort: capture remains useful even if tmux rejects a resize.
       return false;
     });
     if (resized) {
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
   }
-
-  await scrollTmuxHarnessHistory(session, direction);
-  await new Promise((resolve) => setTimeout(resolve, 50));
-  const capture = await captureTmuxPaneView(session, TMUX_CAPTURE_HISTORY_LINES);
+  const capture = await captureTmuxPaneView(session, lines, outputRevision ?? undefined);
   res.json({ session, ...capture } satisfies TmuxCaptureDto);
 }));
 
@@ -414,7 +386,13 @@ async function listTmuxSessionsWithStatus(excludedBrowserClientId?: string | nul
   const harnessStatuses = await readTmuxHarnessStatuses(sessions);
   const nowMs = Date.now();
   return Promise.all(sessions.map(async (session) => {
-    const { clientCount, panePid: _panePid, currentPath: _currentPath, ...sessionData } = session;
+    const {
+      clientCount,
+      panePid: _panePid,
+      currentPath: _currentPath,
+      paneTitle: _paneTitle,
+      ...sessionData
+    } = session;
     const output = await captureTmuxVisiblePane(session.name).catch(() => "");
     const visibleStatus = classifyTmuxStatus({
       activityAtMs: session.activityAtMs,
@@ -464,14 +442,34 @@ app.post("/api/server-request/:requestId/respond", asyncHandler(async (req, res)
 }));
 
 const clientDist = path.join(process.cwd(), "dist", "client");
-app.use(express.static(clientDist));
-app.use((req, res, next) => {
-  if (req.method !== "GET" || req.path.startsWith("/api/")) {
-    next();
-    return;
-  }
-  res.sendFile(path.join(clientDist, "index.html"));
-});
+if (developmentMode) {
+  const { createServer: createViteServer } = await import("vite");
+  const tailscaleDns = await readTailscale().then((tailscale) => tailscale.dns).catch(() => null);
+  const allowedHosts = [...new Set([
+    bindHost,
+    tailscaleDns,
+    ...(process.env.AGENT_TMUX_WEB_DEV_ALLOWED_HOSTS ?? "").split(",")
+  ].map((host) => host?.trim()).filter((host): host is string => Boolean(host)))];
+  const vite = await createViteServer({
+    appType: "spa",
+    configFile: path.join(process.cwd(), "vite.config.ts"),
+    server: {
+      allowedHosts,
+      hmr: { server },
+      middlewareMode: true
+    }
+  });
+  app.use(vite.middlewares);
+} else {
+  app.use(express.static(clientDist));
+  app.use((req, res, next) => {
+    if (req.method !== "GET" || req.path.startsWith("/api/")) {
+      next();
+      return;
+    }
+    res.sendFile(path.join(clientDist, "index.html"));
+  });
+}
 
 const wss = new WebSocketServer({ noServer: true });
 wss.on("connection", async (socket, req) => {
@@ -593,7 +591,10 @@ server.on("upgrade", (req, socket, head) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
   const target = url.pathname === "/ws" ? wss : url.pathname === "/tmux-ws" ? tmuxWss : null;
   if (!target) {
-    socket.destroy();
+    const viteHmr = developmentMode
+      && url.pathname === "/"
+      && req.headers["sec-websocket-protocol"] === "vite-hmr";
+    if (!viteHmr) socket.destroy();
     return;
   }
 
@@ -635,7 +636,12 @@ function asyncHandler(handler: (req: Request, res: Response, next: NextFunction)
 }
 
 function isPublicAssetRequest(req: Request): boolean {
-  return req.method === "GET" && (req.path.startsWith("/assets/") || req.path === "/favicon.ico");
+  const normalizedPath = req.path.toLowerCase();
+  return req.method === "GET" && (
+    req.path.startsWith("/assets/")
+    || req.path === "/favicon.ico"
+    || (developmentMode && req.path !== "/" && !normalizedPath.startsWith("/api/"))
+  );
 }
 
 function isAuthorizedWebSocket(url: URL): boolean {
@@ -827,6 +833,7 @@ function broadcast(payload: unknown): void {
 async function getStatus(): Promise<AppStatus> {
   const tailscale = await readTailscale().catch(() => ({ ip: null, dns: null }));
   return {
+    environment: runtimeEnvironment,
     bindHost,
     port,
     defaultCwd,
@@ -863,13 +870,6 @@ function requireString(value: unknown, name: string): string {
     throw new Error(`Missing required field: ${name}`);
   }
   return result;
-}
-
-function requireTmuxHistoryDirection(value: unknown): TmuxHistoryDirection {
-  if (value !== "up" && value !== "down") {
-    throw new Error("Missing required field: direction");
-  }
-  return value;
 }
 
 function stringArray(value: unknown): string[] {

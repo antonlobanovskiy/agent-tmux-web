@@ -40,4 +40,16 @@ describe("parseOpenCodeSidebar", () => {
   it("falls back to an OpenCode title for an empty capture", () => {
     expect(parseOpenCodeSidebar("")).toEqual({ title: "OpenCode", sections: [] });
   });
+
+  it("parses compact captures without blank rows between headings", () => {
+    expect(parseOpenCodeSidebar("Session title\nContext\n25,467 tokens\nMCP\n• github Connected\nLSP\nDisabled\nTodo\n[ ] Ship\n~/dev\n• OpenCode 1.18.5")).toEqual({
+      title: "Session title",
+      sections: [
+        { id: "context", title: "Context", lines: ["25,467 tokens"] },
+        { id: "mcp", title: "MCP", lines: ["• github Connected"] },
+        { id: "lsp", title: "LSP", lines: ["Disabled"] },
+        { id: "todo", title: "Todo", lines: ["[ ] Ship"] }
+      ]
+    });
+  });
 });

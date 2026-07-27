@@ -44,7 +44,9 @@ export type TmuxSessionStatusDto = {
 export type TmuxCaptureDto = {
   session: string;
   output: string;
-  historyOwner: "tmux" | "harness";
+  outputAppend?: true;
+  outputRevision?: string;
+  outputUnchanged?: true;
   sidebar?: {
     kind: "opencode";
     output: string;
@@ -93,6 +95,7 @@ export type TmuxWatchEvent = {
 };
 
 export type AppStatus = {
+  environment: "development" | "production";
   bindHost: string;
   port: number;
   defaultCwd: string;

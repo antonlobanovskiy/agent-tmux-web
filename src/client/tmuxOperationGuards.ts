@@ -9,7 +9,6 @@ export type TmuxCaptureSource = "follow" | "manual" | "poll" | "session" | "view
 
 type TmuxCaptureAdmission = {
   activeManualOwner: number | null;
-  historySession: string;
   owner?: number;
   session: string;
   source: TmuxCaptureSource;
@@ -28,16 +27,12 @@ export function isCurrentTmuxCaptureOwner({
 
 export function shouldAdmitTmuxCapture({
   activeManualOwner,
-  historySession,
   owner,
   session,
   source,
   terminalActive
 }: TmuxCaptureAdmission): boolean {
   if (!session || terminalActive) {
-    return false;
-  }
-  if (historySession === session) {
     return false;
   }
   if (source === "manual") {

@@ -67,7 +67,6 @@ describe("tmux operation guards", () => {
   describe("capture admission", () => {
     const ordinaryCapture = {
       activeManualOwner: null,
-      historySession: "",
       session: "agent-a",
       source: "poll" as const,
       terminalActive: false
@@ -83,11 +82,6 @@ describe("tmux operation guards", () => {
 
     it("rejects non-manual capture while a manual owner is active", () => {
       expect(shouldAdmitTmuxCapture({ ...ordinaryCapture, activeManualOwner: 4 })).toBe(false);
-    });
-
-    it("blocks only the session whose harness history request is active", () => {
-      expect(shouldAdmitTmuxCapture({ ...ordinaryCapture, historySession: "agent-a" })).toBe(false);
-      expect(shouldAdmitTmuxCapture({ ...ordinaryCapture, historySession: "agent-b" })).toBe(true);
     });
 
     it("accepts capture from the matching manual owner", () => {

@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  shouldAutoCaptureTmux,
-  TMUX_CAPTURE_POLL_INTERVAL_MS,
-  TMUX_SEND_FOLLOW_DELAYS_MS
-} from "../tmuxFollow.js";
+import { shouldAutoCaptureTmux, TMUX_CAPTURE_POLL_INTERVAL_MS, TMUX_SEND_FOLLOW_DELAYS_MS } from "../tmuxFollow.js";
 
 describe("tmux follow behavior", () => {
   it("polls captured tmux output only when a capture pane is visible", () => {

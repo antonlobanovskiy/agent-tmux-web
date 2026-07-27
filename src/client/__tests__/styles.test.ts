@@ -39,7 +39,7 @@ describe("responsive mobile CSS", () => {
     expect(mobileBlock).toContain("flex: 1 1 auto");
   });
 
-  it("keeps the mobile tmux toolbar stable with a direct view toggle and bell notify button", () => {
+  it("keeps the mobile tmux toolbar stable with a direct TTY/Raw toggle and bell notify button", () => {
     const css = readFileSync(join(process.cwd(), "src/client/styles.css"), "utf8");
     const app = readFileSync(join(process.cwd(), "src/client/App.tsx"), "utf8");
     const mobileBlock = css.slice(css.indexOf("@media (max-width: 760px)"));
@@ -48,10 +48,11 @@ describe("responsive mobile CSS", () => {
     expect(css).toContain(".tmux-view-menu-content");
     expect(css).toContain(".tmux-view-menu-caret");
     expect(css).toContain(".tmux-notify-button");
-    expect(app).toContain("Switch to ${terminalActive ? \"TTY\" : \"Raw\"} view");
     expect(app).toContain('className="tmux-view-toggle"');
+    expect(app).toContain('Switch to ${terminalActive ? "TTY" : "Raw"} view');
     expect(app).not.toContain("tmux-view-picker-content");
     expect(app).toContain('raw: "Raw"');
+    expect(app).toContain('tty: "TTY"');
     expect(app).toContain("hasAndroidConnectionSettings");
     expect(app).toContain("openAndroidConnectionSettings");
     expect(app).toContain(">App</span>");
@@ -112,8 +113,8 @@ describe("responsive mobile CSS", () => {
     expect(app).toContain("shouldApplyTmuxCapture({");
     expect(app).toContain("shouldApplyTmuxPrefetch({");
     expect(app).toContain("shouldApplyTmuxToolLaunch({");
-    expect(app).toContain("historySession: tmuxHarnessHistorySessionRef.current");
-    expect(app).toContain("tmuxHarnessHistorySessionRef.current === selectedTmux");
+    expect(app).not.toContain("tmuxHarnessHistorySessionRef");
+    expect(app).not.toContain("navigateTmuxHarnessHistory");
     expect(app).not.toContain("applyCachedTmuxSidebar");
     expect(app).toContain("Promise<boolean>");
     expect(app).toMatch(/\.then\(\(applied\) => \{\s+if \(applied && isCurrentManualCaptureOwner\(owner\)\) \{\s+setTerminalStatus\(`synced \$\{session\}`\)/);
@@ -127,6 +128,8 @@ describe("responsive mobile CSS", () => {
     expect(app).toContain("applyCachedTmuxCapture(selectedTmux)");
     expect(app).toContain("window.setInterval(refreshCache, TMUX_CAPTURE_POLL_INTERVAL_MS)");
     expect(app.match(/clientWidth: String\(resolveTmuxCaptureClientWidth\(\)\)/g)).toHaveLength(2);
+    expect(app).toContain('resize: "true"');
+    expect(app).toContain('resize: "false"');
     expect(app).toContain('ref={tmuxCaptureWidthRef}');
     expect(app).toContain("tmuxCaptureWidthRef.current?.clientWidth");
     expect(app).toContain("TMUX_CAPTURE_HISTORY_LINES");
@@ -181,6 +184,7 @@ describe("responsive mobile CSS", () => {
     expect(app).toContain("const sessionSelected = Boolean(selectedTmux)");
     expect(app).toContain("showTmuxJumpToLatest");
     expect(app).toContain("{showTmuxJumpToLatest && (");
+    expect(app).toContain('tmux-jump-bottom${tmuxSidebar ? " stream-pane" : ""}');
   });
 
   it("guards queued Raw selection status callbacks after cleanup", () => {
@@ -520,7 +524,7 @@ describe("current user guidance", () => {
     expect(marketingCapture).not.toMatch(/--visibility["']\s*,\s*["']1["']/);
   });
 
-  it("documents TTY as a view without exposing OpenCode's removed mini UI mode", () => {
+  it("documents TTY without exposing OpenCode's removed mini UI mode", () => {
     const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
     const marketing = readFileSync(join(process.cwd(), "docs/marketing.md"), "utf8");
     const aiSetup = readFileSync(join(process.cwd(), "AI_SETUP.md"), "utf8");

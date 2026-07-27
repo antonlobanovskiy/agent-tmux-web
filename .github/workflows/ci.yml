@@ -21,6 +21,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      - run: sudo apt-get update && sudo apt-get install -y sqlite3
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: pnpm typecheck

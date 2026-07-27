@@ -1,16 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  normalizeTmuxViewMode,
-  parseTmuxSessionViewModes,
-  resolveTmuxViewMode
-} from "../tmuxViewPreferences.js";
+import { normalizeTmuxViewMode, parseTmuxSessionViewModes, resolveTmuxViewMode } from "../tmuxViewPreferences.js";
 
 describe("tmux view preferences", () => {
   it("parses saved session views and migrates removed modes to TTY", () => {
-    expect(parseTmuxSessionViewModes(JSON.stringify({ admin: "tty", app: "raw", oldGui: "gui", oldFocus: "focus", bad: "other", "": "gui" })))
-      .toEqual({ admin: "tty", app: "raw", oldGui: "tty", oldFocus: "tty" });
+    expect(parseTmuxSessionViewModes(JSON.stringify({ admin: "tty", app: "raw", text: "text", oldGui: "gui", oldFocus: "focus", bad: "other", "": "gui" })))
+      .toEqual({ admin: "tty", app: "raw", text: "tty", oldGui: "tty", oldFocus: "tty" });
     expect(parseTmuxSessionViewModes("invalid")).toEqual({});
+    expect(normalizeTmuxViewMode("text")).toBe("tty");
     expect(normalizeTmuxViewMode("gui")).toBe("tty");
     expect(normalizeTmuxViewMode("focus")).toBe("tty");
   });

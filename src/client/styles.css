@@ -219,6 +219,27 @@ button:disabled {
   font-weight: 800;
 }
 
+.environment-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 17px;
+  padding: 0 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.environment-badge.development {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-strong));
+  background: var(--accent-muted);
+  color: var(--accent-soft-text);
+}
+
 .tmux-title img {
   width: 18px;
   height: 18px;
@@ -1269,20 +1290,9 @@ textarea:focus {
   color: inherit;
   font: inherit;
   line-height: inherit;
-  white-space: pre;
+  white-space: pre-wrap;
   word-break: normal;
-  overflow-wrap: normal;
-}
-
-.tmux-output.harness-history,
-.tmux-opencode-terminal.harness-history {
-  white-space: pre;
-  word-break: normal;
-  overflow-wrap: normal;
-  overflow-x: auto;
-  overflow-y: hidden;
-  overscroll-behavior: contain;
-  touch-action: pan-x;
+  overflow-wrap: anywhere;
 }
 
 .tmux-opencode-sidebar {
@@ -1296,6 +1306,9 @@ textarea:focus {
 }
 
 .tmux-opencode-sidebar-header {
+  position: sticky;
+  z-index: 1;
+  top: 0;
   padding: 14px 14px 12px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-card);
@@ -1479,6 +1492,10 @@ textarea:focus {
 }
 
 @media (min-width: 761px) {
+  .tmux-jump-bottom.stream-pane {
+    right: 348px;
+  }
+
   .tmux-compact-bar {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1762,8 +1779,8 @@ textarea:focus {
   }
 
   .tmux-opencode-sidebar {
-    min-height: 0;
     max-height: none;
+    min-height: 0;
     border-left: 0;
   }
 
