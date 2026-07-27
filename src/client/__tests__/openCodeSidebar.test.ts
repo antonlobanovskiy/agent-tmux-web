@@ -52,4 +52,24 @@ describe("parseOpenCodeSidebar", () => {
       ]
     });
   });
+
+  it("removes compact TUI border remnants before parsing sections", () => {
+    expect(parseOpenCodeSidebar([
+      "Image attachment review              █",
+      "                                       █",
+      "Context                              █",
+      "252,472 tokens                       ▀",
+      "50% used",
+      "$0.00 spent",
+      "",
+      "▼ MCP",
+      "• github Connected"
+    ].join("\n"))).toEqual({
+      title: "Image attachment review",
+      sections: [
+        { id: "context", title: "Context", lines: ["252,472 tokens", "50% used", "$0.00 spent"] },
+        { id: "mcp", title: "MCP", lines: ["• github Connected"] }
+      ]
+    });
+  });
 });

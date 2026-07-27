@@ -14,7 +14,7 @@ const SECTION_TITLES = new Set(["Context", "MCP", "LSP", "Todo"]);
 export function parseOpenCodeSidebar(output: string): OpenCodeSidebarDetails {
   const groups = output
     .split(/\n\s*\n/u)
-    .map((group) => group.split(/\r?\n/u).map((line) => line.trim()).filter(Boolean))
+    .map((group) => group.split(/\r?\n/u).map(cleanSidebarLine).filter(Boolean))
     .filter((group) => group.length > 0);
   const sections: OpenCodeSidebarSection[] = [];
   const titleLines: string[] = [];
@@ -46,6 +46,10 @@ export function parseOpenCodeSidebar(output: string): OpenCodeSidebarDetails {
     title: titleLines.join(" ") || "OpenCode",
     sections
   };
+}
+
+function cleanSidebarLine(line: string): string {
+  return line.trim().replace(/\s*[█▀▄▌▐│┃┆┇┊┋]+\s*$/u, "").trim();
 }
 
 function normalizeSidebarHeading(line: string): string {
