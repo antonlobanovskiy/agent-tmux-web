@@ -306,7 +306,8 @@ function parseFormattedTmuxSession(line: string): TmuxSession | null {
   if (parts.length < 6) {
     return null;
   }
-  const [name, windows, created, attached, activity, currentCommand, panePidValue, currentPath, paneTitle] = parts;
+  const [name, windows, created, attached, activity, currentCommand, panePidValue, currentPath, ...paneTitleParts] = parts;
+  const paneTitle = paneTitleParts.join("\t");
   const windowCount = Number(windows);
   const clientCount = Number(attached);
   const panePid = Number(panePidValue);
@@ -574,8 +575,13 @@ export async function readTmuxHarnessStatuses(sessions: TmuxSession[]): Promise<
 }
 
 async function identifyOpenCodeSessions(sessions: TmuxSession[]): Promise<Map<string, string>> {
-  const openCodeSessions = sessions.filter((session) => session.currentCommand === "opencode" && session.panePid);
   const now = Date.now();
+  for (const [name, cached] of openCodePaneSessionCache) {
+    if (cached.expiresAt <= now) {
+      openCodePaneSessionCache.delete(name);
+    }
+  }
+  const openCodeSessions = sessions.filter((session) => isOpenCodeCommand(session.currentCommand) && session.panePid);
   const identified = new Map<string, string>();
   const uncached = openCodeSessions.filter((session) => {
     const cached = openCodePaneSessionCache.get(session.name);
@@ -630,7 +636,7 @@ function cacheOpenCodePaneSession(session: TmuxSession, sessionId: string, now: 
 }
 
 async function readExplicitOpenCodeSessionIdForPane(session: Pick<TmuxSession, "currentCommand" | "panePid">): Promise<string | null> {
-  if (session.currentCommand !== "opencode" || !session.panePid) {
+  if (!isOpenCodeCommand(session.currentCommand) || !session.panePid) {
     return null;
   }
   const childrenPath = `/proc/${session.panePid}/task/${session.panePid}/children`;
@@ -890,7 +896,11 @@ export function isOpenCodeFullTuiPane(metadata: TmuxPaneMetadata): boolean {
 }
 
 export function isOpenCodeTuiPane(metadata: TmuxPaneMetadata): boolean {
-  return metadata.alternateScreen && /(?:^|[/\\])opencode(?:\.exe)?$/i.test(metadata.currentCommand);
+  return metadata.alternateScreen && isOpenCodeCommand(metadata.currentCommand);
+}
+
+function isOpenCodeCommand(currentCommand: string | undefined): boolean {
+  return Boolean(currentCommand && /(?:^|[/\\])opencode(?:\.exe)?$/i.test(currentCommand));
 }
 
 export function fitTmuxCaptureSizeForPane(size: TerminalSize, metadata: TmuxPaneMetadata | null): TerminalSize {

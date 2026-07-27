@@ -78,7 +78,7 @@ describe("parseTmuxSessions", () => {
 
   it("parses formatted session rows with activity metadata", () => {
     const output = [
-      "agent-tmux-web\t1\t1779925303\t0\t1779925303\topencode\t1517\t/home/dev/codex-web",
+      "agent-tmux-web\t1\t1779925303\t0\t1779925303\topencode\t1517\t/home/dev/codex-web\tOC | Task\twith tab",
       "radchenko-business\t2\t1780351746\t2\t1782255086\tzsh\t2001\t/home/dev"
     ].join("\n");
 
@@ -93,7 +93,8 @@ describe("parseTmuxSessions", () => {
         panePid: 1517,
         currentPath: "/home/dev/codex-web",
         activityAtMs: 1779925303000,
-        currentCommand: "opencode"
+        currentCommand: "opencode",
+        paneTitle: "OC | Task\twith tab"
       },
       {
         name: "radchenko-business",
@@ -514,6 +515,7 @@ describe("tmux command builders", () => {
       alternateScreen: true
     });
     expect(isOpenCodeFullTuiPane({ currentCommand: "opencode", width: 172, height: 48, alternateScreen: true })).toBe(true);
+    expect(isOpenCodeFullTuiPane({ currentCommand: "/usr/local/bin/opencode.exe", width: 172, height: 48, alternateScreen: true })).toBe(true);
     expect(isOpenCodeFullTuiPane({ currentCommand: "opencode", width: 120, height: 48, alternateScreen: true })).toBe(false);
     expect(isOpenCodeFullTuiPane({ currentCommand: "zsh", width: 172, height: 48, alternateScreen: true })).toBe(false);
     expect(() => parseTmuxPaneMetadata("opencode\twide\t48\t1")).toThrow("Invalid tmux pane metadata");

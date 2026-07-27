@@ -777,7 +777,7 @@ export function App() {
     const interval = window.setInterval(() => {
       if (shouldAutoCaptureTmux({
         selectedTmux,
-        terminalActive: false,
+        terminalActive: terminalActiveRef.current,
         documentHidden: document.hidden
       })) {
         captureTmux(selectedTmux, { source: "poll" }).catch(reportError(setError));
