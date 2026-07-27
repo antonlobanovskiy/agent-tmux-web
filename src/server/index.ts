@@ -638,8 +638,11 @@ function asyncHandler(handler: (req: Request, res: Response, next: NextFunction)
 function isPublicAssetRequest(req: Request): boolean {
   const normalizedPath = req.path.toLowerCase();
   return req.method === "GET" && (
-    req.path.startsWith("/assets/")
-    || req.path === "/favicon.ico"
+    normalizedPath.startsWith("/assets/")
+    || normalizedPath === "/agent-tmux-logo.png"
+    || normalizedPath === "/apple-touch-icon.png"
+    || normalizedPath === "/favicon.ico"
+    || normalizedPath === "/favicon.png"
     || (developmentMode && req.path !== "/" && !normalizedPath.startsWith("/api/"))
   );
 }
